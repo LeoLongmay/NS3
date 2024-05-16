@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.lines import Line2D
 
-NS3="/home/vamsi/lakewood/src/phd/ns3-datacenter/simulator/ns-3.35/"
-plots_dir="/home/vamsi/Powertcp-NSDI/"
-
+NS3="~/ns3-datacenter/simulator/ns-3.39/"
+plots_dir="./plot_fairness/"
+os.makedirs(plots_dir,exist_ok=True)
 # plots_dir="/home/vamsi/Powertcp-NSDI/"
 plt.rcParams.update({'font.size': 18})
 
@@ -80,8 +80,8 @@ for alg in algs:
     ax.plot(df4["time"],df4["th"]/1e9,c=colorsFair[3])
     
     fig.tight_layout()    
-    fig.savefig(plots_dir+'fairness/'+alg+'.pdf')
-    fig.savefig(plots_dir+'fairness/'+alg+'.png')
+    fig.savefig(plots_dir+alg+'.pdf')
+    fig.savefig(plots_dir+alg+'.png')
 
 figlegend.tight_layout()
 figlegend.legend(handles=lenged_elements,loc=9,ncol=5, framealpha=0,fontsize=48)

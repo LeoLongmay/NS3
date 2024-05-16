@@ -65,7 +65,7 @@ for load in ${LOADS[@]};do
 
 		sleep 5
 		# Check how many cores are being used.
-		while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 38 ]];do
+		while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 80 ]];do
 			echo "Waiting for cpu cores.... $N-th experiment "
 			sleep 60
 		done
@@ -118,7 +118,7 @@ for req in ${REQ_RATE[@]};do
 
 		sleep 5
 		# Check how many cores are being used.
-		while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 38 ]];do
+		while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 80 ]];do
 			echo "Waiting for cpu cores.... $N-th experiment "
 			sleep 60
 		done
@@ -170,7 +170,7 @@ for query in ${REQ_SIZE[@]};do
 
 		sleep 5
 		# Check how many cores are being used.
-		while [[ $(ps aux|grep "evaluation-workload-optimized"|wc -l) -gt 38 ]];do
+		while [[ $(ps aux|grep "evaluation-workload-optimized"|wc -l) -gt 80 ]];do
 			echo "Waiting for cpu cores.... $N-th experiment "
 			sleep 60
 		done
@@ -191,7 +191,7 @@ echo "#      FINISHED BURST-4 EXPERIMENTS      #"
 echo "##########################################"
 
 
-while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 38 ]];do
+while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 80 ]];do
 	echo "Waiting for cpu cores.... $N-th experiment "
 	sleep 60
 done

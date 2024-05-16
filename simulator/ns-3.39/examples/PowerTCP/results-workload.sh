@@ -1,4 +1,4 @@
-NS3=/home/vamsi/src/phd/ns3-datacenter/simulator/ns-3.35/
+NS3=~/ns3-datacenter/simulator/ns-3.39/
 RES_DUMP=$NS3/examples/PowerTCP/dump_workload
 RES_RESULTS=$NS3/examples/PowerTCP/results_workload
 
