@@ -1,0 +1,51 @@
+# 构建产物
+build/
+.build/
+__pycache__/
+*.o
+*.d
+*.lo
+*.la
+*.su
+*.pyc
+*.swp
+*.swo
+*.nse
+*.idb
+*.pdb
+*.obj
+*.ilk
+*.user
+
+# Waf相关
+.waf-*
+.waf3-*
+.lock-waf*
+
+# 日志与临时文件
+*.tr
+*.log
+*.dat
+*.pcap
+*.DS_Store
+*.Identifier
+
+# IDE配置
+.idea/
+.vscode/
+
+# 文档生成产物
+doc/._*
+doc/html/
+doc/latex/
+
+# 测试输出
+tmp/
+testpy-output/
+
+# 第三方模块构建产物
+contrib/**/build
+
+# 示例生成文件
+examples/**/*.pcap
+examples/**/*.tr

@@ -1,0 +1,73 @@
+## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
+
+def build(bld):
+    module = bld.create_ns3_module('point-to-point', ['internet','network', 'mpi'])
+    module.source = [
+        'model/point-to-point-net-device.cc',
+        'model/point-to-point-channel.cc',
+        'model/point-to-point-remote-channel.cc',
+        'model/ppp-header.cc',
+        'helper/point-to-point-helper.cc',
+        # add new files
+        'model/rdma-driver.cc',  
+        'model/switch-node.cc',
+        'model/conga-routing.cc',
+        'model/conweave-routing.cc',
+        'model/conweave-voq.cc',
+        'model/qbb-net-device.cc',
+        'model/qbb-remote-channel.cc',
+        'model/settings.cc',
+        'model/qbb-header.cc',
+        'model/qbb-channel.cc',
+        'model/rdma-queue-pair.cc',
+        'helper/selective-packet-queue.cc',
+        'helper/qbb-helper.cc',
+        'model/rdma-hw.cc',
+        'model/cn-header.cc',
+        'model/switch-mmu.cc',
+        'model/flow-stat-tag.cc',
+        'model/pause-header.cc',
+        'model/letflow-routing.cc',
+        ]
+
+    module_test = bld.create_ns3_module_test_library('point-to-point')
+    module_test.source = [
+        'test/point-to-point-test.cc',
+        ]
+
+    headers = bld(features='ns3header')
+    headers.module = 'point-to-point'
+    headers.source = [
+        'model/point-to-point-net-device.h',
+        'model/point-to-point-channel.h',
+        'model/point-to-point-remote-channel.h',
+        'model/ppp-header.h',
+        'helper/point-to-point-helper.h',
+        # add new files
+        'model/rdma-driver.h',  
+        'helper/sim-setting.h', 
+        'model/switch-node.h', 
+        'model/conga-routing.h', 
+        'model/conweave-routing.h',
+        'model/conweave-voq.h',
+        'model/qbb-net-device.h',
+        'model/qbb-remote-channel.h',
+        'model/settings.h',
+        'model/qbb-header.h',
+        'model/qbb-channel.h',
+        'model/rdma-queue-pair.h',
+        'helper/selective-packet-queue.h',
+        'helper/qbb-helper.h',
+        'model/rdma-hw.h',
+        'model/cn-header.h',
+        'model/switch-mmu.h',
+        'model/flow-stat-tag.h',
+        'model/pause-header.h',
+        'model/letflow-routing.h',
+        'model/trace-format.h',
+        ]
+
+    if (bld.env['ENABLE_EXAMPLES']):
+        bld.recurse('examples')
+
+    bld.ns3_python_bindings()
