@@ -18,6 +18,7 @@ cc_modes = {
     3: "hp",
     7: "timely",
     8: "dctcp",
+    9: "lpcc"
 }
 lb_modes = {
     0: "fecmp",
@@ -29,6 +30,7 @@ lb_modes = {
 topo2bdp = {
     "leaf_spine_128_100G_OS2": 104000,  # 2-tier
     "fat_k4_100G_OS2": 153000, # 3-tier -> core 400G
+    "test_topoOS2": 50001000
 }
 
 C = [
@@ -158,11 +160,10 @@ def main():
                     netload = parsed_line[16]
                     key = (topo, netload, flow_control)
                     if key not in map_key_to_id:
-                        map_key_to_id[key] = [[config_id, lb_mode]]
+                        map_key_to_id[key] = [[config_id, lb_mode, cc_mode]]
                     else:
-                        map_key_to_id[key].append([config_id, lb_mode])
+                        map_key_to_id[key].append([config_id, lb_mode, cc_mode])
 
-    
     for k, v in map_key_to_id.items():
         ################## Queue Storage ##################
         fig = plt.figure(figsize=(4, 4))
@@ -173,6 +174,7 @@ def main():
         for vv in v:
             config_id = vv[0]
             lb_mode = vv[1]
+            cc_mode = vv[2]
             filename_voq_volume = output_dir + "/{id}/{id}_out_voq_cdf.txt".format(id=config_id)
             data_voq_volume = {"x": [], "y": []}
             with open(filename_voq_volume, "r") as f:
@@ -185,7 +187,7 @@ def main():
                     data_voq_volume["y"],
                     markersize=0,
                     linewidth=3.0,
-                    label="{}".format(lb_mode))
+                    label="{}".format(cc_mode))
             
         ax.legend(bbox_to_anchor=(0.0, 1.2), loc="upper left", borderaxespad=0,
             frameon=False, fontsize=12, facecolor='white', ncol=2,

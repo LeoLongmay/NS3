@@ -19,6 +19,7 @@ cc_modes = {
     3: "hp",
     7: "timely",
     8: "dctcp",
+    9: "lpcc"
 }
 lb_modes = {
     0: "fecmp",
@@ -30,6 +31,7 @@ lb_modes = {
 topo2bdp = {
     "leaf_spine_128_100G_OS2": 104000,  # 2-tier
     "fat_k4_100G_OS2": 153000, # 3-tier -> core 400G
+    "test_topoOS2": 50001000
 }
 
 C = [
@@ -186,9 +188,9 @@ def main():
                     netload = parsed_line[16]
                     key = (topo, netload, flow_control)
                     if key not in map_key_to_id:
-                        map_key_to_id[key] = [[config_id, lb_mode]]
+                        map_key_to_id[key] = [[config_id, lb_mode, cc_mode]]
                     else:
-                        map_key_to_id[key].append([config_id, lb_mode])
+                        map_key_to_id[key].append([config_id, lb_mode, cc_mode])
 
     for k, v in map_key_to_id.items():
         ################## Uplink CDF plotting ##################
@@ -203,13 +205,15 @@ def main():
         ax.yaxis.set_ticks_position('left')
         ax.xaxis.set_ticks_position('bottom')
         
-        lbmode_order = ["fecmp", "conga", "letflow", "conweave"]
-        for tgt_lbmode in lbmode_order:
+
+        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'lpcc']
+        for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]
                 lb_mode = vv[1]
+                cc_mode = vv[2]
 
-                if lb_mode == tgt_lbmode:
+                if cc_mode == tgt_ccmode:
                     # plotting
                     filename_uplink = output_dir + "/{id}/{id}_out_uplink.txt".format(id=config_id)
                     port_list = set()
@@ -276,7 +280,7 @@ def main():
                                 [x[3] for x in cdf_ts_data_arr],
                                 markersize=0,
                                 linewidth=3.0,
-                                label="{}".format(lb_mode))
+                                label="{}".format(cc_mode))
         
         ax.legend(frameon=False, fontsize=12, facecolor='white')
         

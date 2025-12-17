@@ -23,5 +23,6 @@ using namespace ns3;
 int 
 main (int argc, char *argv[])
 {
-  NS_LOG_UNCOND ("Scratch Simulator");
+  std::cout << "wxb" << std::endl;
+  NS_LOG_UNCOND ("Scratch Simulator!!!");
 }

@@ -99,6 +99,7 @@ cc_modes = {
     "hpcc": 3,
     "timely": 7,
     "dctcp": 8,
+    "lpcc": 9,
 }
 
 lb_modes = {
@@ -112,6 +113,7 @@ lb_modes = {
 topo2bdp = {
     "leaf_spine_128_100G_OS2": 104000,  # 2-tier -> all 100Gbps
     "fat_k8_100G_OS2": 156000,  # 3-tier -> all 100Gbps
+    "test_topoOS2": 104000,
 }
 
 FLOWGEN_DEFAULT_TIME = 2.0  # see /traffic_gen/traffic_gen.py::base_t
@@ -126,7 +128,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='run simulation')
     parser.add_argument('--cc', dest='cc', action='store',
-                        default='dcqcn', help="hpcc/dcqcn/timely/dctcp (default: dcqcn)")
+                        default='dcqcn', help="hpcc/dcqcn/timely/dctcp/lpcc (default: dcqcn)")
     parser.add_argument('--lb', dest='lb', action='store',
                         default='fecmp', help="fecmp/pecmp/drill/conga (default: fecmp)")
     parser.add_argument('--pfc', dest='pfc', action='store',
@@ -349,7 +351,7 @@ def main():
     qlen_mon_start = flowgen_start_time
     qlen_mon_end = flowgen_stop_time
 
-    if (cc_mode == 1):  # DCQCN
+    if (cc_mode == 9 or cc_mode == 1):  # LPCC or dcqcn
         ai = 10 * bw / 25
         hai = 25 * bw / 25
         dctcp_ai = 1000
@@ -370,6 +372,36 @@ def main():
                                         has_win=has_win, var_win=var_win,
                                         fast_react=fast_react, mi=mi, int_multi=int_multi, ewma_gain=ewma_gain,
                                         kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
+    elif (cc_mode == 3): # Hpcc
+		# ai = 10 * bw / 25;
+		# if args.hpai > 0:
+		# 	ai = args.hpai
+		# hai = ai # useless
+		# int_multi = bw / 25;
+		# cc = "%s%d"%(args.cc, args.utgt)
+		# if (mi > 0):
+		# 	cc += "mi%d"%mi
+		# if args.hpai > 0:
+		# 	cc += "ai%d"%ai
+		# config_name = "mix/config_%s_%s_%s%s.txt"%(topo, trace, cc, failure)
+		# config = config_template.format(bw=bw, trace=trace, topo=topo, cc=cc, mode=3, t_alpha=1, t_dec=4, t_inc=300, g=0.00390625, ai=ai, hai=hai, dctcp_ai=1000, has_win=1, vwin=1, us=1, u_tgt=u_tgt, mi=mi, int_multi=int_multi, pint_log_base=pint_log_base, pint_prob=pint_prob, ack_prio=0, link_down=args.down, failure=failure, kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map, buffer_size=bfsz, enable_tr=enable_tr)
+
+
+        ai = 10 * bw / 25
+        hai = 50
+        int_multi = bw / 25
+        config = config_template.format(id=config_ID, topo=topo, flow=flow,
+                                        qlen_mon_start=qlen_mon_start, qlen_mon_end=qlen_mon_end, flowgen_start_time=flowgen_start_time,
+                                        flowgen_stop_time=flowgen_stop_time, sw_monitoring_interval=sw_monitoring_interval,
+                                        load=netload, buffer_size=buffer, lb_mode=lb_mode, cwh_tx_expiry_time=cwh_tx_expiry_time,
+                                        cwh_extra_reply_deadline=cwh_extra_reply_deadline, cwh_default_voq_waiting_time=cwh_default_voq_waiting_time,
+                                        cwh_path_pause_time=cwh_path_pause_time, cwh_extra_voq_flush_time=cwh_extra_voq_flush_time,
+                                        enabled_pfc=enabled_pfc, enabled_irn=enabled_irn,
+                                        cc_mode=cc_mode,
+                                        ai=ai, hai=hai, dctcp_ai=1000,
+                                        has_win=has_win, var_win=var_win,
+                                        fast_react=True, mi=0, int_multi=int_multi, ewma_gain=0.00390625,
+                                        kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
     else:
         print("unknown cc:{}".format(args.cc))
 
@@ -379,18 +411,18 @@ def main():
     # run program
     print("Running simulation...")
     output_log = config_name.replace(".txt", ".log")
-    run_command = "./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
+    run_command = "./waf --run 'scratch/LPCC {config_name}' > {output_log} 2>&1".format(
         config_name=config_name, output_log=output_log)
     with open("./mix/.history", "a") as history:
         history.write(run_command + "\n")
         history.write(
-            "./waf --run 'scratch/network-load-balance' --command-template='gdb --args %s {config_name}'\n".format(
+            "./waf --run 'scratch/LPCC' --command-template='gdb --args %s {config_name}'\n".format(
                 config_name=config_name)
         )
         history.write("\n")
 
     print(run_command)
-    os.system("python2.7 ./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
+    os.system("python2.7 ./waf --run 'scratch/LPCC {config_name}' > {output_log} 2>&1".format(
         config_name=config_name, output_log=output_log))
 
     ####################################################

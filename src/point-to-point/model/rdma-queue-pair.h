@@ -29,6 +29,7 @@ enum CcMode {
     CC_MODE_HPCC = 3,
     CC_MODE_TIMELY = 7,
     CC_MODE_DCTCP = 8,
+    CC_MODE_LPCC = 9,
     CC_MODE_UNDEFINED = 0,
 };
 
@@ -114,6 +115,15 @@ class RdmaQueuePair : public Object {
         uint32_t m_ecnCnt;
         uint32_t m_batchSizeOfAlpha;
     } dctcp;
+    struct {
+        DataRate m_targetRate;  //< Target rate
+        DataRate m_curRate;
+        EventId m_rpTimer;
+        bool m_decrease_cnp_arrived; // indicate if CNP arrived in the last slot
+        bool m_first_cnp;          // indicate if the current CNP is the first CNP
+        EventId m_eventDecreaseRate;
+        uint32_t m_rpTimeStage;
+    } lpcc;
 
     struct {
         bool m_enabled;

@@ -41,11 +41,13 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     m_var_win = false;
     m_rate = 0;
     m_nextAvail = Time(0);
+
     mlx.m_alpha = 1;
     mlx.m_alpha_cnp_arrived = false;
     mlx.m_first_cnp = true;
     mlx.m_decrease_cnp_arrived = false;
     mlx.m_rpTimeStage = 0;
+
     hp.m_lastUpdateSeq = 0;
     for (uint32_t i = 0; i < sizeof(hp.keep) / sizeof(hp.keep[0]); i++) hp.keep[i] = 0;
     hp.m_incStage = 0;
@@ -67,6 +69,10 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     dctcp.m_alpha = 1;
     dctcp.m_ecnCnt = 0;
     dctcp.m_batchSizeOfAlpha = 0;
+
+    lpcc.m_first_cnp = true;
+    lpcc.m_rpTimeStage = 0;
+    lpcc.m_decrease_cnp_arrived = false;
 
     irn.m_enabled = false;
     irn.m_highest_ack = 0;

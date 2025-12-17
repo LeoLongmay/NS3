@@ -180,27 +180,6 @@ class RdmaHw : public Object {
     void HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 
     /**********************
-    * LPCC
-    *********************/
-
-    uint16_t m_epsilon; // buffer queue length threshold
-    uint64_t m_theta; // fcnp aggregate time window
-    uint32_t m_tau; // RTT detection time window
-
-    uint64_t m_wr; // min rate adjustment fraction
-    double m_kr; // min rate regulation faction
-    bool m_EcnClampTgtRateLpcc;
-
-    void UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch);
-    void fcnp_received_lpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
-    void HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
-    void ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta);
-    void CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
-    void RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q);
-    void RateIncEventLpcc(Ptr<RdmaQueuePair> q);
-    
-
-    /**********************
      * IRN
      *********************/
     bool m_irn;
