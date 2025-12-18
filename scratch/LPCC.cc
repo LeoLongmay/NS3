@@ -742,7 +742,7 @@ int main(int argc, char *argv[]) {
 
     // if (true) {
     //     std::ifstream conf;
-    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/703348171/config.txt", ios::in);
+    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/350616023/config.txt", ios::in);
         while (!conf.eof()) {
             std::string key;
             conf >> key;
@@ -1394,7 +1394,7 @@ int main(int argc, char *argv[]) {
 
     // rdmaHw config
     for (uint32_t i = 0; i < node_num; i++) {
-        if (n.Get(i)->GetNodeType() == 0 || cc_mode == 9) {  // if cc is LPCC, then all nodes need config rdmaHw
+        if (n.Get(i)->GetNodeType() == 0) {  // is server
             // create RdmaHw
             Ptr<RdmaHw> rdmaHw = CreateObject<RdmaHw>();
             rdmaHw->SetAttribute("ClampTargetRate", BooleanValue(clamp_target_rate));

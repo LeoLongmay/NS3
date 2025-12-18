@@ -15,7 +15,7 @@ from cycler import cycler
 # LB/CC mode matching
 cc_modes = {
     1: "dcqcn",
-    3: "hp",
+    3: "hpcc",
     7: "timely",
     8: "dctcp",
     9: "lpcc"

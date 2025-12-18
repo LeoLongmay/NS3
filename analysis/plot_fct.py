@@ -15,7 +15,7 @@ from cycler import cycler
 # LB/CC mode matching
 cc_modes = {
     1: "dcqcn",
-    3: "hp",
+    3: "hpcc",
     7: "timely",
     8: "dctcp",
     9: "lpcc",
@@ -205,6 +205,7 @@ def main():
                         map_key_to_id[key] = [[config_id, lb_mode, cc_mode]]
                     else:
                         map_key_to_id[key].append([config_id, lb_mode, cc_mode])
+    print (map_key_to_id)
 
     for k, v in map_key_to_id.items():
 

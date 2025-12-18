@@ -602,6 +602,8 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
         return ReceiveAck(p, ch);
     } else if (ch.l3Prot == 0xFC) {  // ACK
         return ReceiveAck(p, ch);
+    } else if (ch.l3Prot == 0xF9) {  // FCNP
+        return ReceiveCnp(p, ch);
     }
     return 0;
 }

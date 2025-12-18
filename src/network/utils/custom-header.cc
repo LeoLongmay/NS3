@@ -100,6 +100,10 @@ uint32_t CustomHeader::GetSerializedSize (void) const{
 			len += 8;
 		else if (l3Prot == 0xFE)
 			len += 9;
+		else if (l3Prot == 0xF9) // FCNP
+			len += sizeof(fcnp.fid) + sizeof(fcnp.qIndex) + sizeof(fcnp.qfb) + 
+                   sizeof(fcnp.ecnBits) + sizeof(fcnp.total) + sizeof(fcnp.timestamp) + 
+                   sizeof(fcnp.m_flowCount);
 	}
 	return len;
 }
@@ -168,6 +172,14 @@ void CustomHeader::Serialize (Buffer::Iterator start) const{
 		  i.WriteU8(cnp.ecnBits);
 		  i.WriteU16(cnp.qfb);
 		  i.WriteU16(cnp.total);
+	  }else if (l3Prot == 0xF9){ // FCNP
+		  i.WriteU16(fcnp.fid);
+		  i.WriteU8(fcnp.qIndex);
+		  i.WriteU8(fcnp.qfb);
+		  i.WriteU8(fcnp.ecnBits);
+		  i.WriteU16(fcnp.total);
+		  i.WriteU64(fcnp.timestamp);
+		  i.WriteU16(fcnp.m_flowCount);
 	  }else if (l3Prot == 0xFC || l3Prot == 0xFD){ // ACK or NACK
 		  i.WriteU16(ack.sport);
 		  i.WriteU16(ack.dport);
@@ -322,6 +334,17 @@ CustomHeader::Deserialize (Buffer::Iterator start)
 		  pfc.qlen = i.ReadU32 ();
 		  pfc.qIndex = i.ReadU8 ();
 		  l4Size = 9;
+	  } else if (l3Prot == 0xF9){ // FCNP
+		  fcnp.fid = i.ReadU16();
+		  fcnp.qIndex = i.ReadU8();
+		  fcnp.qfb = i.ReadU8();
+		  fcnp.ecnBits = i.ReadU8();
+		  fcnp.total = i.ReadU16();
+		  fcnp.timestamp = i.ReadNtohU64();
+		  fcnp.m_flowCount = i.ReadU16();
+		  l4Size = sizeof(fcnp.fid) + sizeof(fcnp.qIndex) + sizeof(fcnp.qfb) + 
+                     sizeof(fcnp.ecnBits) + sizeof(fcnp.total) + sizeof(fcnp.timestamp) + 
+                     sizeof(fcnp.m_flowCount);
 	  }
   }
 

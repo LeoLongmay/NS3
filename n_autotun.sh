@@ -25,9 +25,13 @@ cecho "YELLOW" "----------------------------------\n"
 
 # Lossless RDMA
 cecho "GREEN" "Run Lossless RDMA experiments..."
-python3 run_LPCC.py --lb fecmp --cc lpcc --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null & 
+python3 run_LPCC.py --lb fecmp --cc hpcc --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null & 
 sleep 5
 python3 run.py --lb fecmp --cc dcqcn --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
+sleep 0.1
+python3 run.py --lb fecmp --cc timely --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
+sleep 0.1
+python3 run.py --lb fecmp --cc dctcp --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
 
 # python3 run.py --lb letflow --pfc 1 --irn 0 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
 # sleep 0.1
@@ -38,9 +42,13 @@ python3 run.py --lb fecmp --cc dcqcn --pfc 1 --irn 0 --simul_time ${RUNTIME} --n
 
 # IRN RDMA
 cecho "GREEN" "Run IRN RDMA experiments..."
-python3 run_LPCC.py --lb fecmp --cc lpcc --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
+python3 run_LPCC.py --lb fecmp --cc hpcc --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
 sleep 5
 python3 run.py --lb fecmp --cc dcqcn --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
+sleep 0.1
+python3 run.py --lb fecmp --cc timely --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
+sleep 0.1
+python3 run.py --lb fecmp --cc dctcp --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
 # sleep 0.1
 # python3 run.py --lb conga --pfc 0 --irn 1 --simul_time ${RUNTIME} --netload ${NETLOAD} --topo ${TOPOLOGY} 2>&1 > /dev/null &
 # sleep 0.1

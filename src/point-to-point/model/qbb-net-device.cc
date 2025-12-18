@@ -30,6 +30,7 @@
 #include "ns3/assert.h"
 #include "ns3/boolean.h"
 #include "ns3/cn-header.h"
+#include "ns3/fcn-header.h"
 #include "ns3/custom-header.h"
 #include "ns3/data-rate.h"
 #include "ns3/double.h"

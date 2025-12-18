@@ -373,20 +373,6 @@ def main():
                                         fast_react=fast_react, mi=mi, int_multi=int_multi, ewma_gain=ewma_gain,
                                         kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
     elif (cc_mode == 3): # Hpcc
-		# ai = 10 * bw / 25;
-		# if args.hpai > 0:
-		# 	ai = args.hpai
-		# hai = ai # useless
-		# int_multi = bw / 25;
-		# cc = "%s%d"%(args.cc, args.utgt)
-		# if (mi > 0):
-		# 	cc += "mi%d"%mi
-		# if args.hpai > 0:
-		# 	cc += "ai%d"%ai
-		# config_name = "mix/config_%s_%s_%s%s.txt"%(topo, trace, cc, failure)
-		# config = config_template.format(bw=bw, trace=trace, topo=topo, cc=cc, mode=3, t_alpha=1, t_dec=4, t_inc=300, g=0.00390625, ai=ai, hai=hai, dctcp_ai=1000, has_win=1, vwin=1, us=1, u_tgt=u_tgt, mi=mi, int_multi=int_multi, pint_log_base=pint_log_base, pint_prob=pint_prob, ack_prio=0, link_down=args.down, failure=failure, kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map, buffer_size=bfsz, enable_tr=enable_tr)
-
-
         ai = 10 * bw / 25
         hai = 50
         int_multi = bw / 25
@@ -400,7 +386,42 @@ def main():
                                         cc_mode=cc_mode,
                                         ai=ai, hai=hai, dctcp_ai=1000,
                                         has_win=has_win, var_win=var_win,
-                                        fast_react=True, mi=0, int_multi=int_multi, ewma_gain=0.00390625,
+                                        fast_react=1, mi=0, int_multi=int_multi, ewma_gain=0.00390625,
+                                        kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
+    elif (cc_mode == 7):  # Timely
+        ai = 10 * bw / 10
+        hai = 50 * bw / 10
+        config = config_template.format(id=config_ID, topo=topo, flow=flow,
+                                        qlen_mon_start=qlen_mon_start, qlen_mon_end=qlen_mon_end, flowgen_start_time=flowgen_start_time,
+                                        flowgen_stop_time=flowgen_stop_time, sw_monitoring_interval=sw_monitoring_interval,
+                                        load=netload, buffer_size=buffer, lb_mode=lb_mode, cwh_tx_expiry_time=cwh_tx_expiry_time,
+                                        cwh_extra_reply_deadline=cwh_extra_reply_deadline, cwh_default_voq_waiting_time=cwh_default_voq_waiting_time,
+                                        cwh_path_pause_time=cwh_path_pause_time, cwh_extra_voq_flush_time=cwh_extra_voq_flush_time,
+                                        enabled_pfc=enabled_pfc, enabled_irn=enabled_irn,
+                                        cc_mode=cc_mode,
+                                        ai=ai, hai=hai, dctcp_ai=1000,
+                                        has_win=has_win, var_win=var_win,
+                                        fast_react=0, mi=0, int_multi=1, ewma_gain=0.00390625,
+                                        kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
+    elif (cc_mode == 8):  # DCTCP
+        ai = 10 # ai is useless for dctcp
+        hai = ai  # also useless
+        dctcp_ai=615 # calculated from RTT=13us and MTU=1KB, because DCTCP add 1 MTU per RTT.
+        kmax_map = "2 %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10)
+        kmin_map = "2 %d %d %d %d"%(bw*1000000000, 30*bw/10, bw*4*1000000000, 30*bw*4/10)
+        pmax_map = "2 %d %.2f %d %.2f"%(bw*1000000000, 1.0, bw*4*1000000000, 1.0)
+		# config = config_template.format(bw=bw, trace=trace, topo=topo, cc=args.cc, mode=8, t_alpha=1, t_dec=4, t_inc=300, g=0.0625, ai=ai, hai=hai, dctcp_ai=dctcp_ai, has_win=1, vwin=1, us=0, u_tgt=u_tgt, mi=mi, int_multi=1, pint_log_base=pint_log_base, pint_prob=pint_prob, ack_prio=0, link_down=args.down, failure=failure, kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map, buffer_size=bfsz, enable_tr=enable_tr)
+        config = config_template.format(id=config_ID, topo=topo, flow=flow,
+                                        qlen_mon_start=qlen_mon_start, qlen_mon_end=qlen_mon_end, flowgen_start_time=flowgen_start_time,
+                                        flowgen_stop_time=flowgen_stop_time, sw_monitoring_interval=sw_monitoring_interval,
+                                        load=netload, buffer_size=buffer, lb_mode=lb_mode, cwh_tx_expiry_time=cwh_tx_expiry_time,
+                                        cwh_extra_reply_deadline=cwh_extra_reply_deadline, cwh_default_voq_waiting_time=cwh_default_voq_waiting_time,
+                                        cwh_path_pause_time=cwh_path_pause_time, cwh_extra_voq_flush_time=cwh_extra_voq_flush_time,
+                                        enabled_pfc=enabled_pfc, enabled_irn=enabled_irn,
+                                        cc_mode=cc_mode,
+                                        ai=ai, hai=hai, dctcp_ai=dctcp_ai,
+                                        has_win=has_win, var_win=var_win,
+                                        fast_react=0, mi=0, int_multi=1, ewma_gain=0.0625,
                                         kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
     else:
         print("unknown cc:{}".format(args.cc))

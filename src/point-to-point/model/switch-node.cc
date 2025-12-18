@@ -225,7 +225,7 @@ void SwitchNode::SendToDevContinue(Ptr<Packet> p, CustomHeader &ch) {
 
         // determine the qIndex
         uint32_t qIndex;
-        if (ch.l3Prot == 0xFF || ch.l3Prot == 0xFE ||
+        if (ch.l3Prot == 0xFF || ch.l3Prot == 0xF9 || ch.l3Prot == 0xFE ||
             (m_ackHighPrio &&
              (ch.l3Prot == 0xFD ||
               ch.l3Prot == 0xFC))) {  // QCN or PFC or ACK/NACK, go highest priority

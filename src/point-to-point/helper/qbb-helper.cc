@@ -327,6 +327,15 @@ void QbbHelper::GetTraceFromPacket(TraceFormat &tr, Ptr<QbbNetDevice> dev, Ptr<c
             tr.cnp.ecnBits = hdr.cnp.ecnBits;
             tr.cnp.total = hdr.cnp.total;
             break;
+        case 0xF9:
+            tr.fcnp.fid = hdr.fcnp.fid;
+            tr.fcnp.qIndex = hdr.fcnp.qIndex;
+            tr.fcnp.qfb = hdr.fcnp.qfb;
+            tr.fcnp.ecnBits = hdr.fcnp.ecnBits;
+            tr.fcnp.total = hdr.fcnp.total;
+            tr.fcnp.timestamp = hdr.fcnp.timestamp;
+            tr.fcnp.m_flowCount = hdr.fcnp.m_flowCount;
+            break;
         default:
             break;
     }
