@@ -97,6 +97,7 @@ RANDOM_SEED 1
 cc_modes = {
     "dcqcn": 1,
     "hpcc": 3,
+    "powertcp": 6,
     "timely": 7,
     "dctcp": 8,
     "lpcc": 9,
@@ -128,7 +129,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='run simulation')
     parser.add_argument('--cc', dest='cc', action='store',
-                        default='dcqcn', help="hpcc/dcqcn/timely/dctcp/lpcc (default: dcqcn)")
+                        default='dcqcn', help="hpcc/dcqcn/timely/dctcp/powertcp/lpcc (default: dcqcn)")
     parser.add_argument('--lb', dest='lb', action='store',
                         default='fecmp', help="fecmp/pecmp/drill/conga (default: fecmp)")
     parser.add_argument('--pfc', dest='pfc', action='store',
@@ -373,6 +374,22 @@ def main():
                                         fast_react=fast_react, mi=mi, int_multi=int_multi, ewma_gain=ewma_gain,
                                         kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
     elif (cc_mode == 3): # Hpcc
+        ai = 10 * bw / 25
+        hai = 50
+        int_multi = bw / 25
+        config = config_template.format(id=config_ID, topo=topo, flow=flow,
+                                        qlen_mon_start=qlen_mon_start, qlen_mon_end=qlen_mon_end, flowgen_start_time=flowgen_start_time,
+                                        flowgen_stop_time=flowgen_stop_time, sw_monitoring_interval=sw_monitoring_interval,
+                                        load=netload, buffer_size=buffer, lb_mode=lb_mode, cwh_tx_expiry_time=cwh_tx_expiry_time,
+                                        cwh_extra_reply_deadline=cwh_extra_reply_deadline, cwh_default_voq_waiting_time=cwh_default_voq_waiting_time,
+                                        cwh_path_pause_time=cwh_path_pause_time, cwh_extra_voq_flush_time=cwh_extra_voq_flush_time,
+                                        enabled_pfc=enabled_pfc, enabled_irn=enabled_irn,
+                                        cc_mode=cc_mode,
+                                        ai=ai, hai=hai, dctcp_ai=1000,
+                                        has_win=has_win, var_win=var_win,
+                                        fast_react=1, mi=0, int_multi=int_multi, ewma_gain=0.00390625,
+                                        kmax_map=kmax_map, kmin_map=kmin_map, pmax_map=pmax_map)
+    elif (cc_mode == 6):  # PowerTCP
         ai = 10 * bw / 25
         hai = 50
         int_multi = bw / 25

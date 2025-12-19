@@ -27,6 +27,7 @@ TypeId RdmaQueuePair::GetTypeId(void) {
 RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, uint16_t _sport,
                              uint16_t _dport) {
     startTime = Simulator::Now();
+    stopTime = Simulator::GetMaximumSimulationTime();
     sip = _sip;
     dip = _dip;
     sport = _sport;
@@ -167,6 +168,8 @@ uint64_t RdmaQueuePair::HpGetCurWin() {
 }
 
 bool RdmaQueuePair::IsFinished() {
+	if (Simulator::Now() > stopTime)
+		return true;
     if (irn.m_enabled) {
         uint32_t sack_seq, sack_sz;
         if (irn.m_sack.peekFrontBlock(&sack_seq, &sack_sz)) {

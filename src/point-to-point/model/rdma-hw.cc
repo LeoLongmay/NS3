@@ -139,7 +139,9 @@ TypeId RdmaHw::GetTypeId(void) {
             .AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.6),
                           MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>())
             .AddAttribute("Lpcc_ClampTargetRate", "Lpcc clamp target rate.", BooleanValue(false),
-                          MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker());
+                          MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker())
+            .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
+	        .AddAttribute("PowerTCPdelay", "to enable PowerTCP in delaymode", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPdelay), MakeBooleanChecker());
     return tid;
 }
 
@@ -216,6 +218,8 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
     m_nic[nic_idx].qpGrp->AddQp(qp);
     uint64_t key = GetQpKey(dip.Get(), sport, dport, pg);
     m_qpMap[key] = qp;
+
+    qp->powerEnabled = PowerTCPEnabled;
 
     // set init variables
     DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
@@ -569,6 +573,8 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 
     if (m_cc_mode == 3) {
         HandleAckHp(qp, p, ch);
+    } else if (m_cc_mode == 6) {
+        HandleAckPower(qp, p, ch);
     } else if (m_cc_mode == 7) {
         HandleAckTimely(qp, p, ch);
     } else if (m_cc_mode == 8) {
@@ -851,6 +857,8 @@ Ptr<Packet> RdmaHw::GetNxtPacket(Ptr<RdmaQueuePair> qp) {
 
 void RdmaHw::PktSent(Ptr<RdmaQueuePair> qp, Ptr<Packet> pkt, Time interframeGap) {
     qp->lastPktSize = pkt->GetSize();
+	uint32_t seq = qp->snd_nxt;
+	qp->rates[qp->snd_nxt] = Simulator::Now().GetNanoSeconds();    
     UpdateNextAvail(qp, interframeGap, pkt->GetSize());
 
     if (pkt) {
@@ -1376,6 +1384,156 @@ void RdmaHw::HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &
 }
 
 /**********************
+ * PowerTCP (Int/Delay versions) called from HandleAckHp function at the moment
+ *********************/
+
+ void RdmaHw::HandleAckPower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
+	uint32_t ack_seq = ch.ack.seq;
+	// update rate
+	if (ack_seq > qp->hp.m_lastUpdateSeq) { // if full RTT feedback is ready, do full update
+		if (PowerTCPEnabled) {
+			UpdateRatePower(qp, p, ch, false);
+		}
+		else
+			UpdateRateHp(qp, p, ch, false);
+	} else { // do fast react
+		if (PowerTCPEnabled)
+			FastReactPower(qp, p, ch);
+		else
+			FastReactHp(qp, p, ch);
+	}
+ }
+
+void RdmaHw::UpdateRatePower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react) {
+	uint32_t next_seq = qp->snd_nxt;
+	bool print = !fast_react || true;
+	double prevRtt = qp->m_baseRtt;
+	double prevCompletion = Simulator::Now().GetNanoSeconds();
+	std::map<uint32_t, double>::iterator it = qp->rates.find(ch.ack.seq);
+	DataRate old ;
+	double rtt;
+
+	if (it != qp->rates.end()) {
+		prevRtt = Simulator::Now().GetNanoSeconds() - it->second;
+		if (PowerTCPdelay) {
+			qp->m_baseRtt = std::min(uint64_t(Simulator::Now().GetNanoSeconds() - it->second), qp->m_baseRtt);
+		}
+		prevCompletion = Simulator::Now().GetNanoSeconds();
+        qp->rates.erase(it);
+	}
+	if (qp->hp.m_lastUpdateSeq == 0 && !PowerTCPdelay) {
+		qp->prevRtt = prevRtt;
+		qp->prevCompletion = Simulator::Now().GetNanoSeconds();
+		qp->hp.m_lastUpdateSeq = next_seq;
+		// store INT
+		IntHeader &ih = ch.ack.ih;
+		NS_ASSERT(ih.nhop <= IntHeader::maxHop);
+		for (uint32_t i = 0; i < ih.nhop; i++)
+			qp->hp.hop[i] = ih.hop[i];
+	}else {
+		// check packet INT
+		IntHeader &ih = ch.ack.ih;
+		if (ih.nhop <= IntHeader::maxHop) {
+			double max_c = 0;
+			bool inStable = false;
+			// check each hop
+			double U = 0;
+			uint64_t dt = 0;
+			bool updated[IntHeader::maxHop] = {false}, updated_any = false;
+			NS_ASSERT(ih.nhop <= IntHeader::maxHop);
+			for (uint32_t i = 0; i < ih.nhop; i++) {
+				if (m_sampleFeedback) {
+					if (ih.hop[i].GetQlen() == 0 and fast_react)
+						continue;
+				}
+				updated[i] = updated_any = true;
+
+				uint64_t tau = ih.hop[i].GetTimeDelta(qp->hp.hop[i]);
+				double duration = tau * 1e-9;
+				double rxRate = (ih.hop[i].GetBytesDelta(qp->hp.hop[i])) * 8.0 / duration;
+
+				double u;
+
+				if (!PowerTCPdelay) {
+					double A = rxRate;
+					// double A = txRate + (double(ih.hop[i].GetQlen() * 8.0) - double(qp->hp.hop[i].GetQlen() * 8.0)) / duration;
+					double power = ( A ) * (double(ih.hop[i].GetQlen() * 8.0) + ih.hop[i].GetLineRate() * (qp->m_baseRtt * 1e-9));
+					double powerx = (power) / (ih.hop[i].GetLineRate() * (ih.hop[i].GetLineRate() * qp->m_baseRtt * 1e-9) );
+					u = powerx; // PowerTCP
+				}
+				else {
+					// delay approach
+					double A = ( double(prevRtt - qp->prevRtt) / (prevCompletion - qp->prevCompletion) + 1  );
+					if (A < 0.5)
+						A = 0.5;
+					double power = ( A ) * (prevRtt);
+					double powerx = (power) / (1.05 * qp->m_baseRtt);
+					u = powerx; // theta-PowerTCP
+				}
+				if (u > U) {
+					U = u;
+					if (PowerTCPdelay) {
+						dt = prevCompletion - qp->prevCompletion;
+					}
+					else {
+						dt = tau;
+					}
+				}
+				qp->hp.hop[i] = ih.hop[i];
+			}
+
+			DataRate new_rate;
+			int32_t new_incStage;
+			DataRate new_rate_per_hop[IntHeader::maxHop];
+			int32_t new_incStage_per_hop[IntHeader::maxHop];
+
+			if (updated_any) {
+				if (dt > 1.0 * qp->m_baseRtt)
+					dt = 1.0 * qp->m_baseRtt;
+
+				if (U < 0) {
+					U = qp->hp.u;
+				}
+				qp->hp.u = (qp->hp.u * (1.0 * qp->m_baseRtt - dt) + U * dt) / double(1.0 * qp->m_baseRtt);
+				if (!PowerTCPdelay) {
+					max_c = qp->hp.u / m_targetUtil;
+					new_rate = (0.9 * ( qp->hp.m_curRate / max_c + DataRate("150Mbps") ) + 0.1 * qp->hp.m_curRate);
+
+				}
+				else {
+					max_c = qp->hp.u;
+					new_rate = (0.7 * ( qp->hp.m_curRate / max_c + DataRate("150Mbps") ) + 0.3 * qp->hp.m_curRate);
+				}
+				if (new_rate < m_minRate)
+					new_rate = m_minRate;
+				if (new_rate > qp->m_max_rate)
+					new_rate = qp->m_max_rate;
+			}
+			qp->prevRtt = prevRtt;
+			qp->prevCompletion = Simulator::Now().GetNanoSeconds();
+			if (updated_any) {
+				ChangeRate(qp, new_rate);
+			}
+			if (!fast_react) {
+				if (updated_any) {
+					qp->hp.m_curRate = new_rate;
+					qp->hp.m_incStage = new_incStage;
+				}
+			}
+		}
+		if (!fast_react) {
+			if (next_seq > qp->hp.m_lastUpdateSeq)
+				qp->hp.m_lastUpdateSeq = next_seq;
+		}
+	}
+}
+
+void RdmaHw::FastReactPower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
+	if (m_fast_react)
+		UpdateRatePower(qp, p, ch, true);
+}
+
+/**********************
  * LPCC
  *********************/
 void RdmaHw::fcnp_received_lpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
@@ -1460,6 +1618,15 @@ void RdmaHw::HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &c
     DataRate m_p = qp->lpcc.m_curRate / m_bps * ch.fcnp.m_flowCount;
 
     DataRate new_rate = qp->lpcc.m_curRate * (1 - std::min((1.0 * m_rttl - qp->m_baseRtt) / qp->m_baseRtt * m_p.GetBitRate(), m_kr));
+    std::cout << "lpcc.curRate: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
+    std::cout << "now: " << Simulator::Now().GetTimeStep() << std::endl;
+    std::cout << "ts: " << ch.ack.ih.ts << std::endl;
+    std::cout << "flowCount: " << ch.fcnp.m_flowCount << std::endl;
+    std::cout << "m_rttl: " << m_rttl << std::endl;
+    std::cout << "m_bps: " << m_bps.GetBitRate() << std::endl;
+    std::cout << "m_p: " << m_p.GetBitRate() << std::endl;
+    std::cout << "m_kr: " << m_kr << std::endl;
+    std::cout << "new_rate: " << new_rate.GetBitRate() << std::endl;
     ChangeRate(qp, new_rate);
     qp->lpcc.m_curRate = new_rate;
 }

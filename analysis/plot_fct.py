@@ -16,6 +16,7 @@ from cycler import cycler
 cc_modes = {
     1: "dcqcn",
     3: "hpcc",
+    6: "powertcp",
     7: "timely",
     8: "dctcp",
     9: "lpcc",
@@ -224,7 +225,7 @@ def main():
         
         xvals = [i for i in range(STEP, 100 + STEP, STEP)]
         
-        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'lpcc']
+        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'powertcp', 'lpcc']
         for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]
@@ -277,7 +278,7 @@ def main():
         
         xvals = [i for i in range(STEP, 100 + STEP, STEP)]
 
-        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'lpcc']
+        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'powertcp', 'lpcc']
         for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]

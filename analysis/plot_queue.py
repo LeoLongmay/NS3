@@ -16,6 +16,7 @@ from cycler import cycler
 cc_modes = {
     1: "dcqcn",
     3: "hpcc",
+    6: "powertcp",
     7: "timely",
     8: "dctcp",
     9: "lpcc"

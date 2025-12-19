@@ -180,6 +180,16 @@ class RdmaHw : public Object {
     void HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 
     /**********************
+    * PowerTCP
+    *********************/
+    
+    bool PowerTCPdelay;
+    bool PowerTCPEnabled;
+    void HandleAckPower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch); 
+    void UpdateRatePower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react);
+    void FastReactPower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
+
+    /**********************
     * LPCC
     *********************/
 

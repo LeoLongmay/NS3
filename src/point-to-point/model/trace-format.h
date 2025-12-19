@@ -48,6 +48,20 @@ struct TraceFormat{
 			};
 		} cnp;
 		struct {
+			uint16_t fid;
+			uint8_t qIndex;
+			uint8_t ecnBits; // this is the ECN bits in the CNP
+			union{
+				struct {
+					uint16_t qfb;
+					uint16_t total;
+				};
+				uint32_t seq;
+			};
+			uint64_t timestamp;
+			uint16_t m_flowCount;
+		} fcnp;
+		struct {
 			uint16_t sport, dport;
 			uint16_t flags;
 			uint16_t pg;

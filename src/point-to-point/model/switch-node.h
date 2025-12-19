@@ -28,6 +28,8 @@ class SwitchNode : public Node {
     uint32_t m_ccMode;
     uint32_t m_ackHighPrio;  // set high priority for ACK/NACK
 
+    bool PowerEnabled;
+
    private:
     int GetOutDev(Ptr<Packet>, CustomHeader &ch);
     void SendToDev(Ptr<Packet> p, CustomHeader &ch);

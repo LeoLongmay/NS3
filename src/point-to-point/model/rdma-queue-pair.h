@@ -27,6 +27,7 @@ namespace ns3 {
 enum CcMode {
     CC_MODE_DCQCN = 1,
     CC_MODE_HPCC = 3,
+    CC_MODE_POWERTCP = 6,
     CC_MODE_TIMELY = 7,
     CC_MODE_DCTCP = 8,
     CC_MODE_LPCC = 9,
@@ -70,6 +71,12 @@ class RdmaQueuePair : public Object {
     uint32_t lastPktSize;
     int32_t m_flow_id;
     Time m_timeout;
+
+	std::map<uint32_t,double> rates;
+	double prevRtt;
+	double prevCompletion;
+	bool powerEnabled;
+	Time stopTime;
 
     /******************************
      * runtime states
@@ -115,6 +122,21 @@ class RdmaQueuePair : public Object {
         uint32_t m_ecnCnt;
         uint32_t m_batchSizeOfAlpha;
     } dctcp;
+	struct {
+		uint32_t m_lastUpdateSeq;
+		DataRate m_curRate;
+		IntHop hop[IntHeader::maxHop];
+		uint32_t keep[IntHeader::maxHop];
+		uint32_t m_incStage;
+		double m_lastGap;
+		double u;
+		bool useInt;
+		struct {
+			double u;
+			DataRate Rc;
+			uint32_t incStage;
+		}hopState[IntHeader::maxHop];
+	} power;    
     struct {
         DataRate m_targetRate;  //< Target rate
         DataRate m_curRate;

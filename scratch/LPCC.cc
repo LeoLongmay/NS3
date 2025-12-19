@@ -123,6 +123,7 @@ std::string rate_ai, rate_hai, min_rate = "100Mb/s";
 std::string dctcp_rate_ai = "1000Mb/s";
 
 bool clamp_target_rate = false, l2_back_to_zero = false;
+bool wien = true, delayWien = false; // default support powerTCP, not theta-powerTCP
 double error_rate_per_link = 0.0;
 uint32_t has_win = 1;
 uint32_t global_t = 1;
@@ -725,24 +726,24 @@ int main(int argc, char *argv[]) {
     uint32_t *workload_cdf = nullptr;
     clock_t begint, endt;
     begint = clock();
-#ifndef PGO_TRAINING
-    if (argc > 1)
-#else
-    if (true)
-#endif
-    {
-        // Read the configuration file
-        std::ifstream conf;
-#ifndef PGO_TRAINING
-        conf.open(argv[1]);
-        // conf.open("config.txt", ios::in);
-#else
-        conf.open(PATH_TO_PGO_CONFIG);
-#endif
+// #ifndef PGO_TRAINING
+//     if (argc > 1)
+// #else
+//     if (true)
+// #endif
+//     {
+//         // Read the configuration file
+//         std::ifstream conf;
+// #ifndef PGO_TRAINING
+//         conf.open(argv[1]);
+//         // conf.open("config.txt", ios::in);
+// #else
+//         conf.open(PATH_TO_PGO_CONFIG);
+// #endif
 
-    // if (true) {
-    //     std::ifstream conf;
-    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/350616023/config.txt", ios::in);
+    if (true) {
+        std::ifstream conf;
+        conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/461795121/config.txt", ios::in);
         while (!conf.eof()) {
             std::string key;
             conf >> key;
@@ -1373,8 +1374,6 @@ int main(int argc, char *argv[]) {
     topo2bdpMap[std::string("fat_k8_100G_OS2")] = 156000;      // RTT=12480 --> all 100G links
     topo2bdpMap[std::string("test_topoOS2")] = 100002000;
 
-    cout << "wxb" << endl;
-
     // topology_file
     bool found_topo2bdpMap = false;
     uint32_t irn_bdp_lookup = 0;
@@ -1424,6 +1423,8 @@ int main(int argc, char *argv[]) {
             rdmaHw->SetAttribute("IrnRtoHigh", TimeValue(MicroSeconds(320)));  // 1930
             rdmaHw->SetAttribute("IrnRtoLow", TimeValue(MicroSeconds(100)));   // 454
             rdmaHw->SetAttribute("IrnBdp", UintegerValue(irn_bdp_lookup));
+            rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
+            rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
             // Monitoring CNP Marking frequency of DCQCN
             if (cc_mode == 1 || cc_mode == 9) {
                 Simulator::Schedule(NanoSeconds(cnp_mon_start), &cnp_freq_monitoring, cnp_output, rdmaHw);
@@ -1450,6 +1451,7 @@ int main(int argc, char *argv[]) {
             Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
             sw->SetAttribute("CcMode", UintegerValue(cc_mode));
             sw->SetAttribute("AckHighPrio", UintegerValue(1));
+            sw->SetAttribute("PowerEnabled", BooleanValue(wien));
         }
     }
 

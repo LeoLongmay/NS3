@@ -30,7 +30,8 @@ TypeId SwitchNode::GetTypeId(void) {
                           MakeUintegerChecker<uint32_t>())
             .AddAttribute("AckHighPrio", "Set high priority for ACK/NACK or not", UintegerValue(0),
                           MakeUintegerAccessor(&SwitchNode::m_ackHighPrio),
-                          MakeUintegerChecker<uint32_t>());
+                          MakeUintegerChecker<uint32_t>())
+            .AddAttribute("PowerEnabled", "Inserts Rxbytes instead of Txbytes in INT header", BooleanValue(false), MakeBooleanAccessor(&SwitchNode::PowerEnabled), MakeBooleanChecker());
     return tid;
 }
 
@@ -367,8 +368,13 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
                                               6];  // ppp, ip, udp, SeqTs, INT
             Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
             if (m_ccMode == 3) {  // HPCC
-                ih->PushHop(Simulator::Now().GetTimeStep(), m_txBytes[ifIndex],
+                if (PowerEnabled) {
+                    ih->PushHop(Simulator::Now().GetTimeStep(), dev->GetQueue()->GetNBytesTotal(),
                             dev->GetQueue()->GetNBytesTotal(), dev->GetDataRate().GetBitRate());
+                } else {
+                    ih->PushHop(Simulator::Now().GetTimeStep(), m_txBytes[ifIndex],
+                            dev->GetQueue()->GetNBytesTotal(), dev->GetDataRate().GetBitRate());
+                }
             }
         }
     }

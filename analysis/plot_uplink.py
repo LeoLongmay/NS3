@@ -17,6 +17,7 @@ import numpy as np
 cc_modes = {
     1: "dcqcn",
     3: "hpcc",
+    6: "powertcp",
     7: "timely",
     8: "dctcp",
     9: "lpcc"
@@ -206,7 +207,7 @@ def main():
         ax.xaxis.set_ticks_position('bottom')
         
 
-        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'lpcc']
+        ccmode_order = ['dcqcn', 'hpcc', 'timely', 'dctcp', 'powertcp', 'lpcc']
         for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]
