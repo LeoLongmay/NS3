@@ -61,7 +61,7 @@ TypeId RdmaHw::GetTypeId(void) {
             .AddAttribute("ClampTargetRate", "Clamp target rate.", BooleanValue(false),
                           MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRate), MakeBooleanChecker())
             .AddAttribute("RPTimer", "The rate increase timer at RP in microseconds",
-                          DoubleValue(300.0), MakeDoubleAccessor(&RdmaHw::m_rpgTimeReset),
+                          DoubleValue(100.0), MakeDoubleAccessor(&RdmaHw::m_rpgTimeReset),
                           MakeDoubleChecker<double>())
             .AddAttribute("RateDecreaseInterval", "The interval of rate decrease check",
                           DoubleValue(4.0), MakeDoubleAccessor(&RdmaHw::m_rateDecreaseInterval),
@@ -130,15 +130,15 @@ TypeId RdmaHw::GetTypeId(void) {
                           MakeTimeChecker())
             .AddAttribute("LpccEpsilon", "Buffer queue length threshold", UintegerValue(3),
                           MakeUintegerAccessor(&RdmaHw::m_epsilon), MakeUintegerChecker<uint16_t>())
-            .AddAttribute("LpccTheta", "Fcnp aggregate time window", UintegerValue(10000),
-                          MakeUintegerAccessor(&RdmaHw::m_theta), MakeUintegerChecker<uint64_t>())
+            .AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(4.0),
+                          MakeDoubleAccessor(&RdmaHw::m_theta), MakeDoubleChecker<double>())
             .AddAttribute("LpccTau", "RTT detection time window", UintegerValue(20000),
                           MakeUintegerAccessor(&RdmaHw::m_tau), MakeUintegerChecker<uint32_t>())
             .AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", UintegerValue(2),
                           MakeUintegerAccessor(&RdmaHw::m_wr), MakeUintegerChecker<uint64_t>())
             .AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.6),
-                          MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>())
-            .AddAttribute("Lpcc_ClampTargetRate", "Lpcc clamp target rate.", BooleanValue(false),
+                          MakeDoubleAccessor(&RdmaHw::m_kr), MakeDoubleChecker<double>())
+            .AddAttribute("Lpcc_ClampTargetRate", "Lpcc clamp target rate.", BooleanValue(false), 
                           MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker())
             .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
 	        .AddAttribute("PowerTCPdelay", "to enable PowerTCP in delaymode", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPdelay), MakeBooleanChecker());
@@ -234,6 +234,9 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
         }
     } else if (m_cc_mode == 7) {
         qp->tmly.m_curRate = m_bps;
+    } else if (m_cc_mode == 9) { // LPCC
+        qp->lpcc.m_curRate = m_bps;
+        qp->lpcc.m_targetRate = m_bps;
     }
 
     // Notify Nic
@@ -1539,12 +1542,11 @@ void RdmaHw::FastReactPower(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &
 void RdmaHw::fcnp_received_lpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
     qp->lpcc.m_decrease_cnp_arrived = true;
     if (qp->lpcc.m_first_cnp) {
-
         ScheduleDecreaseRateLpcc(qp, ch, 1);
 
-        qp->lpcc.m_targetRate = qp->lpcc.m_curRate = m_rateOnFirstCNP * qp->lpcc.m_curRate;
+        qp->lpcc.m_targetRate = qp->m_rate = m_rateOnFirstCNP * qp->m_rate;
         qp->lpcc.m_first_cnp = false;
-    } 
+    }
 }
 
 void RdmaHw::CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch) {
@@ -1560,7 +1562,7 @@ void RdmaHw::CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch) {
             if (q->lpcc.m_rpTimeStage == 0) clamp = false;
         }
         if (clamp) {
-            q->lpcc.m_targetRate = q->lpcc.m_curRate;
+            q->lpcc.m_targetRate = q->m_rate;
         }
         UpdateRateLpcc(q, ch);
         q->lpcc.m_rpTimeStage = 0;
@@ -1584,9 +1586,10 @@ void RdmaHw::RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q) {
 void RdmaHw::RateIncEventLpcc(Ptr<RdmaQueuePair> q) {
     uint32_t nic_idx = GetNicIdxOfQp(q);
     Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
-    q->lpcc.m_targetRate += m_rai; // m_rai is a parameter of DCQCN
+    q->lpcc.m_targetRate += m_rhai; // m_rhai is a parameter of DCQCN
     if (q->lpcc.m_targetRate > dev->GetDataRate()) q->lpcc.m_targetRate = dev->GetDataRate();
-    q->lpcc.m_curRate = (q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2);
+    q->lpcc.m_curRate = std::min((q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2), dev->GetDataRate());
+    ChangeRate(q, q->lpcc.m_curRate);
 }
 
 void RdmaHw::ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta) {
@@ -1600,35 +1603,47 @@ void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
     uint64_t m_rtts = Simulator::Now().GetTimeStep() - ch.fcnp.timestamp;
     uint16_t m_qlen = ch.cnp.qfb;
     uint64_t m_k = (1.0 * m_qlen / m_epsilon - 1.0) * (1.0 * m_rttl / m_rtts);
+    // m_nic[nic_idx].dev->GetUsedBuffer();
     
     uint32_t nic_idx = GetNicIdxOfQp(qp);
     DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
     DataRate m_p = qp->lpcc.m_curRate / m_bps * ch.fcnp.m_flowCount;
 
     DataRate new_rate = qp->lpcc.m_curRate * (1 / (1 + std::min(m_k * m_p.GetBitRate(), m_wr)));
+    std::cout << "**************************************" << std::endl;
+    std::cout << "m_rttl: " << m_rttl << std::endl;
+    std::cout << "m_rtts: " << m_rtts << std::endl;
+    std::cout << "m_qlen: " << m_qlen << std::endl;
+    std::cout << "m_k: " << m_k << std::endl;
+    std::cout << "m_p: " << m_p.GetBitRate() << std::endl;
+    std::cout << "Down\t" << "before: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
+    std::cout << "Down\t" << "after: " << new_rate.GetBitRate() << std::endl;
     ChangeRate(qp, new_rate);
-    qp->lpcc.m_curRate = new_rate;
+    qp->m_rate = new_rate;
 }
 
 void RdmaHw::HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
-    uint64_t m_rttl = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+    uint32_t ack_seq = ch.ack.seq;
+    if (ack_seq > qp->lpcc.m_lastUpdateSeq) {  // if full RTT feedback is ready, do full update
+        UpdateRateLpccOnAck(qp, p, ch);
+    }
+}
+void RdmaHw::UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
+    if (qp->lpcc.m_lastUpdateSeq != 0) {  // not first RTT
+        uint64_t m_rttl = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+        
+        uint32_t nic_idx = GetNicIdxOfQp(qp);
+        DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();    
+        double m_p = qp->lpcc.m_curRate / m_bps * (ch.fcnp.m_flowCount / 950.0);
 
-    uint32_t nic_idx = GetNicIdxOfQp(qp);
-    DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();    
-    DataRate m_p = qp->lpcc.m_curRate / m_bps * ch.fcnp.m_flowCount;
-
-    DataRate new_rate = qp->lpcc.m_curRate * (1 - std::min((1.0 * m_rttl - qp->m_baseRtt) / qp->m_baseRtt * m_p.GetBitRate(), m_kr));
-    std::cout << "lpcc.curRate: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
-    std::cout << "now: " << Simulator::Now().GetTimeStep() << std::endl;
-    std::cout << "ts: " << ch.ack.ih.ts << std::endl;
-    std::cout << "flowCount: " << ch.fcnp.m_flowCount << std::endl;
-    std::cout << "m_rttl: " << m_rttl << std::endl;
-    std::cout << "m_bps: " << m_bps.GetBitRate() << std::endl;
-    std::cout << "m_p: " << m_p.GetBitRate() << std::endl;
-    std::cout << "m_kr: " << m_kr << std::endl;
-    std::cout << "new_rate: " << new_rate.GetBitRate() << std::endl;
-    ChangeRate(qp, new_rate);
-    qp->lpcc.m_curRate = new_rate;
+        DataRate new_rate = qp->lpcc.m_curRate * (1 - std::min((1.0 * m_rttl - qp->lpcc.m_minRtt) / qp->lpcc.m_minRtt * m_p, m_kr));
+        ChangeRate(qp, new_rate);
+        qp->lpcc.m_curRate = new_rate;
+        qp->lpcc.m_minRtt = std::min(qp->lpcc.m_minRtt, m_rttl);
+    } else {
+        qp->lpcc.m_lastUpdateSeq = qp->snd_nxt;
+        qp->lpcc.m_minRtt = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+    }
 }
 
 }  // namespace ns3

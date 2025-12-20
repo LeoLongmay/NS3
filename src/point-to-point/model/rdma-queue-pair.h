@@ -145,6 +145,8 @@ class RdmaQueuePair : public Object {
         bool m_first_cnp;          // indicate if the current CNP is the first CNP
         EventId m_eventDecreaseRate;
         uint32_t m_rpTimeStage;
+        uint32_t m_lastUpdateSeq;
+        uint64_t m_minRtt;
     } lpcc;
 
     struct {

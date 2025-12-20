@@ -74,6 +74,7 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     lpcc.m_first_cnp = true;
     lpcc.m_rpTimeStage = 0;
     lpcc.m_decrease_cnp_arrived = false;
+    lpcc.m_lastUpdateSeq = 0;
 
     irn.m_enabled = false;
     irn.m_highest_ack = 0;

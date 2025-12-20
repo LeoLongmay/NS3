@@ -482,10 +482,7 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q) {
     rdma->m_rdma->DeleteRxQp(q->sip.Get(), q->sport, q->dport, q->m_pg);
 
     // fprintf(fout, "%lu QP complete\n", Simulator::Now().GetTimeStep());
-    fprintf(fout, "%u %u %u %u %lu %lu %lu %lu\n", Settings::ip_to_node_id(q->sip),
-            Settings::ip_to_node_id(q->dip), q->sport, q->dport, q->m_size,
-            q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(),
-            standalone_fct);
+    fprintf(fout, "%u %u %u %u %lu %lu %lu %lu\n", Settings::ip_to_node_id(q->sip), Settings::ip_to_node_id(q->dip), q->sport, q->dport, q->m_size, q->startTime.GetTimeStep(), (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct);
 
     // for debugging
     NS_LOG_DEBUG("%u %u %u %u %lu %lu %lu %lu\n" %
@@ -743,7 +740,7 @@ int main(int argc, char *argv[]) {
 
     if (true) {
         std::ifstream conf;
-        conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/461795121/config.txt", ios::in);
+        conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/881604902/config.txt", ios::in);
         while (!conf.eof()) {
             std::string key;
             conf >> key;
@@ -1136,7 +1133,7 @@ int main(int argc, char *argv[]) {
      */
     IntHop::multi = int_multi;
     // IntHeader::mode
-    if (cc_mode == 7)  // timely, use ts
+    if (cc_mode == 7 || cc_mode == 9)  // Lpcc or timely, use ts
         IntHeader::mode = 1;
     else if (cc_mode == 3)  // hpcc, use int
         IntHeader::mode = 0;
@@ -1800,7 +1797,6 @@ int main(int argc, char *argv[]) {
     Simulator::Schedule(Seconds(flowgen_start_time),
                         &stop_simulation_middle);  // check every 100us
     Simulator::Stop(Seconds(flowgen_stop_time + 10.0));
-    cout << "Wxb" << endl;
     Simulator::Run();
     /*-----------------------------------------------------------------------------*/
     /*----- we don't need below. Just we can enforce to close this simulation. -----*/

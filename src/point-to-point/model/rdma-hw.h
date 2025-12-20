@@ -208,6 +208,7 @@ class RdmaHw : public Object {
     void CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
     void RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q);
     void RateIncEventLpcc(Ptr<RdmaQueuePair> q);
+    void UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
     
 
     /**********************
