@@ -197,7 +197,7 @@ class RdmaHw : public Object {
     uint64_t m_theta; // fcnp aggregate time window
     uint32_t m_tau; // RTT detection time window
 
-    uint64_t m_wr; // min rate adjustment fraction
+    double m_wr; // min rate adjustment fraction
     double m_kr; // min rate regulation faction
     bool m_EcnClampTgtRateLpcc;
 

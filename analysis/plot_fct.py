@@ -250,7 +250,7 @@ def main():
         ax.set_xticks(([0] + xvals)[::2])
         ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=10.5)
         ax.set_ylim(bottom=1)
-        # ax.set_yscale("log")
+        ax.set_yscale("log")
 
         fig.tight_layout()
         ax.grid(which='minor', alpha=0.2)
@@ -304,7 +304,7 @@ def main():
         ax.set_xticks(([0] + xvals)[::2])
         ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=10.5)
         ax.set_ylim(bottom=1)
-        # ax.set_yscale("log")
+        ax.set_yscale("log")
 
         fig.tight_layout()
         ax.grid(which='minor', alpha=0.2)

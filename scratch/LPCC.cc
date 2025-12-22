@@ -176,6 +176,8 @@ std::map<uint32_t, std::vector<uint32_t>> torId2DownlinkIf;
 std::ifstream topof, flowf;
 NodeContainer n;                         // node container
 std::vector<Ipv4Address> serverAddress;  // server address
+NetDeviceContainer switchToSwitchInterfaces;
+std::map< uint32_t,std::map< uint32_t,std::vector<Ptr<QbbNetDevice>> > > switchToSwitch;
 
 // flow generator
 std::unordered_map<uint32_t, uint32_t> flows_per_host;
@@ -183,6 +185,11 @@ uint32_t flow_id = 0;
 std::unordered_map<uint32_t, uint16_t> portNumber;
 std::unordered_map<uint32_t, uint16_t> dportNumber;
 uint16_t *port_per_host;
+
+std::map<uint32_t,uint32_t> switchNumToId;
+std::map<uint32_t,uint32_t> switchIdToNum;
+std::map<uint32_t,NetDeviceContainer> switchUp;
+std::map<uint32_t,NetDeviceContainer> sourceNodes;
 
 // Scheduling input flows from flow.txt
 struct FlowInput {
@@ -286,6 +293,7 @@ void ScheduleFlowInputs(FILE *infile) {
 
     // schedule the next time to run this function
     if (flow_input.idx < flow_num) {
+        if (flow_input.idx % 10000 == 0) cout << "Current flow idx: " << flow_input.idx << endl;
         Simulator::Schedule(Seconds(flow_input.start_time) - Simulator::Now(), &ScheduleFlowInputs,
                             infile);
     } else {  // no more flows, close the file
@@ -713,6 +721,25 @@ uint64_t get_nic_rate(NodeContainer &n) {
     return avg_nic_rate / n_servers;
 }
 
+void PrintResultsFlow(std::map<uint32_t,NetDeviceContainer> Src,uint32_t numFlows,double delay){
+	for (uint32_t i=0; i<numFlows;i++){
+		double throughputTotal=0;
+
+		for (uint32_t j=0; j< Src[i].GetN();j++){
+			Ptr<QbbNetDevice> nd = DynamicCast<QbbNetDevice>(Src[i].Get(j));
+//			uint64_t txBytes = nd->getTxBytes();
+			uint64_t txBytes = nd->getNumTxBytes();
+
+			uint64_t qlen = nd->GetQueue()->GetNBytesTotal();
+			double throughput = double(txBytes*8)/delay;
+			throughputTotal+=throughput;
+			// std::cout << "Src " << i << " Port " << j << " throughput "<< throughput << " txBytes " << txBytes << " qlen " << qlen << " time " << Simulator::Now().GetSeconds() << std::endl;
+		}
+		std::cout << "Src " << i << " Total " << 0 << " throughput " << throughputTotal <<  " time " << Simulator::Now().GetSeconds() << std::endl;
+	}
+	Simulator::Schedule(Seconds(delay),PrintResultsFlow,Src,numFlows,delay);
+}
+
 /************************************************************************/
 //                                                                      //
 //                                M A I N                               //
@@ -723,24 +750,24 @@ int main(int argc, char *argv[]) {
     uint32_t *workload_cdf = nullptr;
     clock_t begint, endt;
     begint = clock();
-// #ifndef PGO_TRAINING
-//     if (argc > 1)
-// #else
-//     if (true)
-// #endif
-//     {
-//         // Read the configuration file
-//         std::ifstream conf;
-// #ifndef PGO_TRAINING
-//         conf.open(argv[1]);
-//         // conf.open("config.txt", ios::in);
-// #else
-//         conf.open(PATH_TO_PGO_CONFIG);
-// #endif
-
-    if (true) {
+#ifndef PGO_TRAINING
+    if (argc > 1)
+#else
+    if (true)
+#endif
+    {
+        // Read the configuration file
         std::ifstream conf;
-        conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/881604902/config.txt", ios::in);
+#ifndef PGO_TRAINING
+        conf.open(argv[1]);
+        // conf.open("config.txt", ios::in);
+#else
+        conf.open(PATH_TO_PGO_CONFIG);
+#endif
+
+    // if (true) {
+    //     std::ifstream conf;
+    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/888283503/config.txt", ios::in);
         while (!conf.eof()) {
             std::string key;
             conf >> key;
@@ -1252,6 +1279,18 @@ int main(int argc, char *argv[]) {
             ipv4->AddAddress(1, Ipv4InterfaceAddress(serverAddress[dst], Ipv4Mask(0xff000000)));
         }
 
+		if (!snode->GetNodeType()){
+			sourceNodes[src].Add(DynamicCast<QbbNetDevice>(d.Get(0)));
+		}
+
+		if(snode->GetNodeType()&& dnode->GetNodeType()){
+			switchToSwitchInterfaces.Add(d);
+			switchUp[switchIdToNum[src]].Add(DynamicCast<QbbNetDevice>(d.Get(0)));
+			switchUp[switchIdToNum[dst]].Add(DynamicCast<QbbNetDevice>(d.Get(1)));
+			switchToSwitch[src][dst].push_back(DynamicCast<QbbNetDevice>(d.Get(0)));
+			switchToSwitch[src][dst].push_back(DynamicCast<QbbNetDevice>(d.Get(1)));
+		}
+
         // used to create a graph of the topology
         nbr2if[snode][dnode].idx = DynamicCast<QbbNetDevice>(d.Get(0))->GetIfIndex();
         nbr2if[snode][dnode].up = true;
@@ -1367,7 +1406,7 @@ int main(int argc, char *argv[]) {
 
     // manually type BDP
     std::map<std::string, uint32_t> topo2bdpMap;
-    topo2bdpMap[std::string("leaf_spine_128_100G_OS2")] = 104000;  // RTT=8320
+    topo2bdpMap[std::string("leaf_spine_128_100G_OS2")] = 204000;  // RTT=8320
     topo2bdpMap[std::string("fat_k8_100G_OS2")] = 156000;      // RTT=12480 --> all 100G links
     topo2bdpMap[std::string("test_topoOS2")] = 100002000;
 
@@ -1786,6 +1825,9 @@ int main(int argc, char *argv[]) {
     }
     Simulator::Schedule(Seconds(flowgen_start_time), &periodic_monitoring, voq_output,
                         voq_detail_output, uplink_output, conn_output, &lb_mode);
+
+    double delay = 0.5*maxRtt*1e-9; // 10 micro seconds
+	Simulator::Schedule(Seconds(delay),PrintResultsFlow,sourceNodes,flow_num,delay);
 
     //
     // Now, do the actual simulation.

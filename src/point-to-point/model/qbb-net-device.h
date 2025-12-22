@@ -140,6 +140,33 @@ public:
    TracedCallback<Ptr<const Packet>, uint32_t> m_traceDequeue;
    TracedCallback<Ptr<const Packet>, uint32_t> m_traceDrop;
    TracedCallback<uint32_t> m_tracePfc; // 0: resume, 1: pause
+
+  uint64_t getTxBytes(){
+			uint64_t temp=numTxBytes;
+			numTxBytes=0;
+			return temp;
+	}
+	uint64_t numTxBytes=0;
+	uint64_t numTxBytesLast=0;
+	uint64_t totalBytesSent=0;
+
+	uint64_t getNumTxBytes(){
+		uint64_t temp;
+		temp = totalBytesSent-numTxBytesLast;
+		numTxBytesLast=totalBytesSent;
+		return temp;
+	}
+
+	uint64_t numRxBytes=0;
+	uint64_t numRxBytesLast=0;
+	uint64_t totalBytesRcvd=0;
+	
+	uint64_t getNumRxBytes(){
+		uint64_t temp;
+		temp = totalBytesRcvd-numRxBytesLast;
+		numRxBytesLast=totalBytesRcvd;
+		return temp;
+	}
  protected:
 
    //Ptr<Node> m_node;

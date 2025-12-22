@@ -87,7 +87,7 @@ if __name__ == "__main__":
 		if (t + inter_t > time + base_t):
 			heapq.heappop(host_list)
 		else:
-			size = int(customRand.rand()) * 10
+			size = int(customRand.rand())
 			if size <= 0:
 				size = 1
 			n_flow += 1;

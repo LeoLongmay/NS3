@@ -43,7 +43,7 @@ TypeId RdmaHw::GetTypeId(void) {
                           DoubleValue(4.0), MakeDoubleAccessor(&RdmaHw::m_nack_interval),
                           MakeDoubleChecker<double>())
             .AddAttribute("L2ChunkSize", "Layer 2 chunk size. Disable chunk mode if equals to 0.",
-                          UintegerValue(4000), MakeUintegerAccessor(&RdmaHw::m_chunk),
+                          UintegerValue(0), MakeUintegerAccessor(&RdmaHw::m_chunk),
                           MakeUintegerChecker<uint32_t>())
             .AddAttribute("L2AckInterval", "Layer 2 Ack intervals. Disable ack if equals to 0.",
                           UintegerValue(1), MakeUintegerAccessor(&RdmaHw::m_ack_interval),
@@ -130,17 +130,17 @@ TypeId RdmaHw::GetTypeId(void) {
                           MakeTimeChecker())
             .AddAttribute("LpccEpsilon", "Buffer queue length threshold", UintegerValue(3),
                           MakeUintegerAccessor(&RdmaHw::m_epsilon), MakeUintegerChecker<uint16_t>())
-            .AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(4.0),
+            .AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(1),
                           MakeDoubleAccessor(&RdmaHw::m_theta), MakeDoubleChecker<double>())
             .AddAttribute("LpccTau", "RTT detection time window", UintegerValue(20000),
                           MakeUintegerAccessor(&RdmaHw::m_tau), MakeUintegerChecker<uint32_t>())
-            .AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", UintegerValue(2),
-                          MakeUintegerAccessor(&RdmaHw::m_wr), MakeUintegerChecker<uint64_t>())
-            .AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.6),
+            .AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", DoubleValue(4),
+                          MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>())
+            .AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.3),
                           MakeDoubleAccessor(&RdmaHw::m_kr), MakeDoubleChecker<double>())
             .AddAttribute("Lpcc_ClampTargetRate", "Lpcc clamp target rate.", BooleanValue(false), 
                           MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker())
-            .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
+            .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(true), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
 	        .AddAttribute("PowerTCPdelay", "to enable PowerTCP in delaymode", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPdelay), MakeBooleanChecker());
     return tid;
 }
@@ -571,6 +571,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
         }
         if (m_cc_mode == 9) { // lpcc
             fcnp_received_lpcc(qp, ch);
+            // cnp_received_mlx(qp);
         }
     }
 
@@ -583,7 +584,8 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
     } else if (m_cc_mode == 8) {
         HandleAckDctcp(qp, p, ch);
     } else if (m_cc_mode == 9) {
-        HandleAckLpcc(qp, p, ch);
+        // HandleAckLpcc(qp, p, ch);
+        // HandleAckTimely(qp, p, ch);
     }
     // ACK may advance the on-the-fly window, allowing more packets to send
     dev->TriggerTransmit();
@@ -1588,8 +1590,14 @@ void RdmaHw::RateIncEventLpcc(Ptr<RdmaQueuePair> q) {
     Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
     q->lpcc.m_targetRate += m_rhai; // m_rhai is a parameter of DCQCN
     if (q->lpcc.m_targetRate > dev->GetDataRate()) q->lpcc.m_targetRate = dev->GetDataRate();
-    q->lpcc.m_curRate = std::min((q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2), dev->GetDataRate());
-    ChangeRate(q, q->lpcc.m_curRate);
+    // q->lpcc.m_curRate = std::min((q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2), dev->GetDataRate());
+    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    // std::cout << "Inc\t" << "before: " << q->lpcc.m_curRate.GetBitRate() << std::endl;
+    q->lpcc.m_curRate = (q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2);   
+    // std::cout << "Inc\t" << "after: " << q->lpcc.m_curRate.GetBitRate() << std::endl;
+    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl; 
+    // ChangeRate(q, q->lpcc.m_curRate);
+    q->m_rate = q->lpcc.m_curRate;
 }
 
 void RdmaHw::ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta) {
@@ -1599,26 +1607,25 @@ void RdmaHw::ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, ui
 }
 
 void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
-    uint64_t m_rttl = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
-    uint64_t m_rtts = Simulator::Now().GetTimeStep() - ch.fcnp.timestamp;
-    uint16_t m_qlen = ch.cnp.qfb;
-    uint64_t m_k = (1.0 * m_qlen / m_epsilon - 1.0) * (1.0 * m_rttl / m_rtts);
-    // m_nic[nic_idx].dev->GetUsedBuffer();
+    // uint64_t m_rttl = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+    // uint64_t m_rtts = Simulator::Now().GetTimeStep() - ch.fcnp.timestamp;
+    // uint16_t m_qlen = ch.cnp.qfb;
+    // uint64_t m_k = (1.0 * m_qlen / m_epsilon - 1.0) * (1.0 * m_rttl / m_rtts);
+    uint64_t m_k = 1.2;
     
     uint32_t nic_idx = GetNicIdxOfQp(qp);
     DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
-    DataRate m_p = qp->lpcc.m_curRate / m_bps * ch.fcnp.m_flowCount;
+    DataRate m_p = qp->lpcc.m_curRate / m_bps * (ch.fcnp.m_flowCount / 950.0);
 
-    DataRate new_rate = qp->lpcc.m_curRate * (1 / (1 + std::min(m_k * m_p.GetBitRate(), m_wr)));
-    std::cout << "**************************************" << std::endl;
-    std::cout << "m_rttl: " << m_rttl << std::endl;
-    std::cout << "m_rtts: " << m_rtts << std::endl;
-    std::cout << "m_qlen: " << m_qlen << std::endl;
-    std::cout << "m_k: " << m_k << std::endl;
-    std::cout << "m_p: " << m_p.GetBitRate() << std::endl;
-    std::cout << "Down\t" << "before: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
-    std::cout << "Down\t" << "after: " << new_rate.GetBitRate() << std::endl;
-    ChangeRate(qp, new_rate);
+    DataRate new_rate = qp->lpcc.m_curRate * (1.0 / (1 + std::min(1.0 * m_k * m_p.GetBitRate(), m_wr)));
+    new_rate = std::max(new_rate, m_minRate);
+    // std::cout << "**************************************" << std::endl;
+    // std::cout << "m_k: " << m_k << std::endl;
+    // std::cout << "m_p: " << m_p.GetBitRate() << std::endl;
+    // std::cout << "Down\t" << "before: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
+    // std::cout << "Down\t" << "after: " << new_rate.GetBitRate() << std::endl;
+    // std::cout << "**************************************" << std::endl;
+    // ChangeRate(qp, new_rate);
     qp->m_rate = new_rate;
 }
 
@@ -1637,6 +1644,12 @@ void RdmaHw::UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHea
         double m_p = qp->lpcc.m_curRate / m_bps * (ch.fcnp.m_flowCount / 950.0);
 
         DataRate new_rate = qp->lpcc.m_curRate * (1 - std::min((1.0 * m_rttl - qp->lpcc.m_minRtt) / qp->lpcc.m_minRtt * m_p, m_kr));
+        new_rate = std::max(new_rate, m_minRate);
+        // std::cout << "--------------------------------------" << std::endl;
+        // std::cout << "m_p: " << m_p << std::endl;
+        // std::cout << "Down_rtt\t" << "before: " << qp->lpcc.m_curRate.GetBitRate() << std::endl;
+        // std::cout << "Down_rtt\t" << "after: " << new_rate.GetBitRate() << std::endl;
+        // std::cout << "--------------------------------------" << std::endl;
         ChangeRate(qp, new_rate);
         qp->lpcc.m_curRate = new_rate;
         qp->lpcc.m_minRtt = std::min(qp->lpcc.m_minRtt, m_rttl);
