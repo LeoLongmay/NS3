@@ -115,6 +115,7 @@ topo2bdp = {
     "leaf_spine_128_100G_OS2": 104000,  # 2-tier -> all 100Gbps
     "fat_k8_100G_OS2": 156000,  # 3-tier -> all 100Gbps
     "test_topoOS2": 104000,
+    "topology": 90500,
 }
 
 FLOWGEN_DEFAULT_TIME = 2.0  # see /traffic_gen/traffic_gen.py::base_t
@@ -195,6 +196,7 @@ def main():
     netload = args.netload
     oversub = int(topo.replace("\n", "").split("OS")[-1].replace(".txt", ""))
     assert (int(args.netload) % oversub == 0)
+    oversub = 2
     hostload = int(args.netload) / oversub
     assert (hostload > 0)
 
@@ -217,9 +219,9 @@ def main():
         n_host = int(line[0]) - int(line[1])
 
     assert (hostload >= 0 and hostload < 100)
-    # flow = "L_{load:.2f}_CDF_{cdf}_N_{n_host}_T_{time}ms_B_{bw}_flow".format(
-    #     load=hostload, cdf=args.cdf, n_host=n_host, time=int(float(args.simul_time)*1000), bw=bw)
-    flow = "flow-fairnessExp"
+    flow = "L_{load:.2f}_CDF_{cdf}_N_{n_host}_T_{time}ms_B_{bw}_flow".format(
+        load=hostload, cdf=args.cdf, n_host=n_host, time=int(float(args.simul_time)*1000), bw=bw)
+    # flow = "flow-fairnessExp"
 
     # check the file exists
     if (exists(os.getcwd() + "/config/" + flow + ".txt")):

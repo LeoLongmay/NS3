@@ -721,6 +721,8 @@ uint64_t get_nic_rate(NodeContainer &n) {
     return avg_nic_rate / n_servers;
 }
 
+
+
 void PrintResultsFlow(std::map<uint32_t,NetDeviceContainer> Src,uint32_t numFlows,double delay){
 	for (uint32_t i=0; i<numFlows;i++){
 		double throughputTotal=0;
@@ -735,6 +737,7 @@ void PrintResultsFlow(std::map<uint32_t,NetDeviceContainer> Src,uint32_t numFlow
 			throughputTotal+=throughput;
 			// std::cout << "Src " << i << " Port " << j << " throughput "<< throughput << " txBytes " << txBytes << " qlen " << qlen << " time " << Simulator::Now().GetSeconds() << std::endl;
 		}
+        // fprintf(fair_output, "Src %u Total 0 throughput %lf time %lf\n", i, throughputTotal, Simulator::Now().GetSeconds());
 		std::cout << "Src " << i << " Total " << 0 << " throughput " << throughputTotal <<  " time " << Simulator::Now().GetSeconds() << std::endl;
 	}
 	Simulator::Schedule(Seconds(delay),PrintResultsFlow,Src,numFlows,delay);
@@ -767,7 +770,7 @@ int main(int argc, char *argv[]) {
 
     // if (true) {
     //     std::ifstream conf;
-    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/888283503/config.txt", ios::in);
+    //     conf.open("/root/temp/ns-allinone-3.19/ns-3.19/mix/output/432066848/config.txt", ios::in);
         while (!conf.eof()) {
             std::string key;
             conf >> key;
@@ -1409,6 +1412,7 @@ int main(int argc, char *argv[]) {
     topo2bdpMap[std::string("leaf_spine_128_100G_OS2")] = 204000;  // RTT=8320
     topo2bdpMap[std::string("fat_k8_100G_OS2")] = 156000;      // RTT=12480 --> all 100G links
     topo2bdpMap[std::string("test_topoOS2")] = 100002000;
+    topo2bdpMap[std::string("topology")] = 90500;
 
     // topology_file
     bool found_topo2bdpMap = false;
@@ -1827,7 +1831,6 @@ int main(int argc, char *argv[]) {
                         voq_detail_output, uplink_output, conn_output, &lb_mode);
 
     double delay = 0.5*maxRtt*1e-9; // 10 micro seconds
-	Simulator::Schedule(Seconds(delay),PrintResultsFlow,sourceNodes,flow_num,delay);
 
     //
     // Now, do the actual simulation.
@@ -1836,9 +1839,10 @@ int main(int argc, char *argv[]) {
     std::cout << "Running Simulation.\n";
     fflush(stdout);
     NS_LOG_INFO("Run Simulation.");
-    Simulator::Schedule(Seconds(flowgen_start_time),
-                        &stop_simulation_middle);  // check every 100us
+    Simulator::Schedule(Seconds(flowgen_start_time), &stop_simulation_middle);  // check every 100us
     Simulator::Stop(Seconds(flowgen_stop_time + 10.0));
+    // Simulator::Schedule(Seconds(delay),PrintResultsFlow,sourceNodes,flow_num,delay);
+    // Simulator::Stop(Seconds(2));
     Simulator::Run();
     /*-----------------------------------------------------------------------------*/
     /*----- we don't need below. Just we can enforce to close this simulation. -----*/
