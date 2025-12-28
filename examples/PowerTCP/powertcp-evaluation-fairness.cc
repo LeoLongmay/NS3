@@ -708,10 +708,10 @@ int main(int argc, char *argv[])
 		conf.close();
 
 		// debug for lpcc
-		wien = false;
-		delayWien = false;
-		algorithm = 9;
-		windowCheck = 0;
+		// wien = false;
+		// delayWien = false;
+		// algorithm = 9;
+		// windowCheck = 0;
 
 		// overriding config file. I prefer to use cmd arguments
 		cc_mode = algorithm; // overrides configuration file
