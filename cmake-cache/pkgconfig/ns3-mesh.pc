@@ -1,0 +1,13 @@
+exec_prefix="/usr/local/bin"
+libdir="/usr/local/lib"
+includedir="/usr/local/include"
+
+Name: ns3-mesh
+Description: 
+URL: 
+Version: 3.39
+Requires:  ns3-internet ns3-wifi ns3-applications
+Requires.private: 
+Cflags: -I"${includedir}" 
+Libs: -L"${libdir}" -lns3.39-mesh-debug  -lns3.39-internet-debug -lns3.39-wifi-debug -lns3.39-applications-debug -l-lpthread
+Libs.private: -L"${libdir}" 

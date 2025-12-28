@@ -1,0 +1,2 @@
+# NS3=~/ns3-datacenter/simulator/ns-3.39
+NS3=/root/PowerTCP-RAW/simulator/ns-3.39
