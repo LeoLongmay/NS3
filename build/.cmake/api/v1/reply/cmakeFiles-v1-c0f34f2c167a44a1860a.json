@@ -1,0 +1,660 @@
+{
+	"inputs" : 
+	[
+		{
+			"path" : "CMakeLists.txt"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.25.2/CMakeSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeSystemSpecificInitialize.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.25.2/CMakeCXXCompiler.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.25.2/CMakeCCompiler.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeSystemSpecificInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeGenericSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeInitializeConfigs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/Linux.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeCXXInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Compiler/GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/Linux-GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeCInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Compiler/GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/Linux-GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"path" : "build-support/macros-and-definitions.cmake"
+		},
+		{
+			"path" : "build-support/3rd-party/colored-messages.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/ProcessorCount.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/GNUInstallDirs.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-cmake-package.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckIncludeFile.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckIncludeFileCXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckIncludeFiles.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckFunctionExists.cmake"
+		},
+		{
+			"path" : "build-support/3rd-party/find-program-hints.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-module-macros.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-contributions.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-lock.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-configtable.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-versioning.cmake"
+		},
+		{
+			"path" : "build-support/custom-modules/ns3-compiler-workarounds.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckCXXSourceCompiles.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Internal/CheckSourceCompiles.cmake"
+		},
+		{
+			"path" : "build-support/3rd-party/FindEigen3.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"path" : "build-support/3rd-party/FindHarfBuzz.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPkgConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindLibXml2.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPkgConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindThreads.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckLibraryExists.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckIncludeFile.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckCSourceCompiles.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/Internal/CheckSourceCompiles.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"path" : "build-support/config-store-config-template.h"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindBoost.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindGSL.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPkgConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"path" : "build-support/3rd-party/FindSphinx.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CheckCXXSourceCompiles.cmake"
+		},
+		{
+			"path" : "build-support/core-config-template.h"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"path" : "build-support/pkgconfig-template.pc.in"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/CMakePackageConfigHelpers.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/WriteBasicConfigVersionFile.cmake"
+		},
+		{
+			"path" : "build-support/Config.cmake.in"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/BasicConfigVersion-ExactVersion.cmake.in"
+		},
+		{
+			"path" : "src/CMakeLists.txt"
+		},
+		{
+			"path" : "src/antenna/CMakeLists.txt"
+		},
+		{
+			"path" : "src/aodv/CMakeLists.txt"
+		},
+		{
+			"path" : "src/applications/CMakeLists.txt"
+		},
+		{
+			"path" : "src/bridge/CMakeLists.txt"
+		},
+		{
+			"path" : "src/brite/CMakeLists.txt"
+		},
+		{
+			"path" : "src/buildings/CMakeLists.txt"
+		},
+		{
+			"path" : "src/click/CMakeLists.txt"
+		},
+		{
+			"path" : "src/config-store/CMakeLists.txt"
+		},
+		{
+			"path" : "src/core/CMakeLists.txt"
+		},
+		{
+			"path" : "src/csma/CMakeLists.txt"
+		},
+		{
+			"path" : "src/csma-layout/CMakeLists.txt"
+		},
+		{
+			"path" : "src/dsdv/CMakeLists.txt"
+		},
+		{
+			"path" : "src/dsr/CMakeLists.txt"
+		},
+		{
+			"path" : "src/energy/CMakeLists.txt"
+		},
+		{
+			"path" : "src/fd-net-device/CMakeLists.txt"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPkgConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/share/cmake-3.25/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"path" : "src/flow-monitor/CMakeLists.txt"
+		},
+		{
+			"path" : "src/internet/CMakeLists.txt"
+		},
+		{
+			"path" : "src/internet-apps/CMakeLists.txt"
+		},
+		{
+			"path" : "src/lr-wpan/CMakeLists.txt"
+		},
+		{
+			"path" : "src/lte/CMakeLists.txt"
+		},
+		{
+			"path" : "src/mesh/CMakeLists.txt"
+		},
+		{
+			"path" : "src/mobility/CMakeLists.txt"
+		},
+		{
+			"path" : "src/netanim/CMakeLists.txt"
+		},
+		{
+			"path" : "src/network/CMakeLists.txt"
+		},
+		{
+			"path" : "src/nix-vector-routing/CMakeLists.txt"
+		},
+		{
+			"path" : "src/olsr/CMakeLists.txt"
+		},
+		{
+			"path" : "src/openflow/CMakeLists.txt"
+		},
+		{
+			"path" : "src/point-to-point/CMakeLists.txt"
+		},
+		{
+			"path" : "src/point-to-point-layout/CMakeLists.txt"
+		},
+		{
+			"path" : "src/propagation/CMakeLists.txt"
+		},
+		{
+			"path" : "src/sixlowpan/CMakeLists.txt"
+		},
+		{
+			"path" : "src/spectrum/CMakeLists.txt"
+		},
+		{
+			"path" : "src/stats/CMakeLists.txt"
+		},
+		{
+			"path" : "src/tap-bridge/CMakeLists.txt"
+		},
+		{
+			"path" : "src/topology-read/CMakeLists.txt"
+		},
+		{
+			"path" : "src/traffic-control/CMakeLists.txt"
+		},
+		{
+			"path" : "src/uan/CMakeLists.txt"
+		},
+		{
+			"path" : "src/virtual-net-device/CMakeLists.txt"
+		},
+		{
+			"path" : "src/wifi/CMakeLists.txt"
+		},
+		{
+			"path" : "src/wimax/CMakeLists.txt"
+		},
+		{
+			"path" : "examples/CMakeLists.txt"
+		},
+		{
+			"path" : "scratch/CMakeLists.txt"
+		},
+		{
+			"path" : "scratch/nested-subdir/CMakeLists.txt"
+		},
+		{
+			"path" : "utils/CMakeLists.txt"
+		}
+	],
+	"kind" : "cmakeFiles",
+	"paths" : 
+	{
+		"build" : "/home/leo/PowerTCP-RAW/ns-3.39/build",
+		"source" : "/home/leo/PowerTCP-RAW/ns-3.39"
+	},
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}

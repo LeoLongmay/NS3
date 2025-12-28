@@ -1,0 +1,192 @@
+Performing C++ SOURCE FILE Test MISSING_OSTREAM_NULLPTR_OPERATOR failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb
+
+Run Build Command(s):/usr/bin/ninja cmTC_860fb && [1/2] Building CXX object CMakeFiles/cmTC_860fb.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_860fb.dir/src.cxx.o 
+/usr/bin/g++ -DMISSING_OSTREAM_NULLPTR_OPERATOR  -fPIE -std=c++17 -o CMakeFiles/cmTC_860fb.dir/src.cxx.o -c /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx: In function ‘int main()’:
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:11:12: error: ambiguous overload for ‘operator<<’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream<char>’} and ‘std::nullptr_t’)
+   11 |         os << std::nullptr_t();
+      |         ~~~^~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/9/iostream:39,
+                 from /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:2:
+/usr/include/c++/9/ostream:108:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(std::basic_ostream<_CharT, _Traits>::__ostream_type& (*)(std::basic_ostream<_CharT, _Traits>::__ostream_type&)) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>]’
+  108 |       operator<<(__ostream_type& (*__pf)(__ostream_type&))
+      |       ^~~~~~~~
+/usr/include/c++/9/ostream:117:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(std::basic_ostream<_CharT, _Traits>::__ios_type& (*)(std::basic_ostream<_CharT, _Traits>::__ios_type&)) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>; std::basic_ostream<_CharT, _Traits>::__ios_type = std::basic_ios<char>]’
+  117 |       operator<<(__ios_type& (*__pf)(__ios_type&))
+      |       ^~~~~~~~
+/usr/include/c++/9/ostream:127:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(std::ios_base& (*)(std::ios_base&)) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>]’
+  127 |       operator<<(ios_base& (*__pf) (ios_base&))
+      |       ^~~~~~~~
+/usr/include/c++/9/ostream:245:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(const void*) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>]’
+  245 |       operator<<(const void* __p)
+      |       ^~~~~~~~
+/usr/include/c++/9/ostream:250:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(std::nullptr_t) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>; std::nullptr_t = std::nullptr_t]’
+  250 |       operator<<(nullptr_t)
+      |       ^~~~~~~~
+In file included from /usr/include/c++/9/ostream:702,
+                 from /usr/include/c++/9/iostream:39,
+                 from /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:2:
+/usr/include/c++/9/bits/ostream.tcc:119:5: note: candidate: ‘std::basic_ostream<_CharT, _Traits>& std::basic_ostream<_CharT, _Traits>::operator<<(std::basic_ostream<_CharT, _Traits>::__streambuf_type*) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__streambuf_type = std::basic_streambuf<char>]’
+  119 |     basic_ostream<_CharT, _Traits>::
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:4:26: note: candidate: ‘std::ostream& operator<<(std::ostream&, std::nullptr_t)’
+    4 |     inline std::ostream& operator << (std::ostream& os, std::nullptr_t ptr)
+      |                          ^~~~~~~~
+In file included from /usr/include/c++/9/ostream:702,
+                 from /usr/include/c++/9/iostream:39,
+                 from /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:2:
+/usr/include/c++/9/bits/ostream.tcc:321:5: note: candidate: ‘std::basic_ostream<_CharT, _Traits>& std::operator<<(std::basic_ostream<_CharT, _Traits>&, const char*) [with _CharT = char; _Traits = std::char_traits<char>]’
+  321 |     operator<<(basic_ostream<_CharT, _Traits>& __out, const char* __s)
+      |     ^~~~~~~~
+In file included from /usr/include/c++/9/iostream:39,
+                 from /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-wgaoTb/src.cxx:2:
+/usr/include/c++/9/ostream:565:5: note: candidate: ‘std::basic_ostream<char, _Traits>& std::operator<<(std::basic_ostream<char, _Traits>&, const char*) [with _Traits = std::char_traits<char>]’
+  565 |     operator<<(basic_ostream<char, _Traits>& __out, const char* __s)
+      |     ^~~~~~~~
+/usr/include/c++/9/ostream:578:5: note: candidate: ‘std::basic_ostream<char, _Traits>& std::operator<<(std::basic_ostream<char, _Traits>&, const signed char*) [with _Traits = std::char_traits<char>]’
+  578 |     operator<<(basic_ostream<char, _Traits>& __out, const signed char* __s)
+      |     ^~~~~~~~
+/usr/include/c++/9/ostream:583:5: note: candidate: ‘std::basic_ostream<char, _Traits>& std::operator<<(std::basic_ostream<char, _Traits>&, const unsigned char*) [with _Traits = std::char_traits<char>]’
+  583 |     operator<<(basic_ostream<char, _Traits>& __out, const unsigned char* __s)
+      |     ^~~~~~~~
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+
+    #include <iostream>
+    #include <cstddef>
+    inline std::ostream& operator << (std::ostream& os, std::nullptr_t ptr)
+    {
+      return os << "nullptr"; //whatever you want nullptr to show up as in the console
+    }
+    int main()
+    {
+        std::ostream os(NULL);
+        os << std::nullptr_t();
+        return 0;
+    }
+    
+
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-ARX7wd
+
+Run Build Command(s):/usr/bin/ninja cmTC_4f3c7 && [1/2] Building C object CMakeFiles/cmTC_4f3c7.dir/src.c.o
+[2/2] Linking C executable cmTC_4f3c7
+FAILED: cmTC_4f3c7 
+: && /usr/bin/gcc   CMakeFiles/cmTC_4f3c7.dir/src.c.o -o cmTC_4f3c7   && :
+/usr/bin/ld: CMakeFiles/cmTC_4f3c7.dir/src.c.o: in function `main':
+src.c:(.text+0x46): undefined reference to `pthread_create'
+/usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
+/usr/bin/ld: src.c:(.text+0x5e): undefined reference to `pthread_cancel'
+/usr/bin/ld: src.c:(.text+0x6f): undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-5crnde
+
+Run Build Command(s):/usr/bin/ninja cmTC_0f816 && [1/2] Building C object CMakeFiles/cmTC_0f816.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_0f816
+FAILED: cmTC_0f816 
+: && /usr/bin/gcc -DCHECK_FUNCTION_EXISTS=pthread_create  CMakeFiles/cmTC_0f816.dir/CheckFunctionExists.c.o -o cmTC_0f816  -lpthreads && :
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+
+Performing C++ SOURCE FILE Test HAVE_UINT128_T failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe
+
+Run Build Command(s):/usr/bin/ninja cmTC_3492b && [1/2] Building CXX object CMakeFiles/cmTC_3492b.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_3492b.dir/src.cxx.o 
+/usr/bin/g++ -DHAVE_UINT128_T  -fPIE -std=c++17 -o CMakeFiles/cmTC_3492b.dir/src.cxx.o -c /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx: In function ‘int main()’:
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx:4:18: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
+    4 |             if ((uint128_t *) 0) return 0;
+      |                  ^~~~~~~~~
+      |                  uint32_t
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx:4:29: error: expected primary-expression before ‘)’ token
+    4 |             if ((uint128_t *) 0) return 0;
+      |                             ^
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx:4:30: error: expected ‘)’ before numeric constant
+    4 |             if ((uint128_t *) 0) return 0;
+      |                ~             ^~
+      |                              )
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-vp9nCe/src.cxx:5:25: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
+    5 |             if (sizeof (uint128_t)) return 0;
+      |                         ^~~~~~~~~
+      |                         uint32_t
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+#include <stdint.h>
+       int main()
+         {
+            if ((uint128_t *) 0) return 0;
+            if (sizeof (uint128_t)) return 0;
+            return 1;
+         }
+
+Determining if files boost/units/quantity.hpp;boost/units/systems/si.hpp exist failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-Ua7cde
+
+Run Build Command(s):/usr/bin/ninja cmTC_99a4d && [1/2] Building CXX object CMakeFiles/cmTC_99a4d.dir/HAVE_BOOST_UNITS.cpp.o
+FAILED: CMakeFiles/cmTC_99a4d.dir/HAVE_BOOST_UNITS.cpp.o 
+/usr/bin/g++   -fPIE -std=c++17 -o CMakeFiles/cmTC_99a4d.dir/HAVE_BOOST_UNITS.cpp.o -c /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-Ua7cde/HAVE_BOOST_UNITS.cpp
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-Ua7cde/HAVE_BOOST_UNITS.cpp:2:10: fatal error: boost/units/quantity.hpp: No such file or directory
+    2 | #include <boost/units/quantity.hpp>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+Source:
+/* */
+#include <boost/units/quantity.hpp>
+#include <boost/units/systems/si.hpp>
+
+
+int main(void){return 0;}
+
+Determining if the include file net/netmap_user.h exists failed with the following output:
+Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-0haKpc
+
+Run Build Command(s):/usr/bin/ninja cmTC_2b0d8 && [1/2] Building C object CMakeFiles/cmTC_2b0d8.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_2b0d8.dir/CheckIncludeFile.c.o 
+/usr/bin/gcc   -fPIE -o CMakeFiles/cmTC_2b0d8.dir/CheckIncludeFile.c.o -c /home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-0haKpc/CheckIncludeFile.c
+/home/leo/PowerTCP-RAW/ns-3.39/build/CMakeFiles/CMakeScratch/TryCompile-0haKpc/CheckIncludeFile.c:1:10: fatal error: net/netmap_user.h: No such file or directory
+    1 | #include <net/netmap_user.h>
+      |          ^~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+

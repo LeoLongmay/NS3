@@ -1,0 +1,56 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "NS3: waf 生成活动文件",
+            "command": "/root/PowerTCP-RAW/simulator/ns-3.39/waf",
+            "args": [],
+            "options": {
+                "cwd": "/root/PowerTCP-RAW/simulator/ns-3.39"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "detail": "编译器: /usr/bin/gcc"
+        },
+    ]
+}
+
+
+// {
+//     "version": "2.0.0",
+//     "tasks": [
+//         {
+//             "type": "cppbuild",
+//             "label": "NS3: waf 生成活动文件",
+//             "command": "/root/PowerTCP-RAW/simulator/ns-3.39/ns3",
+//             // 核心修改：指定debug模式 + 编译当前活动文件
+//             "args": [
+//                 "--build-profile=debug",  // 强制编译debug版本（禁用优化，保留调试信息）
+//                 "--run",                  // 编译并准备运行（等价于先build再run，仅build可换为build）
+//                 "${fileBasenameNoExtension}"  // 自动匹配当前打开的.cc文件名（如powertcp-evaluation-fairness）
+//             ],
+//             "options": {
+//                 "cwd": "/root/PowerTCP-RAW/simulator/ns-3.39"
+//             },
+//             "problemMatcher": ["$gcc"],
+//             "group": {
+//                 "kind": "build",
+//                 "isDefault": false
+//             },
+//             "detail": "编译器: /usr/bin/gcc",
+//             // 可选：确保任务失败时提示
+//             "presentation": {
+//                 "echo": true,
+//                 "reveal": "always",
+//                 "focus": false,
+//                 "panel": "shared"
+//             }
+//         }
+//     ]
+// }
