@@ -67,6 +67,7 @@
 				"src/point-to-point/model/switch-mmu.h",
 				"src/point-to-point/model/switch-node.h",
 				"src/point-to-point/model/trace-format.h",
+				"src/point-to-point/model/rdma-flow-table.h",
 				"src/point-to-point/helper/qbb-helper.h",
 				"src/point-to-point/helper/sim-setting.h",
 				"build/include/ns3/point-to-point-module.h"
