@@ -339,7 +339,7 @@ uint64_t SwitchMmu::GetIngressSharedUsed() {
 // A sky high threshold for a queue can be emulated by setting the corresponding alpha to a large value. eg., UINT32_MAX
 uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type) {
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		if (ingressSharedPool > ingressPoolSharedUsed) {
@@ -353,7 +353,7 @@ uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		if (egressPool[type] > egressPoolUsed[type]) {
 			uint64_t remaining = egressPool[type] - egressPoolUsed[type];
 			// UINT64_MAX - 1024*1024 is just a randomly chosen big value.
@@ -365,6 +365,7 @@ uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string
 			return 0;
 		}
 	}
+	return 0;
 }
 void SwitchMmu::setCongested(uint32_t portId, uint32_t qIndex, std::string inout, double satLevel) {
 	if (inout == "ingress") {
@@ -453,7 +454,7 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 		updateDequeueRates();
 	}
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		double satLevel = double(ingress_bytes[port][qIndex]) / congestionIndicator;
@@ -482,7 +483,7 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		double satLevel = double(egress_bytes[port][qIndex]) / congestionIndicator;
 		if (satLevel > 1) {
 			satLevel = 1;
@@ -506,11 +507,12 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 			return 0;
 		}
 	}
+	return 0;
 }
 
 uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type, uint32_t unsched) {
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		if (ingressSharedPool > ingressPoolSharedUsed) {
@@ -532,7 +534,7 @@ uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string 
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		if (egressPool[type] > egressPoolUsed[type]) {
 			uint64_t remaining = egressPool[type] - egressPoolUsed[type];
 			// UINT64_MAX - 1024*1024 is just a randomly chosen big value.
@@ -551,6 +553,7 @@ uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string 
 			return 0;
 		}
 	}
+	return 0;
 }
 
 
@@ -614,6 +617,7 @@ uint64_t SwitchMmu::ReverieThreshold(uint32_t port, uint32_t qIndex, uint32_t ty
 			return 0;
 		}
 	}
+	return 0;
 }
 
 uint64_t SwitchMmu::Threshold(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type, uint32_t unsched) {
@@ -1023,6 +1027,7 @@ bool SwitchMmu::CheckShouldResume(uint32_t port, uint32_t qIndex) {
 	}
 	// Minor detail: Threshold(port, qIndex, "ingress", LOSSLESS, 0) is used above where type=LOSSLESS and unsched=0; It is obvious that resume is triggered only for LOSSLESS queues.
 	// Abound unsched=0: sending resume must be independent of arriving traffic and hence the threshold used is the default value and a prioritized value cannot be used here as is done for admission of priority packets in ABM.
+	return false;
 }
 
 void SwitchMmu::SetPause(uint32_t port, uint32_t qIndex) {

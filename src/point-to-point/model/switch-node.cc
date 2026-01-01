@@ -69,7 +69,25 @@ SwitchNode::SwitchNode() {
 		m_lastPktSize[i] = m_lastPktTs[i] = 0;
 	for (uint32_t i = 0; i < pCnt; i++)
 		m_u[i] = 0;
+    uint64_t inactiveThreshold = m_epsilon * 5;
+    m_flowTable = Create<FlowTable>(inactiveThreshold);
+
+    ScheduleCleanFlowTable();	
 }
+
+void SwitchNode::ScheduleCleanFlowTable() {
+    m_flowTable->CleanInactiveFlows();
+
+    m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(100),
+                                           &SwitchNode::ScheduleCleanFlowTable, this);
+}
+
+// void SwitchNode::HandlePacket(Ptr<Packet> pkt, Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport) {
+//     m_flowTable->InsertOrUpdateFlow(sip, dip, sport, dport);
+
+//     uint32_t dipFlowCount = m_flowTable->GetFlowCountByDip(dip);
+//     NS_LOG_DEBUG("DIP " << dip << " has " << dipFlowCount << " flows");
+// }
 
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch) {
 	// look up entries
@@ -169,7 +187,7 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 			CheckAndSendPfc(inDev, qIndex);
 		}
 		// std::cout << "inDev: " << inDev << " outDev: " << idx << " qIndex: " << qIndex << std::endl;
-		qIndex %= 8;
+		// qIndex %= 8;
 		m_bytes[inDev][idx][qIndex] += p->GetSize();
 		m_devices[idx]->SwitchSend(qIndex, p, ch);
 		DynamicCast<QbbNetDevice>(m_devices[idx])->totalBytesRcvd += p->GetSize(); // Attention: this is the egress port's total received packets. Not the ingress port.
@@ -247,6 +265,47 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 		m_mmu->RemoveFromIngressAdmission(inDev, qIndex, p->GetSize(), found);
 		m_mmu->RemoveFromEgressAdmission(ifIndex, qIndex, p->GetSize(), found);
 		m_bytes[inDev][ifIndex][qIndex] -= p->GetSize();
+		if (m_ccMode == 9) { // lpcc
+			if (m_mmu->egress_bytes[ifIndex][qIndex] > m_epsilon) { // m_mmu->kmin[ifIndex]
+				PppHeader ppp;
+				Ipv4Header h;
+				UdpHeader ch;
+				Ptr<Packet> packet = p->Copy();
+				packet->RemoveHeader(ppp);
+				packet->RemoveHeader(h);
+				packet->PeekHeader(ch);
+
+				Ipv4Address srcip = h.GetDestination(); // origin pkt's dst ip is fcnp's src ip
+				Ipv4Address dstip = h.GetSource(); // origin pkt's src ip is fcnp's dst ip;
+				PppHeader nppp = ppp;
+				Ipv4Header nh = h;
+				nh.SetSource(srcip);
+				nh.SetDestination(dstip);
+				nh.SetProtocol(0xF9); // fcnp
+					
+				CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+				nch.sip = srcip.Get();
+				nch.dip = dstip.Get();
+				nch.l3Prot = 0xF9; // fcnp
+				nch.fcnp.timestamp = Simulator::Now().GetTimeStep();
+				nch.fcnp.qIndex = 0;
+				nch.fcnp.pg = 3;
+				nch.fcnp.dport = ch.GetSourcePort();
+				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
+				nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+				nch.fcnp.m_flowCount = 2; // TODO: rdma_flow_table
+				// for (uint32_t i = 0; i < m_rtTable.size(); i++) {
+				// 	if (m_rtTable[i].) continue;
+				// }
+
+				Ptr<Packet> fcnp_pkt = Create<Packet>();
+				fcnp_pkt->AddHeader(nch);
+				fcnp_pkt->AddHeader(nh);
+				fcnp_pkt->AddHeader(nppp);
+				fcnp_pkt->AddPacketTag(t);
+				SendToDev(fcnp_pkt, nch);
+			}
+		}
 		if (m_ecnEnabled) {
 			bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
 			if (egressCongested) {
@@ -257,34 +316,6 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				h.SetEcn((Ipv4Header::EcnType)0x03);
 				p->AddHeader(h);
 				p->AddHeader(ppp);
-
-				if (m_ccMode == 9) { // lpcc
-					Ipv4Address srcip = h.GetDestination(); // origin pkt's dst ip is fcnp's src ip
-					Ipv4Address dstip = h.GetSource(); // origin pkt's src ip is fcnp's dst ip
-					Ptr<Packet> fcnp_pkt = Create<Packet>();
-					PppHeader nppp = ppp;
-					Ipv4Header nh = h;
-					nh.SetSource(srcip);
-					nh.SetDestination(dstip);
-					nh.SetProtocol(0xF9); // fcnp
-					
-					CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
-					nch.l3Prot = 0xF9; // fcnp
-					nch.fcnp.timestamp = Simulator::Now().GetTimeStep();
-					nch.fcnp.qIndex = 0;
-					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
-					nch.fcnp.qlen = dev->GetQueue()->GetNBytesTotal();
-					nch.fcnp.m_flowCount = 29199;
-					// for (uint32_t i = 0; i < m_rtTable.size(); i++) {
-					// 	if (m_rtTable[i].) continue;
-					// }
-					fcnp_pkt->AddHeader(nch);
-					fcnp_pkt->AddHeader(nh);
-					fcnp_pkt->AddHeader(nppp);
-					fcnp_pkt->AddPacketTag(t);
-					std::cout << "fcnp_send" << std::endl;
-					SendToDev(fcnp_pkt, nch);
-				}
 			}
 		}
 		//CheckAndSendPfc(inDev, qIndex);
@@ -417,6 +448,10 @@ int SwitchNode::log2apprx(int x, int b, int m, int l) {
 #endif
 	}
 	return int(log2(x) * (1 << logres_shift(b, l)));
+}
+
+SwitchNode::~SwitchNode() {
+    Simulator::Cancel(m_cleanFlowEvent);
 }
 
 } /* namespace ns3 */

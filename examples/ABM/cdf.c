@@ -103,7 +103,7 @@ double avg_cdf(struct cdf_table *table)
         avg += (value * prob);
 	sq += value*value*prob;
     }
-	double var = sq - avg*avg;
+	// double var = sq - avg*avg;
 
     return avg;
 }

@@ -136,7 +136,8 @@ uint64_t GetBytesDelta(uint64_t a, uint64_t b) {
 double GetUDelta (double a, double b) {
 	if (a > b)
 		return a - b;
-	if (b > a)
+	// if (b > a)
+	else
 		return b - a;
 }
 
@@ -201,7 +202,7 @@ void TcpAdvanced::UpdateRatePowertcp(Ptr<Packet> packet, const TcpHeader& tcpHea
 
 		if (fb.getHopCount() <= fb.getMaxHops()) {
 			double max_c = 0;
-			bool inStable = false;
+			// bool inStable = false;
 
 			double U = 0;
 			uint64_t dt = 0;
@@ -247,12 +248,12 @@ void TcpAdvanced::UpdateRatePowertcp(Ptr<Packet> packet, const TcpHeader& tcpHea
 
 
 			DataRate new_rate;
-			int32_t new_incStage;
-			DataRate new_rate_per_hop[fb.getMaxHops()];
-			int32_t new_incStage_per_hop[fb.getMaxHops()];
+			int32_t new_incStage = 0;
+			// DataRate new_rate_per_hop[fb.getMaxHops()];
+			// int32_t new_incStage_per_hop[fb.getMaxHops()];
 
 			if (updated_any) {
-				if (dt > m_baseRtt.GetNanoSeconds())
+				if (dt > static_cast<uint64_t>(m_baseRtt.GetNanoSeconds()))
 					dt = m_baseRtt.GetNanoSeconds();
 
 				uAggregate = (uAggregate * (m_baseRtt.GetNanoSeconds() - dt) + U * dt) / (double(m_baseRtt.GetNanoSeconds()));
@@ -318,7 +319,7 @@ void TcpAdvanced::UpdateRateThetaPowertcp(Ptr<Packet> packet, const TcpHeader& t
 
 		double rtt = Simulator::Now().GetNanoSeconds() - fb.getPktTimestamp();
 
-		if (dt > m_baseRtt.GetNanoSeconds())
+		if (dt > static_cast<uint64_t>(m_baseRtt.GetNanoSeconds()))
 			dt = m_baseRtt.GetNanoSeconds();
 
 		double A = double(rtt - lastRTT) / dt + 1;
@@ -333,7 +334,7 @@ void TcpAdvanced::UpdateRateThetaPowertcp(Ptr<Packet> packet, const TcpHeader& t
 		DataRate new_rate;
 
 		if (updated_any) {
-			if (dt > m_baseRtt.GetNanoSeconds())
+			if (dt > static_cast<uint64_t>(m_baseRtt.GetNanoSeconds()))
 				dt = m_baseRtt.GetNanoSeconds();
 
 			uAggregate = (uAggregate * (m_baseRtt.GetNanoSeconds() - dt) + U * dt) / (double(m_baseRtt.GetNanoSeconds()));
@@ -433,7 +434,7 @@ void TcpAdvanced::UpdateRateHpcc(Ptr<Packet> packet, const TcpHeader& tcpHeader,
 			int32_t new_incStage_per_hop[fb.getMaxHops()];
 			if (!tcb->m_multipleRate) {
 				if (updated_any) {
-					if (dt > m_baseRtt.GetNanoSeconds())
+					if (dt > static_cast<uint64_t>(m_baseRtt.GetNanoSeconds()))
 						dt = m_baseRtt.GetNanoSeconds();
 					uAggregate = (uAggregate * (m_baseRtt.GetNanoSeconds() - dt) + U * dt) / double(m_baseRtt.GetNanoSeconds());
 					max_c = uAggregate / tcb->m_targetUtil;

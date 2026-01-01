@@ -61,7 +61,7 @@ main (int argc, char *argv[])
 	double START_TIME = 0;
 	double END_TIME = 20;
 
-	uint64_t serverCapacity = 10*GIGA;
+	uint64_t serverCapacity = static_cast<uint64_t>(10)*GIGA;
 	uint64_t linkCapacity = 1*GIGA;
 	uint32_t linkLatency = 1000; // in microseconds
 
@@ -219,7 +219,7 @@ main (int argc, char *argv[])
 
 
 	uint32_t port = 4444;
-	uint64_t flowSize = 20*GIGA/8.0;
+	uint64_t flowSize = static_cast<uint64_t>(20)*GIGA/8.0;
 	double startTime = START_TIME+0.1;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////

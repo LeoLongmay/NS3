@@ -528,7 +528,7 @@ SQLite3_header_internal_sqlite3.h:FILEPATH=SQLite3_header_internal_sqlite3.h-NOT
 SQLite3_library_internal_sqlite3:FILEPATH=SQLite3_library_internal_sqlite3-NOTFOUND
 
 //Path to a program.
-VALGRIND:FILEPATH=VALGRIND-NOTFOUND
+VALGRIND:FILEPATH=/usr/bin/valgrind
 
 //Path to a file.
 brite_header_internal_Brite.h:FILEPATH=brite_header_internal_Brite.h-NOTFOUND

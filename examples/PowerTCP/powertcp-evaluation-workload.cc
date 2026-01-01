@@ -249,7 +249,7 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n) {
 			}
 		fflush(qlen_output);
 	}
-	if (Simulator::Now().GetTimeStep() < qlen_mon_end)
+	if ((uint64_t)Simulator::Now().GetTimeStep() < qlen_mon_end)
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
@@ -364,6 +364,7 @@ uint64_t get_nic_rate(NodeContainer &n) {
 	for (uint32_t i = 0; i < n.GetN(); i++)
 		if (n.Get(i)->GetNodeType() == 0)
 			return DynamicCast<QbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
+	return 0;
 }
 
 
@@ -419,7 +420,7 @@ void install_applications_queryNew (int fromLeafId, double requestRate, uint32_t
 			while (leaftarget == fromLeafId)
 				leaftarget = get_target_leaf(LEAF_COUNT);//rand_range(0,LEAF_COUNT);
 
-			uint16_t port = PORT_START++;//uint16_t (rand_range (PORT_START, PORT_END));
+			// uint16_t port = PORT_START++;//uint16_t (rand_range (PORT_START, PORT_END));
 
 			int destServerIndex = fromServerIndexX;
 
@@ -427,7 +428,7 @@ void install_applications_queryNew (int fromLeafId, double requestRate, uint32_t
 			uint32_t flowSize = double(requestSize) / double(fan);//QUERY_DATA/fan;//gen_random_cdf (cdfTable);
 
 
-			for (int r = 0; r < fan; r++) {
+			for (uint32_t r = 0; r < fan; r++) {
 
 				uint32_t fromServerIndex = SERVER_COUNT * leaftarget + rand_range(0, SERVER_COUNT);
 
@@ -936,7 +937,7 @@ int main(int argc, char *argv[])
 
 	topof.open(topology_file.c_str());
 	flowf.open(flow_file.c_str());
-	uint32_t node_num, switch_num, tors, link_num, trace_num;
+	uint32_t node_num, switch_num, tors, link_num;
 	topof >> node_num >> switch_num >> tors >> link_num ; // changed here. The previous order was node, switch, link // tors is not used. switch_num=tors for now.
 	std::cout << node_num << " " << switch_num << " " << tors <<  " " << link_num << std::endl;
 	flowf >> flow_num;
@@ -1013,7 +1014,7 @@ int main(int argc, char *argv[])
 	rem->SetAttribute("ErrorRate", DoubleValue(error_rate_per_link));
 	rem->SetAttribute("ErrorUnit", StringValue("ERROR_UNIT_PACKET"));
 
-	FILE *pfc_file = fopen(pfc_output_file.c_str(), "w");
+	// FILE *pfc_file = fopen(pfc_output_file.c_str(), "w");
 
 	QbbHelper qbb;
 	Ipv4AddressHelper ipv4;
@@ -1113,7 +1114,7 @@ int main(int argc, char *argv[])
 	for (uint32_t i = 0; i < node_num; i++) {
 		if (n.Get(i)->GetNodeType()) { // is switch
 			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
-			uint32_t shift = 3; // by default 1/8
+			// uint32_t shift = 3; // by default 1/8
 			double alpha = 1.0 / 8;
 			sw->m_mmu->SetAlphaIngress(alpha);
 			uint64_t totalHeadroom = 0;
@@ -1288,7 +1289,7 @@ int main(int argc, char *argv[])
 	long flowCount = 1;
 	long totalFlowSize = 0;
 
-	for (int fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
+	for (uint32_t fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
 	{
 		install_applications(fromLeafId, requestRate, cdfTable, flowCount, totalFlowSize, SERVER_COUNT, LEAF_COUNT, START_TIME, END_TIME, FLOW_LAUNCH_END_TIME);
 	}
@@ -1311,7 +1312,7 @@ int main(int argc, char *argv[])
 		requestRate = 0;
 	}
 	if (requestRate > 0 && requestSize > 0) {
-		for (int fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
+		for (uint32_t fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
 		{
 			install_applications_queryNew(fromLeafId, requestRate, requestSize, cdfTable, flowCountQ, totalFlowSizeQ, SERVER_COUNT, LEAF_COUNT, QUERY_START_TIME, END_TIME, FLOW_LAUNCH_END_TIME);
 		}

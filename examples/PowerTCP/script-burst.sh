@@ -80,7 +80,6 @@ done
 
 
 
-
 while [[ $(ps aux|grep "powertcp-evaluation-burst-optimized"|wc -l) -gt 1 ]];do
 	echo "Waiting for cpu cores.... $N-th experiment "
 	sleep 5

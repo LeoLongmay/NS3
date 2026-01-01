@@ -54,6 +54,7 @@ for algorithm in ${algs[@]};do
 	sleep 5
 	# Check how many cores are being used.
 	while [[ $(ps aux|grep "powertcp-evaluation-fairness-optimized"|wc -l) -gt 10 ]];do
+	# while [[ $(ps aux|grep "powertcp-evaluation-fairness-debug"|wc -l) -gt 10 ]];do
 		echo "Waiting for cpu cores.... $N-th experiment "
 		sleep 60
 	done
@@ -70,6 +71,7 @@ done
 
 
 while [[ $(ps aux|grep "powertcp-evaluation-fairness-optimized"|wc -l) -gt 1 ]];do
+# while [[ $(ps aux|grep "powertcp-evaluation-fairness-debug"|wc -l) -gt 1 ]];do
 	echo "Waiting for cpu cores.... $N-th experiment "
 	sleep 5
 done

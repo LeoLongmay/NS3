@@ -174,7 +174,7 @@ void install_applications_incast (int incastLeaf, NodeContainer* servers, double
 			//     txLeaf = get_target_leaf(LEAF_COUNT);
 			// }
 
-			for (uint32_t txServer = 0; txServer < fan; txServer++) {
+			for (uint32_t txServer = 0; (int)txServer < fan; txServer++) {
 
 				uint16_t port = PORT_START[ incastLeaf * SERVER_COUNT + incastServer]++;
 				if (port > PORT_END) {
@@ -224,7 +224,7 @@ void install_applications_incast (int incastLeaf, NodeContainer* servers, double
 void install_applications (int txLeaf, NodeContainer* servers, double requestRate, struct cdf_table *cdfTable,
                            long &flowCount, int SERVER_COUNT, int LEAF_COUNT, double START_TIME, double END_TIME, double FLOW_LAUNCH_END_TIME, int numPrior)
 {
-	uint64_t flowSize;
+	// uint64_t flowSize;
 
 
 
@@ -244,7 +244,7 @@ void install_applications (int txLeaf, NodeContainer* servers, double requestRat
 			// }
 
 			uint32_t prior = rand_range(1, numPrior + 1);
-			if (prior == (numPrior + 1)) {
+			if ((int)prior == (numPrior + 1)) {
 				prior = numPrior;
 			}
 
@@ -884,7 +884,7 @@ main (int argc, char *argv[])
 	for (uint32_t i = 0; i < SERVER_COUNT * LEAF_COUNT; i++)
 		PORT_START[i] = 4444;
 
-	for (int fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
+	for (int fromLeafId = 0; fromLeafId < (int)LEAF_COUNT; fromLeafId ++)
 	{
 		install_applications(fromLeafId, servers, requestRate, cdfTable, flowCount, SERVER_COUNT, LEAF_COUNT, START_TIME, END_TIME, FLOW_LAUNCH_END_TIME, nPrior - 1);
 		if (queryRequestRate > 0 && requestSize > 0) {

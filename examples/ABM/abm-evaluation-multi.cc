@@ -173,11 +173,11 @@ void install_applications_incast (int incastLeaf, NodeContainer* servers, double
 			// while (txLeaf==incastLeaf){
 			//     txLeaf = get_target_leaf(LEAF_COUNT);
 			// }
-			for (uint32_t txLeaf = 0; txLeaf < LEAF_COUNT; txLeaf++) {
-				if (txLeaf == incastLeaf) {
+			for (uint32_t txLeaf = 0; (int)txLeaf < LEAF_COUNT; txLeaf++) {
+				if ((int)txLeaf == incastLeaf) {
 					continue;
 				}
-				for (uint32_t txServer = 0; txServer < SERVER_COUNT; txServer++) {
+				for (uint32_t txServer = 0; (int)txServer < SERVER_COUNT; txServer++) {
 
 					uint16_t port = PORT_START[incastLeaf * SERVER_COUNT + incastServer]++;
 					if (port > PORT_END) {
@@ -228,7 +228,7 @@ void install_applications_incast (int incastLeaf, NodeContainer* servers, double
 void install_applications (int txLeaf, NodeContainer* servers, double requestRate, struct cdf_table *cdfTable,
                            long &flowCount, int SERVER_COUNT, int LEAF_COUNT, double START_TIME, double END_TIME, double FLOW_LAUNCH_END_TIME, int priority)
 {
-	uint64_t flowSize;
+	// uint64_t flowSize;
 
 	uint32_t prior = priority;
 	for (int txServer = 0; txServer < SERVER_COUNT; txServer++)
@@ -247,7 +247,7 @@ void install_applications (int txLeaf, NodeContainer* servers, double requestRat
 			// }
 
 			uint32_t rxServer = rand_range(0, SERVER_COUNT);
-			if (rxServer == SERVER_COUNT)
+			if ((int)rxServer == SERVER_COUNT)
 				rxServer = SERVER_COUNT - 1;
 
 			uint16_t port = PORT_START[rxLeaf * SERVER_COUNT + rxServer]++;
