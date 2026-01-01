@@ -203,7 +203,8 @@ main (int argc, char *argv[])
 
 
 	uint32_t port = 4444;
-	uint64_t flowSize = 20*GIGA/8.0;
+	// uint64_t flowSize = 20*GIGA/8;
+	uint64_t flowSize = static_cast<uint64_t>(20) * GIGA / 8;
 	double startTime = START_TIME+0.1;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////

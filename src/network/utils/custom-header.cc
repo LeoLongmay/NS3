@@ -101,8 +101,8 @@ uint32_t CustomHeader::GetSerializedSize (void) const{
 		else if (l3Prot == 0xFE)
 			len += 9;
 		else if (l3Prot == 0xF9)
-			len += sizeof(fcnp.fid) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
-                   sizeof(fcnp.ecnBits) + sizeof(fcnp.total) + sizeof(fcnp.timestamp) + 
+			len += sizeof(fcnp.pg) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
+                   sizeof(fcnp.ecnBits) + sizeof(fcnp.dport) + sizeof(fcnp.timestamp) + 
                    sizeof(fcnp.m_flowCount);
 	}
 	return len;
@@ -173,13 +173,20 @@ void CustomHeader::Serialize (Buffer::Iterator start) const{
 		  i.WriteU16(cnp.qfb);
 		  i.WriteU16(cnp.total);
 	  } else if (l3Prot == 0xF9){ // FCNP
-		  i.WriteU16(fcnp.fid);
-		  i.WriteU8(fcnp.qIndex);
-		  i.WriteU16(fcnp.qlen);
-		  i.WriteU8(fcnp.ecnBits);
-		  i.WriteU16(fcnp.total);
-		  i.WriteU64(fcnp.timestamp);
-		  i.WriteU16(fcnp.m_flowCount);
+		//   i.WriteU16(fcnp.fid);
+		//   i.WriteU8(fcnp.qIndex);
+		//   i.WriteU16(fcnp.qlen);
+		//   i.WriteU8(fcnp.ecnBits);
+		//   i.WriteU16(fcnp.total);
+		//   i.WriteU64(fcnp.timestamp);
+		//   i.WriteU16(fcnp.m_flowCount);
+		  i.WriteHtonU16(fcnp.pg);       // uint16_t → 网络序
+		  i.WriteU8(fcnp.qIndex);         // uint8_t 无字节序问题
+		  i.WriteHtonU32(fcnp.qlen);      // 修正：uint32_t → 写4字节+网络序
+		  i.WriteU8(fcnp.ecnBits);        // uint8_t 无问题
+		  i.WriteHtonU16(fcnp.dport);     // uint16_t → 网络序
+		  i.WriteHtonU64(fcnp.timestamp); // uint64_t → 网络序（匹配Deserialize的ReadNtohU64）
+		  i.WriteHtonU16(fcnp.m_flowCount); // uint16_t → 网络序（你的flownum）
 	  } else if (l3Prot == 0xFC || l3Prot == 0xFD){ // ACK or NACK
 		  i.WriteU16(ack.sport);
 		  i.WriteU16(ack.dport);
@@ -331,16 +338,32 @@ CustomHeader::Deserialize (Buffer::Iterator start)
 		  pfc.qIndex = i.ReadU8 ();
 		  l4Size = 9;
 	  } else if (l3Prot == 0xF9){ // FCNP
-		  fcnp.fid = i.ReadU16();
-		  fcnp.qIndex = i.ReadU8();
-		  fcnp.qlen = i.ReadU32();
-		  fcnp.ecnBits = i.ReadU8();
-		  fcnp.total = i.ReadU16();
-		  fcnp.timestamp = i.ReadNtohU64();
-		  fcnp.m_flowCount = i.ReadU16();
-		  l4Size = sizeof(fcnp.fid) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
-                     sizeof(fcnp.ecnBits) + sizeof(fcnp.total) + sizeof(fcnp.timestamp) + 
-                     sizeof(fcnp.m_flowCount);
+		//   fcnp.fid = i.ReadU16();
+		//   fcnp.qIndex = i.ReadU8();
+		//   fcnp.qlen = i.ReadU32();
+		//   fcnp.ecnBits = i.ReadU8();
+		//   fcnp.total = i.ReadU16();
+		//   fcnp.timestamp = i.ReadNtohU64();
+		//   fcnp.m_flowCount = i.ReadU16();
+		//   l4Size = sizeof(fcnp.fid) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
+        //              sizeof(fcnp.ecnBits) + sizeof(fcnp.total) + sizeof(fcnp.timestamp) + 
+        //              sizeof(fcnp.m_flowCount);
+		  i = start;
+		  i.Next(l2Size + l3Size);
+		  
+		  // 2. 网络序转主机序读取
+		  fcnp.pg = i.ReadNtohU16();        // uint16_t → 主机序
+		  fcnp.qIndex = i.ReadU8();          // uint8_t 无问题
+		  fcnp.qlen = i.ReadNtohU32();       // 修正：读4字节+网络序
+		  fcnp.ecnBits = i.ReadU8();         // uint8_t 无问题
+		  fcnp.dport = i.ReadNtohU16();      // uint16_t → 主机序
+		  fcnp.timestamp = i.ReadNtohU64();  // uint64_t → 主机序（匹配Serialize）
+		  fcnp.m_flowCount = i.ReadNtohU16(); // 你的flownum，转主机序
+		  
+		  // 3. 修正l4Size计算（匹配GetSerializedSize）
+		  l4Size = sizeof(fcnp.pg) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
+                   sizeof(fcnp.ecnBits) + sizeof(fcnp.dport) + sizeof(fcnp.timestamp) + 
+                   sizeof(fcnp.m_flowCount);
 	  }
   }
 

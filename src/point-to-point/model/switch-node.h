@@ -5,6 +5,7 @@
 #include <ns3/node.h>
 #include "qbb-net-device.h"
 #include "switch-mmu.h"
+#include "flow-table.h"
 #include "pint.h"
 
 namespace ns3 {
@@ -36,6 +37,7 @@ protected:
 
 	// vamsi
 	bool PowerEnabled;
+	uint16_t m_epsilon; // lpcc epsilon
 
 private:
 	int GetOutDev(Ptr<const Packet>, CustomHeader &ch);
@@ -43,16 +45,24 @@ private:
 	static uint32_t EcmpHash(const uint8_t* key, size_t len, uint32_t seed);
 	void CheckAndSendPfc(uint32_t inDev, uint32_t qIndex);
 	void CheckAndSendResume(uint32_t inDev, uint32_t qIndex);
+
+    Ptr<FlowTable> m_flowTable; // flow table
+    EventId m_cleanFlowEvent;
+
+    // callback for scheduled flow table cleanup
+    void ScheduleCleanFlowTable();
 public:
 	Ptr<SwitchMmu> m_mmu;
 
 	static TypeId GetTypeId (void);
 	SwitchNode();
+	~SwitchNode();
 	void SetEcmpSeed(uint32_t seed);
 	void AddTableEntry(Ipv4Address &dstAddr, uint32_t intf_idx);
 	void ClearTable();
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
+	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
 
 	// for approximate calc in PINT
 	int logres_shift(int b, int l);

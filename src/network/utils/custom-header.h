@@ -118,11 +118,11 @@ public:
 		  uint16_t total;
 	  } cnp;
     struct {
-		  uint16_t fid;
+		  uint16_t pg;
 		  uint8_t qIndex;
 		  uint32_t qlen;
 		  uint8_t ecnBits;
-		  uint16_t total;
+		  uint16_t dport;
       uint64_t timestamp;
       uint16_t m_flowCount;
     } fcnp;

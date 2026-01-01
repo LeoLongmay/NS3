@@ -4295,7 +4295,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "VALGRIND-NOTFOUND"
+			"value" : "/usr/bin/valgrind"
 		},
 		{
 			"name" : "_Boost_COMPONENTS_SEARCHED",

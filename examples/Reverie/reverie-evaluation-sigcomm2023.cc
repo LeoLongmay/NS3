@@ -342,6 +342,7 @@ uint64_t get_nic_rate(NodeContainer &n) {
     for (uint32_t i = 0; i < n.GetN(); i++)
         if (n.Get(i)->GetNodeType() == 0)
             return DynamicCast<QbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
+    return 0;
 }
 
 
@@ -401,7 +402,7 @@ void incast_rdma (int fromLeafId, double requestRate, uint32_t requestSize, stru
             uint32_t flowSize = double(requestSize) / double(fan);
 
 
-            for (int r = 0; r < fan; r++) {
+            for (int r = 0; r < (int)fan; r++) {
 
                 uint32_t fromServerIndex = SERVER_COUNT * leaftarget + r ; //rand_range(0, SERVER_COUNT);
 
@@ -500,7 +501,7 @@ void incast_tcp (int incastLeaf, double requestRate, uint32_t requestSize, struc
             if (txLeaf == LEAF_COUNT) {
                 txLeaf = 0;
             }
-            for (uint32_t txServer = 0; txServer < fan; txServer++) {
+            for (uint32_t txServer = 0; (int)txServer < fan; txServer++) {
 
                 uint16_t port = PORT_START[incastLeaf * SERVER_COUNT + incastServer]++;
                 if (port >= UINT16_MAX - 1) {
@@ -550,7 +551,7 @@ void incast_tcp (int incastLeaf, double requestRate, uint32_t requestSize, struc
 void workload_tcp (int txLeaf, double requestRate, struct cdf_table *cdfTable,
                            long &flowCount, int SERVER_COUNT, int LEAF_COUNT, double START_TIME, double END_TIME, double FLOW_LAUNCH_END_TIME)
 {
-    uint64_t flowSize;
+    // uint64_t flowSize;
     uint32_t prior = 1; // hardcoded for tcp
 
     for (int txServer = 0; txServer < SERVER_COUNT; txServer++)
@@ -1008,7 +1009,7 @@ int main(int argc, char *argv[])
 
     topof.open(topology_file.c_str());
     flowf.open(flow_file.c_str());
-    uint32_t node_num, switch_num, tors, link_num, trace_num;
+    uint32_t node_num, switch_num, tors, link_num;
     topof >> node_num >> switch_num >> tors >> link_num >> LEAF_SERVER_CAPACITY >> SPINE_LEAF_CAPACITY ;
     LEAF_COUNT = tors;
     SPINE_COUNT = switch_num - tors;
@@ -1384,10 +1385,10 @@ int main(int argc, char *argv[])
         PORT_START[i] = 4444;
 
     long flowCount = 1;
-    long totalFlowSize = 0;
+    // long totalFlowSize = 0;
     double requestRate = rdmaload * LEAF_SERVER_CAPACITY * SERVER_COUNT / oversubRatio / (8 * avg_cdf (cdfTable)) / SERVER_COUNT;
 
-    for (int fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
+    for (int fromLeafId = 0; fromLeafId < (int)LEAF_COUNT; fromLeafId ++)
     {
         workload_rdma(fromLeafId, requestRate, cdfTable, flowCount, SERVER_COUNT, LEAF_COUNT, START_TIME, END_TIME, FLOW_LAUNCH_END_TIME);
         if (rdmaqueryRequestRate > 0 && rdmarequestSize > 0){
@@ -1421,7 +1422,7 @@ int main(int argc, char *argv[])
     }
 
     requestRate = tcpload * LEAF_SERVER_CAPACITY * SERVER_COUNT / oversubRatio / (8 * avg_cdf (cdfTable)) / SERVER_COUNT;
-    for (int fromLeafId = 0; fromLeafId < LEAF_COUNT; fromLeafId ++)
+    for (int fromLeafId = 0; fromLeafId < (int)LEAF_COUNT; fromLeafId ++)
     {
         workload_tcp(fromLeafId, requestRate, cdfTable, flowCount, SERVER_COUNT, LEAF_COUNT, START_TIME, END_TIME, FLOW_LAUNCH_END_TIME);
         if (tcpqueryRequestRate > 0 && tcprequestSize > 0) {

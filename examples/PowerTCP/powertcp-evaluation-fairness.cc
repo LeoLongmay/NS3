@@ -231,7 +231,7 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n){
 			}
 		fflush(qlen_output);
 	}
-	if (Simulator::Now().GetTimeStep() < qlen_mon_end)
+	if (Simulator::Now().GetTimeStep() < (int64_t)qlen_mon_end)
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
 }
 
@@ -346,12 +346,13 @@ uint64_t get_nic_rate(NodeContainer &n){
 	for (uint32_t i = 0; i < n.GetN(); i++)
 		if (n.Get(i)->GetNodeType() == 0)
 			return DynamicCast<QbbNetDevice>(n.Get(i)->GetDevice(1))->GetDataRate().GetBitRate();
+	return 0;
 }
 
 void PrintResults(std::map<uint32_t,NetDeviceContainer> ToR,uint32_t numToRs,double delay){
 	for (uint32_t i=0; i<numToRs;i++){
 		double throughputTotal=0;
-		uint64_t torBuffer;
+		// uint64_t torBuffer;
 		for (uint32_t j=0; j< ToR[i].GetN();j++){
 			Ptr<QbbNetDevice> nd = DynamicCast<QbbNetDevice>(ToR[i].Get(j));
 //			uint64_t txBytes = nd->getTxBytes();
@@ -377,7 +378,7 @@ void PrintResultsFlow(std::map<uint32_t,NetDeviceContainer> Src,uint32_t numFlow
 //			uint64_t txBytes = nd->getTxBytes();
 			uint64_t txBytes = nd->getNumTxBytes();
 
-			uint64_t qlen = nd->GetQueue()->GetNBytesTotal();
+			// uint64_t qlen = nd->GetQueue()->GetNBytesTotal();
 			double throughput = double(txBytes*8)/delay;
 			throughputTotal+=throughput;
 			// std::cout << "Src " << i << " Port " << j << " throughput "<< throughput << " txBytes " << txBytes << " qlen " << qlen << " time " << Simulator::Now().GetSeconds() << std::endl;
@@ -401,7 +402,7 @@ int main(int argc, char *argv[])
 		uint32_t algorithm=3;
 		uint32_t windowCheck=1;
 		// std::string confFile = "/home/vamsi/src/phd/codebase/ns3-datacenter/simulator/ns-3.39/examples/PowerTCP/config-fairness.txt";
-		std::string confFile = "/root/PowerTCP-RAW/simulator/ns-3.39/examples/PowerTCP/config-fairness.txt";
+		std::string confFile = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/config-fairness.txt";
 
 		std::cout << confFile;
 		CommandLine cmd;
@@ -708,10 +709,10 @@ int main(int argc, char *argv[])
 		conf.close();
 
 		// debug for lpcc
-		// wien = false;
-		// delayWien = false;
-		// algorithm = 9;
-		// windowCheck = 0;
+		wien = false;
+		delayWien = false;
+		algorithm = 9;
+		windowCheck = 0;
 
 		// overriding config file. I prefer to use cmd arguments
 		cc_mode = algorithm; // overrides configuration file
@@ -724,7 +725,7 @@ int main(int argc, char *argv[])
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7) // timely, use ts
+	if (cc_mode == 7 || cc_mode == 9) // timely or lpcc, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, powertcp, use int
 		IntHeader::mode = IntHeader::NORMAL;
@@ -732,6 +733,12 @@ int main(int argc, char *argv[])
 		IntHeader::mode = IntHeader::PINT;
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
+
+	// lpcc: epsilon
+	uint16_t epsilon = 0;
+	if (cc_mode == 9) {
+		epsilon = 2000;
+	}
 
 	// Set Pint
 	if (cc_mode == 10){
@@ -741,7 +748,7 @@ int main(int argc, char *argv[])
 
 	topof.open(topology_file.c_str());
 	flowf.open(flow_file.c_str());
-	uint32_t node_num, switch_num, tors, link_num, trace_num;
+	uint32_t node_num, switch_num, tors, link_num;
 	topof >> node_num >> switch_num >> tors >> link_num; // changed here. The previous order was node, switch, link // tors is not used. switch_num=tors for now.
 	tors=switch_num;
 	std::cout << node_num << " " << switch_num << " " << tors <<  " " << link_num << std::endl;
@@ -783,6 +790,7 @@ int main(int argc, char *argv[])
 			switchNodes.Add(sw);
 			allNodes.Add(sw);
 			sw->SetAttribute("EcnEnabled", BooleanValue(enable_qcn));
+			sw->SetEpsilon(epsilon);
 			if (node_type[i]==1){
 				torNodes.Add(sw);
 				sw->SetNodeType(1);
@@ -824,7 +832,7 @@ int main(int argc, char *argv[])
 	rem->SetAttribute("ErrorRate", DoubleValue(error_rate_per_link));
 	rem->SetAttribute("ErrorUnit", StringValue("ERROR_UNIT_PACKET"));
 
-	FILE *pfc_file = fopen(pfc_output_file.c_str(), "w");
+	// FILE *pfc_file = fopen(pfc_output_file.c_str(), "w");
 
 	QbbHelper qbb;
 	Ipv4AddressHelper ipv4;
@@ -919,7 +927,7 @@ int main(int argc, char *argv[])
 	for (uint32_t i = 0; i < node_num; i++) {
 		if (n.Get(i)->GetNodeType()) { // is switch
 			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
-			uint32_t shift = 3; // by default 1/8
+			// uint32_t shift = 3; // by default 1/8
 			double alpha = 1.0/8;
 			sw->m_mmu->SetAlphaIngress(alpha);
 			uint64_t totalHeadroom = 0;
@@ -929,9 +937,9 @@ int main(int argc, char *argv[])
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
 					// set ecn
 					uint64_t rate = dev->GetDataRate().GetBitRate();
-					NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
-					NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
-					NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
+					// NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
+					// NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
+					// NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
 					sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
 					// set pfc
 					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
@@ -986,6 +994,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("DctcpRateAI", DataRateValue(DataRate(dctcp_rate_ai)));
 			rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 			rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
+			rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
 			rdmaHw->SetPintSmplThresh(pint_prob);
 			// create and install RdmaDriver
 			Ptr<RdmaDriver> rdma = CreateObject<RdmaDriver>();

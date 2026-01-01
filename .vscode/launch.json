@@ -5,10 +5,10 @@
             "name": "waf - Build and debug active file",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/root/PowerTCP-RAW/simulator/ns-3.39/build/examples/PowerTCP/ns3.39-${fileBasenameNoExtension}-optimized",
+            "program": "/home/leo/PowerTCP-RAW/ns-3.39/build/examples/PowerTCP/ns3.39-${fileBasenameNoExtension}-debug",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "/root/PowerTCP-RAW/simulator/ns-3.39",
+            "cwd": "/home/leo/PowerTCP-RAW/ns-3.39",
             "environment": [],
             "MIMode": "gdb",
             "setupCommands": [

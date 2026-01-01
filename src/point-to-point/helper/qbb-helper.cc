@@ -89,7 +89,7 @@ QbbHelper::EnablePcapInternal (std::string prefix, Ptr<NetDevice> nd, bool promi
   // the system.  We can only deal with devices of type QbbNetDevice.
   //
   Ptr<QbbNetDevice> device = nd->GetObject<QbbNetDevice> ();
-  if (device == 0)
+  if (!device)
     {
       NS_LOG_INFO ("QbbHelper::EnablePcapInternal(): Device " << device << " not of type ns3::QbbNetDevice");
       return;
@@ -125,7 +125,7 @@ QbbHelper::EnableAsciiInternal (
   // the system.  We can only deal with devices of type QbbNetDevice.
   //
   Ptr<QbbNetDevice> device = nd->GetObject<QbbNetDevice> ();
-  if (device == 0)
+  if (!device)
     {
       NS_LOG_INFO ("QbbHelper::EnableAsciiInternal(): Device " << device << 
                    " not of type ns3::QbbNetDevice");
@@ -144,7 +144,7 @@ QbbHelper::EnableAsciiInternal (
   // since there will be one file per context and therefore the context would
   // be redundant.
   //
-  if (stream == 0)
+  if (!stream)
     {
       //
       // Set up an output stream object to deal with private ofstream copy 
@@ -367,11 +367,11 @@ void QbbHelper::GetTraceFromPacket(TraceFormat &tr, Ptr<QbbNetDevice> dev, Ptr<c
 			tr.cnp.total = hdr.cnp.total;
 			break;
     case 0xF9:
-      tr.fcnp.fid = hdr.fcnp.fid;
+      tr.fcnp.fid = hdr.fcnp.pg;
       tr.fcnp.qIndex = hdr.fcnp.qIndex;
       tr.fcnp.qlen = hdr.fcnp.qlen;
       tr.fcnp.ecnBits = hdr.fcnp.ecnBits;
-      tr.fcnp.total = hdr.fcnp.total;
+      tr.fcnp.total = hdr.fcnp.dport;
       tr.fcnp.timestamp = hdr.fcnp.timestamp;
       tr.fcnp.flowCount = hdr.fcnp.m_flowCount;
 		default:
@@ -410,8 +410,8 @@ void QbbHelper::QpDequeueCallback(FILE *file, Ptr<QbbNetDevice> dev, Ptr<const P
 }
 
 void QbbHelper::EnableTracingDevice(FILE *file, Ptr<QbbNetDevice> nd){
-	uint32_t nodeid = nd->GetNode ()->GetId ();
-	uint32_t deviceid = nd->GetIfIndex ();
+	// uint32_t nodeid = nd->GetNode ()->GetId ();
+	// uint32_t deviceid = nd->GetIfIndex ();
 	std::ostringstream oss;
 
 	#if 1
