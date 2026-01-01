@@ -70,7 +70,8 @@ SwitchNode::SwitchNode() {
 	for (uint32_t i = 0; i < pCnt; i++)
 		m_u[i] = 0;
     uint64_t inactiveThreshold = m_epsilon * 5;
-    m_flowTable = Create<FlowTable>(inactiveThreshold);
+	m_flowTable = CreateObject<RDMAFlowTable>();
+	m_flowTable->SetInactiveThreshold(inactiveThreshold);
 
     ScheduleCleanFlowTable();	
 }
@@ -81,13 +82,6 @@ void SwitchNode::ScheduleCleanFlowTable() {
     m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(100),
                                            &SwitchNode::ScheduleCleanFlowTable, this);
 }
-
-// void SwitchNode::HandlePacket(Ptr<Packet> pkt, Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport) {
-//     m_flowTable->InsertOrUpdateFlow(sip, dip, sport, dport);
-
-//     uint32_t dipFlowCount = m_flowTable->GetFlowCountByDip(dip);
-//     NS_LOG_DEBUG("DIP " << dip << " has " << dipFlowCount << " flows");
-// }
 
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch) {
 	// look up entries
@@ -249,6 +243,15 @@ void SwitchNode::ClearTable() {
 
 // This function can only be called in switch mode
 bool SwitchNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch) {
+	PppHeader ppp;
+	Ipv4Header h;
+	UdpHeader udph;
+	Ptr<Packet> p = packet->Copy();
+	p->RemoveHeader(ppp);
+	p->RemoveHeader(h);
+	p->PeekHeader(udph);	
+	m_flowTable->InsertOrUpdateFlow(h.GetSource(), h.GetDestination(), udph.GetSourcePort(), udph.GetDestinationPort()); // update flow table
+
 	SendToDev(packet, ch);
 	return true;
 }
@@ -293,10 +296,7 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				nch.fcnp.dport = ch.GetSourcePort();
 				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
 				nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
-				nch.fcnp.m_flowCount = 2; // TODO: rdma_flow_table
-				// for (uint32_t i = 0; i < m_rtTable.size(); i++) {
-				// 	if (m_rtTable[i].) continue;
-				// }
+				nch.fcnp.m_flowCount = m_flowTable->GetFlowCountByDip(srcip);
 
 				Ptr<Packet> fcnp_pkt = Create<Packet>();
 				fcnp_pkt->AddHeader(nch);

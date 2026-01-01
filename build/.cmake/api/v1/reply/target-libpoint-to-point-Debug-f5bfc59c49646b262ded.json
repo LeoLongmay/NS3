@@ -279,7 +279,8 @@
 				13,
 				14,
 				15,
-				16
+				16,
+				17
 			]
 		}
 	],
@@ -379,6 +380,12 @@
 			"backtrace" : 2,
 			"isGenerated" : true,
 			"path" : "build/src/point-to-point/CMakeFiles/libpoint-to-point-obj.dir/model/switch-node.cc.o",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 2,
+			"isGenerated" : true,
+			"path" : "build/src/point-to-point/CMakeFiles/libpoint-to-point-obj.dir/model/rdma-flow-table.cc.o",
 			"sourceGroupIndex" : 0
 		},
 		{

@@ -20,6 +20,7 @@
     #include <ns3/switch-mmu.h>
     #include <ns3/switch-node.h>
     #include <ns3/trace-format.h>
+    #include <ns3/rdma-flow-table.h>
     #include <ns3/qbb-helper.h>
     #include <ns3/sim-setting.h>
 #endif 

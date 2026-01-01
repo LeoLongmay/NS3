@@ -5,7 +5,7 @@
 #include <ns3/node.h>
 #include "qbb-net-device.h"
 #include "switch-mmu.h"
-#include "flow-table.h"
+#include "rdma-flow-table.h"
 #include "pint.h"
 
 namespace ns3 {
@@ -46,7 +46,7 @@ private:
 	void CheckAndSendPfc(uint32_t inDev, uint32_t qIndex);
 	void CheckAndSendResume(uint32_t inDev, uint32_t qIndex);
 
-    Ptr<FlowTable> m_flowTable; // flow table
+    Ptr<RDMAFlowTable> m_flowTable; // flow table
     EventId m_cleanFlowEvent;
 
     // callback for scheduled flow table cleanup
