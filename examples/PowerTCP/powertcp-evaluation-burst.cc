@@ -715,16 +715,21 @@ int main(int argc, char *argv[])
 	conf.close();
 
 	// debug for lpcc
-	wien = false;
-	delayWien = false;
-	algorithm = 1;
-	windowCheck = 0;	
+	// wien = false;
+	// delayWien = false;
+	// algorithm = 9;
+	// windowCheck = 0;
+
+	// debug for powerInt
+	// wien = true;
+	// delayWien = false;
+	// algorithm = 3;
+	// windowCheck = 1;
 
 	// overriding config file. I prefer to use cmd arguments
 	cc_mode = algorithm; // overrides configuration file
 	has_win = windowCheck; // overrides configuration file
 	var_win = windowCheck; // overrides configuration file
-
 
 	Config::SetDefault("ns3::QbbNetDevice::PauseTime", UintegerValue(pause_time));
 	Config::SetDefault("ns3::QbbNetDevice::QcnEnabled", BooleanValue(enable_qcn));
@@ -732,7 +737,7 @@ int main(int argc, char *argv[])
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7) // timely, use ts
+	if (cc_mode == 7 || cc_mode == 9) // timely or lpcc, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, powertcp, use int
 		IntHeader::mode = IntHeader::NORMAL;
@@ -740,6 +745,12 @@ int main(int argc, char *argv[])
 		IntHeader::mode = IntHeader::PINT;
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
+
+	// lpcc: epsilon
+	uint16_t epsilon = 0;
+	if (cc_mode == 9) {
+		epsilon = 2000;
+	}
 
 	// Set Pint
 	if (cc_mode == 10) {
@@ -993,6 +1004,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("DctcpRateAI", DataRateValue(DataRate(dctcp_rate_ai)));
 			rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 			rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
+			rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
 			rdmaHw->SetPintSmplThresh(pint_prob);
 			// create and install RdmaDriver
 			Ptr<RdmaDriver> rdma = CreateObject<RdmaDriver>();

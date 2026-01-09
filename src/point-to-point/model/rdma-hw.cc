@@ -178,13 +178,13 @@ TypeId RdmaHw::GetTypeId (void)
 	                    .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
 	                    .AddAttribute("PowerTCPdelay", "to enable PowerTCP in delaymode", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPdelay), MakeBooleanChecker())
 						.AddAttribute("LpccEpsilon", "Buffer queue length threshold", UintegerValue(2000), MakeUintegerAccessor(&RdmaHw::m_epsilon), MakeUintegerChecker<uint16_t>())
-            			.AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(5.0),
+            			.AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(2.0),
                         			MakeDoubleAccessor(&RdmaHw::m_theta), MakeDoubleChecker<double>())
             			.AddAttribute("LpccTau", "RTT detection time window", UintegerValue(20000),
                           			MakeUintegerAccessor(&RdmaHw::m_tau), MakeUintegerChecker<uint32_t>())
-            			.AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", DoubleValue(2),
+            			.AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", DoubleValue(7),
                           			MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>())
-            			.AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.3),
+            			.AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.7),
                           			MakeDoubleAccessor(&RdmaHw::m_kr), MakeDoubleChecker<double>())
             			.AddAttribute("Lpcc_ClampTargetRate", "lpcc clamp target rate.", BooleanValue(false), 
                           			MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker())
@@ -432,6 +432,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 		std::cout << "ERROR: " << "node:" << m_node->GetId() << ' ' << (ch.l3Prot == 0xFC ? "ACK" : "NACK") << " NIC cannot find the flow\n";
 		return 0;
 	}
+	// std::cout << "RTT:" << Simulator::Now().GetTimeStep() - ch.ack.ih.ts << std::endl;
 
 	uint32_t nic_idx = GetNicIdxOfQp(qp);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
@@ -455,6 +456,7 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 	if (cnp) {
 		if (m_cc_mode == 1) { // mlx version
 			cnp_received_mlx(qp);
+			std::cout << "recevie cnp: " << Simulator::Now().GetTimeStep() << std::endl;
 		} else if (m_cc_mode == 9) { //lpcc
             fcnp_received_lpcc(qp, ch);
             // cnp_received_mlx(qp);			
@@ -498,10 +500,10 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
 		uint16_t qIndex = nch.fcnp.pg;
 		uint16_t port = nch.fcnp.dport;
 		Ptr<RdmaQueuePair> qp = GetQp(nch.sip, port, qIndex);
-		// if (qp == NULL) {
-		// 	std::cout << "ERROR: cannot find the flow\n";
-		// 	return 0;
-		// }
+		if (qp == NULL) {
+			std::cout << "ERROR: cannot find the flow or the flow is complete\n";
+			return 0;
+		}
 
 		fcnp_received_lpcc(qp, nch);
 	}
@@ -556,7 +558,6 @@ void RdmaHw::RecoverQueue(Ptr<RdmaQueuePair> qp) {
 
 void RdmaHw::QpComplete(Ptr<RdmaQueuePair> qp) {
 	NS_ASSERT(!m_qpCompleteCallback.IsNull());
-	std::cout << "wxb_qpcomplete" << std::endl;
 	if (m_cc_mode == 1) {
 		Simulator::Cancel(qp->mlx.m_eventUpdateAlpha);
 		Simulator::Cancel(qp->mlx.m_eventDecreaseRate);
@@ -1367,7 +1368,7 @@ void RdmaHw::CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch) {
         q->lpcc.m_rpTimeStage = 0;
         q->lpcc.m_decrease_cnp_arrived = false;
         Simulator::Cancel(q->lpcc.m_rpTimer);
-        q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_theta * 3),
+        q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(7),
                                                &RdmaHw::RateIncEventTimerLpcc, this, q);
 #if PRINT_LOG
         printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9,
@@ -1377,7 +1378,7 @@ void RdmaHw::CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch) {
 }
 
 void RdmaHw::RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q) {
-    q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_theta * 3), &RdmaHw::RateIncEventTimerLpcc, this, q);
+    q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(7), &RdmaHw::RateIncEventTimerLpcc, this, q);
     RateIncEventLpcc(q);
     q->lpcc.m_rpTimeStage++;
 }
@@ -1414,6 +1415,7 @@ void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
     uint32_t nic_idx = GetNicIdxOfQp(qp);
     DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
     double m_p = 1.0 * qp->m_rate.GetBitRate() / m_bps.GetBitRate() * (ch.fcnp.m_flowCount);
+	qp->lpcc.m_flowCount = ch.fcnp.m_flowCount;
 
     DataRate new_rate = qp->m_rate * (1.0 / (1 + std::min(m_k * m_p, m_wr)));
 	// DataRate new_rate = qp->lpcc.m_curRate * m_k;
@@ -1444,7 +1446,7 @@ void RdmaHw::UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHea
         
         uint32_t nic_idx = GetNicIdxOfQp(qp);
         DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();    
-        double m_p = qp->m_rate / m_bps * (2); // flow_count is 2 for test
+        double m_p = qp->m_rate / m_bps * (qp->lpcc.m_flowCount); // flow_count is 2 for test
 
         DataRate new_rate = qp->m_rate * (1 - std::min((1.0 * m_rttl - qp->lpcc.m_minRtt) / qp->lpcc.m_minRtt * m_p, m_kr));
         new_rate = std::max(new_rate, m_minRate);

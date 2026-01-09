@@ -575,10 +575,10 @@ int main(int argc, char *argv[])
 	uint32_t algorithm = 3;
 	uint32_t windowCheck = 1;
 
-	std::string confFile = "/home/vamsi/src/phd/codebase/ns3-datacenter/simulator/ns-3.39/examples/PowerTCP/config-workload.txt";
-	std::string cdfFileName = "/home/vamsi/src/phd/codebase/ns3-datacenter/simulator/ns-3.39/examples/PowerTCP/websearch.txt";
+	std::string confFile = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/config-workload.txt";
+	std::string cdfFileName = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/websearch.txt";
 
-	unsigned randomSeed = 7;
+	unsigned randomSeed = 8;
 
 
 	std::cout << confFile;
@@ -908,6 +908,24 @@ int main(int argc, char *argv[])
 	}
 	conf.close();
 
+	// debug for lpcc
+	wien = false;
+	delayWien = false;
+	algorithm = 9;
+	windowCheck = 0;
+
+	START_TIME = 0.1;
+	END_TIME = 2.0;
+	FLOW_LAUNCH_END_TIME = 1.8;
+
+	load = 0.6;
+
+	requestSize = 0;
+	queryRequestRate = 0;
+	incast = 10;
+	randomSeed = 16;
+	// debug
+
 	// overriding config file. I prefer to use cmd arguments
 	cc_mode = algorithm; // overrides configuration file
 	has_win = windowCheck; // overrides configuration file
@@ -919,7 +937,7 @@ int main(int argc, char *argv[])
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7) // timely, use ts
+	if (cc_mode == 7 || cc_mode == 9 || cc_mode == 1) // timely or lpcc, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, powertcp, use int
 		IntHeader::mode = IntHeader::NORMAL;
@@ -927,6 +945,12 @@ int main(int argc, char *argv[])
 		IntHeader::mode = IntHeader::PINT;
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
+
+	// lpcc: epsilon
+	uint16_t epsilon = 0;
+	if (cc_mode == 9) {
+		epsilon = 2000;
+	}
 
 	// Set Pint
 	if (cc_mode == 10) {
@@ -1124,9 +1148,9 @@ int main(int argc, char *argv[])
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
 					// set ecn
 					uint64_t rate = dev->GetDataRate().GetBitRate();
-					NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
-					NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
-					NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
+					// NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
+					// NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
+					// NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
 					sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
 					// set pfc
 					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
@@ -1177,6 +1201,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("DctcpRateAI", DataRateValue(DataRate(dctcp_rate_ai)));
 			rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 			rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
+			rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
 			rdmaHw->SetPintSmplThresh(pint_prob);
 			// create and install RdmaDriver
 			Ptr<RdmaDriver> rdma = CreateObject<RdmaDriver>();
