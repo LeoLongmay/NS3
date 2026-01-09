@@ -113,6 +113,7 @@ public:
         EventId m_eventDecreaseRate;
         uint32_t m_rpTimeStage;
         uint32_t m_lastUpdateSeq;
+		uint16_t m_flowCount;
 		uint64_t m_lastRtt;
         uint64_t m_minRtt;
     }lpcc;

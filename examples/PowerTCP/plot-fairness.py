@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.lines import Line2D
 
-NS3="/root/PowerTCP-RAW/simulator/ns-3.39/"
+NS3="/home/leo/PowerTCP-RAW/ns-3.39/"
 plots_dir="./plot_fairness/"
 os.makedirs(plots_dir,exist_ok=True)
 # plots_dir="/home/vamsi/Powertcp-NSDI/"
@@ -22,22 +22,22 @@ plt.rcParams.update({'font.size': 18})
 
 
 
-algs=list(["lpcc"])
-# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algs=list(["lpcc"])
+algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
 algnames={}
-# algnames["dcqcn"]="DCQCN"
-# algnames["powerInt"]="PowerTCP"
-# algnames["hpcc"]="HPCC"
-# algnames["powerDelay"]=r'$\theta-PowerTCP$'
-# algnames["timely"]="TIMELY"
-# algnames["DCTCP"]="DCTCP"
+algnames["dcqcn"]="DCQCN"
+algnames["powerInt"]="PowerTCP"
+algnames["hpcc"]="HPCC"
+algnames["powerDelay"]=r'$\theta-PowerTCP$'
+algnames["timely"]="TIMELY"
+algnames["DCTCP"]="DCTCP"
 algnames["lpcc"]="LPCC"
 
 
 ######## FAIRNESS #############
 
-algs=list(["lpcc"])
-# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algs=list(["lpcc"])
+algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
 results=NS3+"examples/PowerTCP/results_fairness/"
 
 plt.rcParams.update({'font.size': 30})
@@ -62,7 +62,7 @@ for alg in algs:
     ax.yaxis.grid(True,ls='--')
     
     ax.set_ylabel("Throughput (Gbps)")
-    ax.set_xlabel("Time (s)")
+    ax.set_xlabel("Time (ms)")
     # fig.suptitle(alg)
     
     df1 = pd.read_csv(results+'result-'+alg+'.1',delimiter=' ',usecols=[5,7],names=["th","time"])
@@ -70,7 +70,12 @@ for alg in algs:
     df3 = pd.read_csv(results+'result-'+alg+'.3',delimiter=' ',usecols=[5,7],names=["th","time"])
     df4 = pd.read_csv(results+'result-'+alg+'.4',delimiter=' ',usecols=[5,7],names=["th","time"])
     
-    ax.set_xlim(0,0.7)
+    ax.set_xlim(0,0.69)
+    original_ticks = [0, 0.23, 0.46, 0.69]
+    ax.set_xticks(original_ticks)
+
+    target_labels = [0, 10, 20, 40]
+    ax.set_xticklabels(target_labels)
     
     # ax.plot(df1["time"][::100],df1["th"][::100]/1e9)
     # ax.plot(df2["time"][::100],df2["th"][::100]/1e9)

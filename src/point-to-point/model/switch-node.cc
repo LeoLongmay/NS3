@@ -307,6 +307,7 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 			}
 		}
 		if (m_ecnEnabled) {
+			if (Simulator::Now().GetTimeStep() > 150000000) std::cout << "send cnp: " << Simulator::Now().GetTimeStep() << std::endl;
 			bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
 			if (egressCongested) {
 				PppHeader ppp;

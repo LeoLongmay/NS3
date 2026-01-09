@@ -22,7 +22,7 @@ plt.rcParams.update({'font.size': 18})
 
 
 
-algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "lpcc"])
 algnames={}
 algnames["dcqcn"]="DCQCN"
 algnames["powerInt"]="PowerTCP"
@@ -30,13 +30,21 @@ algnames["hpcc"]="HPCC"
 algnames["powerDelay"]=r'$\theta-PowerTCP$'
 algnames["timely"]="TIMELY"
 algnames["DCTCP"]="DCTCP"
+algnames["lpcc"]="LPCC"
 
+# algs=list(["dcqcn"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+
+# algs=list(["powerInt"])
+# algnames={}
+# algnames["powerInt"]="PowerTCP"
 
 #%%
 
 ######### BURST ###############
 
-plt.rcParams.update({'font.size': 22})
+plt.rcParams.update({'font.size': 30})
 
 
 figlegend = pylab.figure(figsize=(11.5,1.5))
@@ -58,8 +66,8 @@ for alg in algs:
     ax.xaxis.grid(True,ls='--')
     ax.yaxis.grid(True,ls='--')
     ax1=ax.twinx()
-    ax.set_yticks([10e9,25e9,40e9,80e9,100e9])
-    ax.set_yticklabels(["10","25","40","80","100"])
+    ax.set_yticks([10e9,25e9,40e9,55e9,70e9,85e9,100e9])
+    ax.set_yticklabels(["10","25","40","55","70","85","100"])
     ax.set_ylabel("Throughput (Gbps)")
 
     start=0.15
@@ -78,12 +86,12 @@ for alg in algs:
         c='#1979a9',
         lw=2
     )
-    ax1.set_ylim(0,600)
-    ax1.set_ylabel("Queue length (KB)")
+    ax1.set_ylim(0,5)
+    ax1.set_ylabel("Queue length (MB)")
     # ax1.plot(df["time"],df["qlen"]/(1000),c='r',label="Qlen",lw=2)
     ax1.plot(
         df["time"].dropna().to_numpy(),
-        (df["qlen"].dropna().to_numpy()) / 1000,
+        (df["qlen"].dropna().to_numpy()) / 1000000,
         c='r',
         label="Qlen",
         lw=2
@@ -92,7 +100,7 @@ for alg in algs:
     # ax1.legend(loc=3)
     # fig.legend(loc=2,ncol=2,framealpha=0,borderpad=-0.1)
     fig.tight_layout()
-    fig.savefig(plots_dir+alg+'.pdf')
+    fig.savefig(plots_dir+alg+'-burst.pdf')
     fig.savefig(plots_dir+alg+'.png')
 
     fig1,ax2 = plt.subplots(1,1)
@@ -100,8 +108,8 @@ for alg in algs:
     ax2.xaxis.grid(True,ls='--')
     ax2.yaxis.grid(True,ls='--')
     ax3=ax2.twinx()
-    ax2.set_yticks([10e9,25e9,40e9,80e9,100e9])
-    ax2.set_yticklabels(["10","25","40","80","100"])
+    ax2.set_yticks([10e9,25e9,40e9,55e9,70e9,850e9,100e9])
+    ax2.set_yticklabels(["10","25","40","55","70","85","100"])
     ax2.set_ylabel("Throughput (Gbps)")
 
     start=0.15
@@ -135,5 +143,5 @@ for alg in algs:
 
 
 figlegend.tight_layout()
-figlegend.legend(handles=lenged_elements,loc=9,ncol=2, framealpha=0,fontsize=48)
-# figlegend.savefig(plots_dir+'/burst/burst-legend.pdf')
+figlegend.legend(handles=lenged_elements,loc=9,ncol=2, framealpha=0,fontsize=38)
+figlegend.savefig(plots_dir+'burst-legend.pdf')

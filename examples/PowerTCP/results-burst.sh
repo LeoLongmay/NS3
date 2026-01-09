@@ -5,10 +5,10 @@ RES_RESULTS=$NS3/examples/PowerTCP/results_burst
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
 
-# algs=(0 1 2 3 4 5)
+# algs=(0 1 2 3 4 5 6)
 
-# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp")
-# CCMODE=(1 3 3 3 7 8)
+# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc")
+# CCMODE=(1 3 3 3 7 8 9)
 
 algs=(0)
 
@@ -21,6 +21,14 @@ CCMODE=(1)
 
 wien=false
 delay=false
+
+# algs=(0)
+
+# algNames=("powerInt")
+# CCMODE=(3)
+
+# wien=true
+# delay=false
 
 cd $NS3
 
