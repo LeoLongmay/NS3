@@ -19,6 +19,8 @@
 #include "ns3/unsched-tag.h"
 
 namespace ns3 {
+// uint32_t SwitchNode::cnp_count = 0;
+// uint32_t SwitchNode::fcnp_count = 0;
 
 TypeId SwitchNode::GetTypeId (void)
 {
@@ -50,6 +52,11 @@ TypeId SwitchNode::GetTypeId (void)
 	                                  BooleanValue(false),
 	                                  MakeBooleanAccessor(&SwitchNode::PowerEnabled),
 	                                  MakeBooleanChecker())
+						.AddAttribute("Epsilon",
+	                                  "lpcc epsilon",
+	                                  UintegerValue(3000),
+	                                  MakeUintegerAccessor(&SwitchNode::m_epsilon),
+	                                  MakeUintegerChecker<uint32_t>())
 
 	                    ;
 	return tid;
@@ -73,7 +80,7 @@ SwitchNode::SwitchNode() {
 	m_flowTable = CreateObject<RDMAFlowTable>();
 	m_flowTable->SetInactiveThreshold(inactiveThreshold);
 
-    ScheduleCleanFlowTable();	
+    ScheduleCleanFlowTable();
 }
 
 void SwitchNode::ScheduleCleanFlowTable() {
@@ -269,7 +276,12 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 		m_mmu->RemoveFromEgressAdmission(ifIndex, qIndex, p->GetSize(), found);
 		m_bytes[inDev][ifIndex][qIndex] -= p->GetSize();
 		if (m_ccMode == 9) { // lpcc
-			if (m_mmu->egress_bytes[ifIndex][qIndex] > m_epsilon) { // m_mmu->kmin[ifIndex]
+			if (m_mmu->totalUsed > m_epsilon) { // send FCNP
+				// std::cout << "egress_bytes: " << m_mmu->egress_bytes[ifIndex][qIndex] << std::endl;egress_bytes[ifIndex][qIndex]
+				if (Simulator::Now().GetTimeStep() >= 165210000) {
+					int debug = 1;
+					std::cout << debug << std::endl;
+				}
 				PppHeader ppp;
 				Ipv4Header h;
 				UdpHeader ch;
@@ -295,7 +307,8 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				nch.fcnp.pg = 3;
 				nch.fcnp.dport = ch.GetSourcePort();
 				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
-				nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+				// nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+				nch.fcnp.qlen = m_mmu->totalUsed;
 				nch.fcnp.m_flowCount = m_flowTable->GetFlowCountByDip(srcip);
 
 				Ptr<Packet> fcnp_pkt = Create<Packet>();
@@ -304,10 +317,10 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				fcnp_pkt->AddHeader(nppp);
 				fcnp_pkt->AddPacketTag(t);
 				SendToDev(fcnp_pkt, nch);
+				// fcnp_count++;
 			}
 		}
 		if (m_ecnEnabled) {
-			if (Simulator::Now().GetTimeStep() > 150000000) std::cout << "send cnp: " << Simulator::Now().GetTimeStep() << std::endl;
 			bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
 			if (egressCongested) {
 				PppHeader ppp;
@@ -317,6 +330,7 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				h.SetEcn((Ipv4Header::EcnType)0x03);
 				p->AddHeader(h);
 				p->AddHeader(ppp);
+				// cnp_count++;
 			}
 		}
 		//CheckAndSendPfc(inDev, qIndex);

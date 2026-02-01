@@ -37,7 +37,7 @@ protected:
 
 	// vamsi
 	bool PowerEnabled;
-	uint16_t m_epsilon; // lpcc epsilon
+	uint32_t m_epsilon; // lpcc epsilon
 
 private:
 	int GetOutDev(Ptr<const Packet>, CustomHeader &ch);
@@ -63,6 +63,8 @@ public:
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
 	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
+	// static uint32_t cnp_count;
+	// static uint32_t fcnp_count;
 
 	// for approximate calc in PINT
 	int logres_shift(int b, int l);

@@ -9,10 +9,20 @@ algs=(0)
 algNames=("lpcc")
 CCMODE=(9)
 
+# algs=(0)
+
+# algNames=("hpcc")
+# CCMODE=(3)
+
 # algs=(0 1 2 3 4 5)
 
 # algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp")
 # CCMODE=(1 3 3 3 7 8)
+
+# algs=(0)
+
+# algNames=("dcqcn")
+# CCMODE=(1)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
@@ -64,7 +74,8 @@ for algorithm in ${algs[@]};do
 	N=$(( $N+1 ))
 	RESULT_FILE="$RES_DUMP/evaluation-${algNames[$algorithm]}.out"
 	# echo "time ./waf --run "evaluation-fairness --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window""
-	time ./waf --run "powertcp-evaluation-fairness --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window" > $RESULT_FILE  2> $RESULT_FILE &
+	# time ./waf --run "powertcp-evaluation-fairness --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window" > $RESULT_FILE  2> $RESULT_FILE &
+	time ./build/examples/PowerTCP/ns3.39-powertcp-evaluation-fairness-debug --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window > $RESULT_FILE  2> $RESULT_FILE &
 done
 
 

@@ -1055,4 +1055,14 @@ void SwitchMmu::ConfigEcn(uint32_t port, uint32_t _kmin, uint32_t _kmax, double 
 	pmax[port] = _pmax;
 }
 
+uint64_t SwitchMmu::GetTotalUsedBuffer() {
+	uint64_t totalUsedBuffer = 0;
+	for (uint32_t i = 0; i < pCnt; i++) {
+		for (uint32_t j = 0; j < qCnt; j++) {
+			totalUsedBuffer += egress_bytes[i][j];
+		}
+	}
+	return totalUsedBuffer;
+}
+
 }

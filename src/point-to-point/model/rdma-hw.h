@@ -163,13 +163,19 @@ public:
     * LPCC
     *********************/
 
-    uint16_t m_epsilon; // buffer queue length threshold
+    uint32_t m_epsilon; // buffer queue length threshold
     uint64_t m_theta; // fcnp aggregate time window
+	uint64_t m_increaseInterval; // rate increase interval
     uint32_t m_tau; // RTT detection time window
+	uint64_t last_rtt;
 
     double m_wr; // min rate adjustment fraction
     double m_kr; // min rate regulation faction
+	double m_beta; // upper limit factor of rate increase
     bool m_EcnClampTgtRateLpcc;
+
+	Time m_lastfcnpInvokeTime = ns3::Time::Min();
+	Time m_fcnpInvokeInterval;
 
     void UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch);
     void fcnp_received_lpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);

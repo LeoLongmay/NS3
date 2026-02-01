@@ -10,10 +10,25 @@ mkdir $RES_RESULTS
 # algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc")
 # CCMODE=(1 3 3 3 7 8 9)
 
+# algs=(0 1 2 3 4 5)
+
+# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp")
+# CCMODE=(1 3 3 3 7 8)
+
+# algs=(0)
+
+# algNames=("dcqcn")
+# CCMODE=(1)
+
+# algs=(0)
+
+# algNames=("timely")
+# CCMODE=(7)
+
 algs=(0)
 
-algNames=("dcqcn")
-CCMODE=(1)
+algNames=("lpcc")
+CCMODE=(9)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
@@ -47,7 +62,8 @@ for algorithm in ${algs[@]};do
 	N=$(( $N+1 ))
 	RESULT_FILE="$RES_DUMP/evaluation-${algNames[$algorithm]}.out"
 	# echo "time ./waf --run "evaluation-fairness --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window""
-	cat $RESULT_FILE | grep 'ToR 0 Port 16' > $RES_RESULTS/result-${algNames[$algorithm]}.burst
+	# cat $RESULT_FILE | grep 'ToR 0 Port 16' > $RES_RESULTS/result-${algNames[$algorithm]}.burst
+	cat $RESULT_FILE | grep 'ToR 0 Port 0' > $RES_RESULTS/result-${algNames[$algorithm]}.burst
 done
 
 

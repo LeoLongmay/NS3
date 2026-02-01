@@ -11,10 +11,25 @@ algs=(0)
 algNames=("lpcc")
 CCMODE=(9)
 
+# algs=(0)
+
+# algNames=("hpcc")
+# CCMODE=(3)
+
 # algs=(0 1 2 3 4 5)
 
 # algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp")
 # CCMODE=(1 3 3 3 7 8)
+
+# algs=(0)
+
+# algNames=("dcqcn")
+# CCMODE=(1)
+
+# algs=(0)
+
+# algNames=("timely")
+# CCMODE=(7)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
