@@ -1,7 +1,7 @@
 source config.sh
 RES_DUMP=$NS3/examples/PowerTCP/dump_workload
 RES_RESULTS=$NS3/examples/PowerTCP/results_workload
-configFile=$NS3/examples/PowerTCP/config-burst.txt #config-burst works just fine with workload as well. Flows are created from within evaluation-workload.cc
+configFile=$NS3/examples/PowerTCP/config-workload.txt #config-burst works just fine with workload as well. Flows are created from within evaluation-workload.cc
 
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
@@ -15,10 +15,10 @@ mkdir $RES_RESULTS
 # algNames=("dcqcn" "powerInt" "hpcc" "timely" "dctcp" "lpcc")
 # CCMODE=(1 3 3 7 8 9)
 
-algs=(0 1 2)
+algs=(0)
 
-algNames=("dcqcn" "timely" "lpcc")
-CCMODE=(1 7 9)
+algNames=("lpcc")
+CCMODE=(9)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
@@ -30,12 +30,16 @@ delay=false
 cd $NS3
 
 
+# START=0.1
+# END=10
+# FLOWEND=9
 
 START=0.1
-END=10
-FLOWEND=9
+END=1.5
+FLOWEND=1.0
 
-LOADS=(0.2 0.4 0.6 0.8 0.9 0.95)
+# LOADS=(0.2 0.4 0.6 0.8 0.9 0.95)
+LOADS=(0.6)
 
 REQ_RATE=(1 4 8 16)
 REQ_SIZE=(1000000 2000000 4000000 6000000 8000000 1000000)
@@ -43,15 +47,15 @@ REQ_SIZE=(1000000 2000000 4000000 6000000 8000000 1000000)
 
 N=1
 
-cdf="$NS3/examples/PowerTCP/websearch.txt"
+cdf="$NS3/examples/PowerTCP/traffic_gen/cross_datacenter_traffic.txt"
 
 ################################################
 
 # Varying Load. No Incast traffic.
 
 ################################################
-req=0
-query=0
+req=1
+query=1000000
 for load in ${LOADS[@]};do
 	for algorithm in ${algs[@]};do
 

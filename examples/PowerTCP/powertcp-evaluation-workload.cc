@@ -557,8 +557,10 @@ int main(int argc, char *argv[])
 	uint32_t SERVER_COUNT = 32;
 	uint32_t LEAF_COUNT = 2; // LEAF and SPINE correspond to a single pod. Leafs are ToR switches and Spine are AGG switches. Count is within a single pod.
 	uint32_t SPINE_COUNT = 2;
-	uint64_t LEAF_SERVER_CAPACITY = 25;
-	uint64_t SPINE_LEAF_CAPACITY = 100;
+	// uint64_t LEAF_SERVER_CAPACITY = 25;
+	// uint64_t SPINE_LEAF_CAPACITY = 100;
+	uint64_t LEAF_SERVER_CAPACITY = 50;
+	uint64_t SPINE_LEAF_CAPACITY = 200;
 
 	double START_TIME = 0.1;
 	double END_TIME = 6;
@@ -909,21 +911,21 @@ int main(int argc, char *argv[])
 	conf.close();
 
 	// debug for lpcc
-	wien = false;
-	delayWien = false;
-	algorithm = 9;
-	windowCheck = 0;
+	// wien = false;
+	// delayWien = false;
+	// algorithm = 9;
+	// windowCheck = 0;
 
-	START_TIME = 0.1;
-	END_TIME = 2.0;
-	FLOW_LAUNCH_END_TIME = 1.8;
+	// START_TIME = 0.1;
+	// END_TIME = 2.0;
+	// FLOW_LAUNCH_END_TIME = 1.8;
 
-	load = 0.6;
+	// load = 0.8;
 
-	requestSize = 0;
-	queryRequestRate = 0;
-	incast = 10;
-	randomSeed = 16;
+	// requestSize = 0;
+	// queryRequestRate = 0;
+	// incast = 10;
+	// randomSeed = 16;
 	// debug
 
 	// overriding config file. I prefer to use cmd arguments
@@ -937,7 +939,7 @@ int main(int argc, char *argv[])
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7 || cc_mode == 9 || cc_mode == 1) // timely or lpcc, use ts
+	if (cc_mode == 7 || cc_mode == 9) // timely or lpcc, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, powertcp, use int
 		IntHeader::mode = IntHeader::NORMAL;
@@ -949,7 +951,7 @@ int main(int argc, char *argv[])
 	// lpcc: epsilon
 	uint16_t epsilon = 0;
 	if (cc_mode == 9) {
-		epsilon = 2000;
+		epsilon = 40000;
 	}
 
 	// Set Pint
@@ -1148,9 +1150,9 @@ int main(int argc, char *argv[])
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
 					// set ecn
 					uint64_t rate = dev->GetDataRate().GetBitRate();
-					// NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
-					// NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
-					// NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
+					NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
+					NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
+					NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
 					sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
 					// set pfc
 					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
@@ -1265,6 +1267,7 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("CcMode", UintegerValue(cc_mode));
 			sw->SetAttribute("MaxRtt", UintegerValue(maxRtt));
 			sw->SetAttribute("PowerEnabled", BooleanValue(wien));
+			sw->SetAttribute("Epsilon", UintegerValue(epsilon));
 		}
 	}
 

@@ -715,10 +715,10 @@ int main(int argc, char *argv[])
 	conf.close();
 
 	// debug for lpcc
-	// wien = false;
-	// delayWien = false;
-	// algorithm = 9;
-	// windowCheck = 0;
+	wien = false;
+	delayWien = false;
+	algorithm = 9;
+	windowCheck = 0;
 
 	// debug for powerInt
 	// wien = true;
@@ -747,9 +747,9 @@ int main(int argc, char *argv[])
 		IntHeader::mode = IntHeader::NONE;
 
 	// lpcc: epsilon
-	uint16_t epsilon = 0;
+	uint32_t epsilon = 0;
 	if (cc_mode == 9) {
-		epsilon = 2000;
+		epsilon = 40000;
 	}
 
 	// Set Pint
@@ -951,9 +951,9 @@ int main(int argc, char *argv[])
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
 					// set ecn
 					uint64_t rate = dev->GetDataRate().GetBitRate();
-					// NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
-					// NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
-					// NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
+					NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
+					NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
+					NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
 					sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
 					// set pfc
 					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
@@ -1069,6 +1069,7 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("CcMode", UintegerValue(cc_mode));
 			sw->SetAttribute("MaxRtt", UintegerValue(maxRtt));
 			sw->SetAttribute("PowerEnabled", BooleanValue(wien));
+			sw->SetAttribute("Epsilon", UintegerValue(epsilon));
 		}
 	}
 
@@ -1101,7 +1102,8 @@ int main(int argc, char *argv[])
 	topof.close();
 	tracef.close();
 	double delay = 1.5 * minRtt * 1e-9; // 10 micro seconds
-	Simulator::Schedule(Seconds(delay), PrintResults, switchDown, 1, delay);
+	// Simulator::Schedule(Seconds(delay), PrintResults, switchDown, 1, delay);
+	Simulator::Schedule(Seconds(delay), PrintResults, switchUp, 1, delay);
 
 	// AsciiTraceHelper ascii;
 	//     qbb.EnableAsciiAll (ascii.CreateFileStream ("eval.tr"));

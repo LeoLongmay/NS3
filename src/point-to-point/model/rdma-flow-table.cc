@@ -81,4 +81,13 @@ void RDMAFlowTable::CleanInactiveFlows() {
     }
 }
 
+uint64_t RDMAFlowTable::GetTotalMemoryUsage() const {
+    uint64_t totalMem = 0;
+
+    using FlowMapPair = typename decltype(m_flowMap)::value_type;
+    totalMem += m_flowMap.size() * sizeof(FlowMapPair);
+
+    return totalMem;
+}
+
 } // namespace ns3

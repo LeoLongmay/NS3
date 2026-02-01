@@ -60,6 +60,8 @@ public:
 
     size_t GetTotalFlowCount() const { return m_flowMap.size(); }
 
+    uint64_t GetTotalMemoryUsage() const;
+
 private:
     RDMAFlowTable(const RDMAFlowTable&) = delete;
     RDMAFlowTable& operator=(const RDMAFlowTable&) = delete;

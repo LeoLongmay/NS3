@@ -21,23 +21,33 @@ os.makedirs(plots_dir,exist_ok=True)
 plt.rcParams.update({'font.size': 18})
 
 
+# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+# algnames["powerInt"]="PowerTCP"
+# algnames["hpcc"]="HPCC"
+# algnames["powerDelay"]=r'$\theta-PowerTCP$'
+# algnames["timely"]="TIMELY"
+# algnames["DCTCP"]="DCTCP"
 
-# algs=list(["lpcc"])
-algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algs=list(["dcqcn"])
+
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+
+# algs=list(["timely"])
+# algnames={}
+# algnames["timely"]="TIMELY"
+
+algs=list(["lpcc"])
 algnames={}
-algnames["dcqcn"]="DCQCN"
-algnames["powerInt"]="PowerTCP"
-algnames["hpcc"]="HPCC"
-algnames["powerDelay"]=r'$\theta-PowerTCP$'
-algnames["timely"]="TIMELY"
-algnames["DCTCP"]="DCTCP"
 algnames["lpcc"]="LPCC"
 
 
 ######## FAIRNESS #############
 
 # algs=list(["lpcc"])
-algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
 results=NS3+"examples/PowerTCP/results_fairness/"
 
 plt.rcParams.update({'font.size': 30})
@@ -62,7 +72,7 @@ for alg in algs:
     ax.yaxis.grid(True,ls='--')
     
     ax.set_ylabel("Throughput (Gbps)")
-    ax.set_xlabel("Time (ms)")
+    ax.set_xlabel("Time (s)")
     # fig.suptitle(alg)
     
     df1 = pd.read_csv(results+'result-'+alg+'.1',delimiter=' ',usecols=[5,7],names=["th","time"])
@@ -70,12 +80,14 @@ for alg in algs:
     df3 = pd.read_csv(results+'result-'+alg+'.3',delimiter=' ',usecols=[5,7],names=["th","time"])
     df4 = pd.read_csv(results+'result-'+alg+'.4',delimiter=' ',usecols=[5,7],names=["th","time"])
     
-    ax.set_xlim(0,0.69)
-    original_ticks = [0, 0.23, 0.46, 0.69]
+    ax.set_xlim(0,0.7)
+    original_ticks = [0, 0.2, 0.4, 0.6]
     ax.set_xticks(original_ticks)
 
-    target_labels = [0, 10, 20, 40]
+    target_labels = [0, 0.2, 0.4, 0.6]
     ax.set_xticklabels(target_labels)
+
+    ax.set_ylim(0,52)
     
     # ax.plot(df1["time"][::100],df1["th"][::100]/1e9)
     # ax.plot(df2["time"][::100],df2["th"][::100]/1e9)
@@ -112,8 +124,8 @@ for alg in algs:
     # fig.tight_layout(rect=[0, 0, 1.1, 0.92])  
 
     fig.tight_layout()    
-    fig.savefig(plots_dir+alg+ '-fairness' + '.pdf')
-    fig.savefig(plots_dir+alg+'.png')
+    fig.savefig(plots_dir+alg+ '-fairness' + '.pdf', bbox_inches='tight', pad_inches=0)
+    fig.savefig(plots_dir+alg+'.png', bbox_inches='tight', pad_inches=0, dpi=300)
 
 figlegend.tight_layout()
 figlegend.legend(handles=lenged_elements,loc=9,ncol=5, framealpha=0,fontsize=48)

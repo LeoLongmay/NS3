@@ -109,6 +109,7 @@ public:
 
 	void UpdateLpfCounters();
 
+	uint64_t GetTotalUsedBuffer();
 
 	// config
 	uint32_t node_id;
