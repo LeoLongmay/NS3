@@ -128,15 +128,15 @@
 
 1.  `switch-node.cc` 文件的函数`CheckAndSendPfc`：检测队列长度（NS3.19中默认实现一个交换机节点128个端口，每个端口8个队列），并对超过特定长度的队列发送PFC（调用switch节点中的网络设备抽象类`qbb-net-device.cc`中的函数`SendPfc`）
 
-    ![image-20251218224134054](examples/PowerTCP/explaination_image/image-20251218224134054.png)
+    ![image-20251218224134054](explaination_image/image-20251218224134054.png)
 
 2.  `SendPfc`中创建数据包，并封装相应的IPv4头（其中IPv4投中填充了上层协议的协议号，PFC对应0xFE，CNP对应0xFF）和PFC头，并添加了定制头`CustomHeader ch`，该定制头似乎可以自动从缓存中获得CNP或fCNP的控制信息（通过`p->PeekHeader`调用实现）
 
-    ![image-20251218224247754](/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/explaination_image/image-20251218224247754.png)
+    ![image-20251218224247754](explaination_image/image-20251218224247754.png)
 
 3.  完成上述操作后，调用`SwitchSend`函数，对于PFC、CNP和fCNP等高优先级报文将直接发出，而不进入队列（实际上进入了队列，但是立马发出去了，即先调用了`m_queue->Enqueue(packet, qIndex)`再立即调用`DequeueAndTransmit()`
 
-    ![image-20251218224308481](/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/explaination_image/image-20251218224308481.png)
+    ![image-20251218224308481](explaination_image/image-20251218224308481.png)
 
 4.  PFC或CNP发送完成后，将在网络中传输，直到被下一个交换机节点或者主机节点接收到
 
@@ -144,15 +144,15 @@
 
 6.  若是主机节点接收到，则触发`rdma-hw.cc`类中的回调函数`m_rdmaReciveCb(packet, ch)`，并调用`Receive`函数
 
-    ![image-20251218225630773](/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/explaination_image/image-20251218225630773.png)
+    ![image-20251218225630773](explaination_image/image-20251218225630773.png)
 
 7.  `Receive`函数将进行判断是哪种数据包，并进行相应的操作
 
-    ![image-20251218225729887](/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/explaination_image/image-20251218225729887.png)
+    ![image-20251218225729887](explaination_image/image-20251218225729887.png)
 
 8.  其中，`ReceiveCnp`函数将快速初始化发送端速率为一个特定值，ReceiveAck函数将判断接收到的数据包的是否携带cnp位，若cnp位为true，则DCQCN等基于cnp的算法将进行速率调整；最后，基于RTT的算法也将调整速率
 
-    ![image-20251218230419648](/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/explaination_image/image-20251218230419648.png)
+    ![image-20251218230419648](explaination_image/image-20251218230419648.png)
 
 疑似组包函数：`qbb-net-device`中的`DequeueAndTransmit`
 
