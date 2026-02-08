@@ -60,7 +60,7 @@ ax.yaxis.grid(True, ls='--')
 # 设置轴标签
 ax.set_xlabel("Time (ms)")
 ax.set_xticklabels([0, 10, 20, 30, 8])
-ax.set_ylabel("Used buffer (MB)")
+ax.set_ylabel("Used Buffer (MB)")
 ax.set_yticklabels([-1, 0, 1, 2, 3])
 # ax1.set_ylabel("Flow Table Memory (KB)")
 

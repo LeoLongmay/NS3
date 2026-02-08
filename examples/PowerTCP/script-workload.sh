@@ -35,8 +35,8 @@ cd $NS3
 # FLOWEND=9
 
 START=0.1
-END=1.5
-FLOWEND=1.0
+END=1.3
+FLOWEND=0.8
 
 # LOADS=(0.2 0.4 0.6 0.8 0.9 0.95)
 LOADS=(0.6)
@@ -47,7 +47,7 @@ REQ_SIZE=(1000000 2000000 4000000 6000000 8000000 1000000)
 
 N=1
 
-cdf="$NS3/examples/PowerTCP/traffic_gen/cross_datacenter_traffic.txt"
+cdf="$NS3/examples/PowerTCP/traffic_gen/cross_datacenter_traffic2.txt"
 
 ################################################
 
