@@ -14,6 +14,7 @@ plots_dir = "./plot_workload/"
 # 颜色配置（复用参考代码中的colorsBurst，保证颜色一致性）
 colorsBurst = list(["#1979a9", "red", "#478fb5", "tab:brown", "tab:gray"])
 # 算法a：#1979a9（蓝）、算法b：red（红）、比值折线：#478fb5（浅蓝）
+figlegend = pylab.figure(figsize=(11.5,1.5))
 
 # ---------------------- 步骤1：构造模拟数据（可替换为真实数据） ----------------------
 # 4组数据的组标签
@@ -71,24 +72,36 @@ ax2.set_ylim(0, np.max(ratio_a_b) * 1.2)  # 预留一定顶部空间
 legend_elements = [
     # 算法a图例（蓝色，实心块）
     Line2D([0], [0], color=colorsBurst[0], lw=0, marker='s', markersize=15, 
-           label="LPCC-fCNP"),
+           label="LPCC(fCNP)"),
     # 算法b图例（红色，实心块）
     Line2D([0], [0], color=colorsBurst[1], lw=0, marker='s', markersize=15, 
-           label="DCQCN-CNP"),
+           label="DCQCN(CNP)"),
     # 比值折线图例（浅蓝，线宽3）
     Line2D([0], [0], color="xkcd:orange", lw=3, linestyle="--", marker="*", markersize=16,
-           label="fCNP:CNP")
+           label="LPCC(fCNP):DCQCN(CNP)")
 ]
 
-# 绘制图例（与参考代码一致：无背景、字体18、右上位置）
-ax.legend(handles=legend_elements, loc='center left', ncol=1, 
-          framealpha=0, fontsize=18)
+# 构造图例并赋值给变量leg
+# leg = ax.legend(
+#     handles=legend_elements,
+#     loc='upper center',
+#     bbox_to_anchor=(0.5, 1.1),
+#     bbox_transform=fig.transFigure,
+#     ncol=3,
+#     framealpha=0,
+#     fontsize=18
+# )
+
 
 # ---------------------- 步骤8：保存图表（与参考代码格式完全对齐） ----------------------
 fig.tight_layout()  # 自动调整布局，避免标签重叠
 # 保存PDF格式（去除白边）
 fig.savefig(plots_dir + "ratio_bar_line.pdf", 
             bbox_inches='tight', pad_inches=0)
+
+# figlegend.tight_layout()
+# figlegend.legend(handles=legend_elements,loc=9,ncol=3, framealpha=0,fontsize=38)
+# figlegend.savefig(plots_dir+'ratio-only.pdf', bbox_inches='tight', pad_inches=0)
 # 保存PNG格式（高分辨率300dpi，去除白边）
 # fig.savefig(plots_dir + "alg_a_b_ratio_bar_line.png", 
             # bbox_inches='tight', pad_inches=0, dpi=300)

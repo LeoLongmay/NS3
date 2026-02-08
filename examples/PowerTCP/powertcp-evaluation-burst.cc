@@ -715,10 +715,10 @@ int main(int argc, char *argv[])
 	conf.close();
 
 	// debug for lpcc
-	wien = false;
-	delayWien = false;
-	algorithm = 9;
-	windowCheck = 0;
+	// wien = false;
+	// delayWien = false;
+	// algorithm = 9;
+	// windowCheck = 0;
 
 	// debug for powerInt
 	// wien = true;
@@ -749,7 +749,8 @@ int main(int argc, char *argv[])
 	// lpcc: epsilon
 	uint32_t epsilon = 0;
 	if (cc_mode == 9) {
-		epsilon = 40000;
+		// epsilon = 20000;
+		epsilon = 15000;
 	}
 
 	// Set Pint

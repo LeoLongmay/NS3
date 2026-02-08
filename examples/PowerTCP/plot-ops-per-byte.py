@@ -82,8 +82,8 @@ legend_elements = [
 ]
 
 # 绘制图例（与参考代码一致：无背景、字体18、右上位置）
-ax.legend(handles=legend_elements, loc='upper left', ncol=1, 
-          framealpha=0, fontsize=18)
+# ax.legend(handles=legend_elements, loc='upper left', ncol=1, 
+#           framealpha=0, fontsize=18)
 
 # ---------------------- 步骤8：保存图表（与参考代码格式完全对齐） ----------------------
 fig.tight_layout()  # 自动调整布局，避免标签重叠

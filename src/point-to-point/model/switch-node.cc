@@ -278,10 +278,10 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 		if (m_ccMode == 9) { // lpcc
 			if (m_mmu->totalUsed > m_epsilon) { // send FCNP
 				// std::cout << "egress_bytes: " << m_mmu->egress_bytes[ifIndex][qIndex] << std::endl;egress_bytes[ifIndex][qIndex]
-				if (Simulator::Now().GetTimeStep() >= 165210000) {
-					int debug = 1;
-					std::cout << debug << std::endl;
-				}
+				// if (Simulator::Now().GetTimeStep() >= 165210000) {
+				// 	int debug = 1;
+				// 	std::cout << debug << std::endl;
+				// }
 				PppHeader ppp;
 				Ipv4Header h;
 				UdpHeader ch;
