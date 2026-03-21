@@ -10,6 +10,7 @@
 #include <limits>
 #include <random>
 #include <algorithm>
+#include <vector>
 #include "cstdio"
 #include "fstream"
 #include "iostream"
@@ -38,7 +39,8 @@
 using namespace ns3;
 using namespace std;
 
-NS_LOG_COMPONENT_DEFINE("DMRL_LOAD_BALANCE_SIMULATION");
+NS_LOG_COMPONENT_DEFINE
+("DMRL_LOAD_BALANCE_SIMULATION");
 
 /*----------------load balancing parameters----------------*/
 /**
@@ -53,8 +55,8 @@ uint64_t one_hop_delay = 1000;
 uint32_t cc_model = 1; // 拥塞控制模型: 1：DCQCN
 double pause_time = 5; // PFC 暂停帧时间，5us 流量控制过程中暂停的数据传输时间
 bool enable_qcn = true, enable_pfc = true, use_dynamic_pfc_threshold = true;
-// 包大小的单位为字节
-uint32_t packet_payload_size = 2048, l2_chunk_size = 0, l2_ack_interval = 0;
+// 包大小的单位为字节, ns3中采用的是10进制计算内存，因此1000B=1KB
+uint32_t packet_payload_size = 2000, l2_chunk_size = 0, l2_ack_interval = 0;
 double flowgen_start_time = 2.0, flowgen_stop_time = 2.5, simulator_extra_time = 0.1;
 uint64_t qlen_mon_start, qlen_mon_end;
 uint64_t cnp_mon_start, irn_mon_start;
@@ -137,6 +139,19 @@ map<Ptr<Node>, map<Ptr<Node>, uint64_t>> pairRtt;
 map<Ptr<Node>, map<Ptr<Node>, uint64_t>> pairDelay;
 map<Ptr<Node>, map<Ptr<Node>, uint64_t>> pairTxDelay;
 
+// 光链路表，记录两个节点对之间是否有一条光链路，最大节点数量为512（为了节约内存开支）
+bool optLinkMap[512][512] = {};
+
+// 实际检测到的迭代轮数
+uint32_t realEpisodes = 0;
+// 所有迭代轮次的总时间
+double totalEpisodesTime = 0;
+
+uint32_t largeFlowSuccess = 0;
+uint32_t smallFlowSucces = 0;
+uint32_t largeFlowFailed = 0;
+uint32_t smallFlowFailed = 0;
+
 // 在TOR交换机 监控 上行/下行链路 （负载均衡性能）TOR交换机ID到上行/下行链路接口的映射
 map<uint32_t, vector<uint32_t>> torId2UplinkIf;
 map<uint32_t, vector<uint32_t>> torId2DownlinkIf;
@@ -187,7 +202,7 @@ struct FlowLog {
     uint32_t idx;
     // 开始时间
     double start_time;
-    uint32_t maxPathCount, port;
+    uint32_t maxPacketCount, port;
 };
 
 // 流周期阈值，当同一节点对的流连续出现三次流的大小相似时，近似认为该节点对之间的流具有周期性
@@ -196,11 +211,19 @@ uint8_t flowPeriodThreshold = 3;
 // 流日志表，用于查询任意两个节点之间的流的信息 pair存储源节点和目的节点，vector存储该节点对的流的信息
 map<pair<uint32_t, uint32_t>, vector<FlowLog>> flowLogMap;
 
+// 节点对抖动表
+map<pair<uint32_t, uint32_t>, vector<double>> nodePairJitterMap;
+
+// 所有成功调度流的完成时间之和
+double totalFCT = 0.0;
+
 // 光电链路切换时间 10毫秒
 double optEleConvertionTime = 0.01;
 
-// 光链路流包数阈值，即光链路的流的包的数量至少为2的20次方个（每个包固定大小为2KB, 因此为2GB流）
-uint32_t optFlowPacketCountThreshold = 1048576;
+// 光链路流包数阈值，即光链路的流的包的数量至少为2x10e6个（每个包固定大小为2KB, 因此为2GB流）
+uint32_t optFlowPacketCountThreshold = 2000000;
+// 光链路带宽为800GBps = 800000000000Bps
+uint64_t optLinkBw = 800000000000;
 
 // 光链路结构体
 // 光链路带宽为800Gbps
@@ -274,6 +297,8 @@ Ptr<OpenGymSpace> MyGetActionSpace(void)
     return space;
 }
 
+double calculateJitter();
+
 /**
  * 定义结束条件：MyGetGameOver
  */
@@ -287,6 +312,12 @@ bool MyGetGameOver(void)
         cout << "Failed flows: " << failedFlowCount << endl;
         cout << "Aborted flows: " << abortedFlowCount << endl;
         cout << "Success flows: " << successFlowCount << endl;
+        cout << "Average FCT:" << totalFCT / successFlowCount << endl;
+        cout << "RealEpisodes: " << realEpisodes << " totalEpisodesTime: " << totalEpisodesTime << endl;
+        cout << "Average time per iteration:" << totalEpisodesTime / realEpisodes << endl;
+        cout << "Average jitter: " << calculateJitter() << endl;
+        cout << "largeFlowFailedRate:" << float(largeFlowFailed) / (largeFlowFailed + largeFlowSuccess) << endl;
+        cout << "smallFlowFailedRate" << float(smallFlowFailed) / (smallFlowFailed + smallFlowSucces) << endl;
         cout << "Total reward: " << totalRew << endl;
         cout << "Total time: " << totalTime << endl;
         return true;
@@ -300,7 +331,6 @@ bool MyGetGameOver(void)
 Ptr<OpenGymDataContainer> MyGetObservation(void)
 {
     curflow = allFlows[flow_idx];
-    cout << "currflow: " << flow_idx << endl;
     assert(Seconds(curflow.start_time) == Simulator::Now());
 
     vector<uint32_t> shape = {maxPathCount * 6};
@@ -386,6 +416,380 @@ bool MyExecuteActions(Ptr<OpenGymDataContainer> actionData)
     return true;
 }
 
+double calculateJitter() {
+    double totalJitterValue = 0;
+    uint32_t nodePairMultipleFlow = nodePairJitterMap.size();
+    for (auto iter = nodePairJitterMap.begin(); iter != nodePairJitterMap.end(); iter++) {
+        double jitterDifference = 0;
+        if (iter->second.size() <= 1) {
+            nodePairMultipleFlow--;
+            continue;
+        }
+        // 计算单个节点对的抖动平均值
+        for (uint32_t i = 0; i < iter->second.size() - 1; i++) {
+            uint32_t j = i + 1;
+            jitterDifference += abs(iter->second[j] - iter->second[i]);
+        }
+        totalJitterValue += jitterDifference / (iter->second.size() - 1);
+    }
+    // 计算所有节点对的抖动平均值
+    return totalJitterValue / nodePairMultipleFlow;
+}
+
+// 光链路开启标识符
+bool optLinkEnable = false;
+// 是否开启随机包喷洒
+bool isRPSEnable = false;
+
+float iterFlowSize = 4.8;
+uint32_t iterationFlowPacketCount = uint32_t(iterFlowSize * 1e9 / packet_payload_size);
+
+// 生成n个正整数，使其总和为sum
+std::vector<uint32_t> generateRandomNumbersWithFixedSum(uint32_t n, uint32_t sum) {
+    // 检查输入合法性
+    if (n <= 0 || sum <= 0 || sum < n) {
+        throw std::invalid_argument("无效输入: n必须为正, sum必须大于等于n");
+    }
+
+    // 随机数生成器
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(1, sum - n); // 确保每个数至少为1
+
+    std::vector<uint32_t> splits;
+    // 生成n-1个分割点
+    for (uint32_t i = 0; i < n - 1; ++i) {
+        splits.push_back(dist(gen));
+    }
+
+    // 排序分割点
+    std::sort(splits.begin(), splits.end());
+
+    // 计算每个随机数
+    std::vector<uint32_t> result;
+    uint32_t prev = 0;
+    for (uint32_t split : splits) {
+        result.push_back(split - prev);
+        prev = split;
+    }
+    result.push_back((sum - n) - prev); // 最后一个数
+
+    // 每个数加1，确保至少为1且总和不变
+    for (uint32_t& num : result) {
+        num += 1;
+    }
+
+    return result;
+}
+
+/** *
+ * 计算当前流走电链路的奖励值
+ * @param paths: 当前流的路径向量
+*/
+float calculateEleLinkReward(vector<PathInfo> paths) {
+    // 电链路可以复用，因此存在被占用的情况
+    // 检查是否足够被分配
+    uint32_t linkNumber = paths.size();
+    vector<bool> flowLinkEnable(linkNumber, true);
+    uint32_t failedFlowLinkNumber = 0;
+
+    for (size_t i = 0; i < paths.size(); i++)
+    {
+        const PathInfo &p = paths[i];
+        for (size_t j = 1; j < p.path.size(); j++)
+        {
+            uint32_t node1 = p.path[j - 1]->GetId();
+            uint32_t node2 = p.path[j]->GetId();
+            // 链路的下一次可用时间大于当前时间，表明当前链路被占用
+            if (nextAvailableTime[node1][node2] > Simulator::Now())
+            {
+                flowLinkEnable[i] = false;
+                failedFlowLinkNumber++;
+                break;
+            }
+        }
+    }
+
+    if (failedFlowLinkNumber == linkNumber) {
+        failedFlowCount++;
+        if (curflow.maxPacketCount >= optFlowPacketCountThreshold) largeFlowFailed++;
+        else smallFlowFailed++;
+        return -1.0;
+    }
+
+    double flowCompletionATime = 0.0;
+
+    vector<uint32_t> randomPacketCount;
+    uint32_t rpsIndex;
+    if (isRPSEnable) {
+        randomPacketCount = generateRandomNumbersWithFixedSum(linkNumber - failedFlowLinkNumber, curflow.maxPacketCount);
+        rpsIndex = 0;
+    }
+
+    // 更新分配记录
+    for (size_t i = 0; i < paths.size(); i++)
+    {
+        const PathInfo &p = paths[i];
+        // 存在多条可用路径且开启随机包喷洒
+        if (failedFlowLinkNumber < (linkNumber - 1) && isRPSEnable) {
+            if (flowLinkEnable[i]) {
+                double allocatedData = randomPacketCount[rpsIndex++] * packet_payload_size;
+                double transmissionTime = (allocatedData * 8) / p.bw;
+                // 当前流的完成时间是所有路径中传输最慢的那一条分支的时间
+                flowCompletionATime = max(transmissionTime, flowCompletionATime);
+                for (size_t j = 1; j < p.path.size(); j ++)
+                {
+                    uint32_t node1 = p.path[j - 1]->GetId();
+                    uint32_t node2 = p.path[j]->GetId();
+                    nextAvailableTime[node1][node2] = Simulator::Now() + Seconds(transmissionTime);
+                    nextAvailableTime[node2][node1] = nextAvailableTime[node1][node2];
+                }
+                totalTime += transmissionTime;
+            }
+        }
+        else {
+            if (failedFlowLinkNumber == 0) { // 当前流的所有分支路径均可用 
+                double allocatedData = currentAction[i] * curflow.maxPacketCount * packet_payload_size;
+                double transmissionTime = (allocatedData * 8) / p.bw;
+                // 当前流的完成时间是所有路径中传输最慢的那一条分支的时间
+                flowCompletionATime = max(transmissionTime, flowCompletionATime);
+                for (size_t j = 1; j < p.path.size(); j ++)
+                {
+                    uint32_t node1 = p.path[j - 1]->GetId();
+                    uint32_t node2 = p.path[j]->GetId();
+                    nextAvailableTime[node1][node2] = Simulator::Now() + Seconds(transmissionTime);
+                    nextAvailableTime[node2][node1] = nextAvailableTime[node1][node2];
+                }
+                totalTime += transmissionTime;
+
+            } else if (flowLinkEnable[i]) { // 将该流全部发送到一条分支路径中 
+                double allocatedData = curflow.maxPacketCount * packet_payload_size;
+                double transmissionTime = (allocatedData * 8) / p.bw;
+                
+                flowCompletionATime = transmissionTime;
+                for (size_t j = 1; j < p.path.size(); j ++)
+                {
+                    uint32_t node1 = p.path[j - 1]->GetId();
+                    uint32_t node2 = p.path[j]->GetId();
+                    nextAvailableTime[node1][node2] = Simulator::Now() + Seconds(transmissionTime);
+                    nextAvailableTime[node2][node1] = nextAvailableTime[node1][node2];
+                }
+                totalTime += transmissionTime;
+                break;
+            }
+        }
+    }
+
+    pair<uint32_t, uint32_t> nodePair(curflow.src, curflow.dst);
+
+    if (nodePairJitterMap.find(nodePair) == nodePairJitterMap.end()) {
+        vector<double> jitterList = {flowCompletionATime};
+        nodePairJitterMap.emplace(nodePair, jitterList);
+    } else {
+        nodePairJitterMap[nodePair].emplace_back(flowCompletionATime);
+    }
+
+    totalFCT += flowCompletionATime;
+
+    successFlowCount++;
+    if (curflow.maxPacketCount >= optFlowPacketCountThreshold) largeFlowSuccess++;
+    else smallFlowSucces++;
+    float ratio = curflow.maxPacketCount / float(maxPacketSize);
+    float base_reward = 1.0 / (1.0 + exp(-10 * ratio)) - 0.5;  // sigmoid函数压缩到 0-0.5
+    float size_bonus = 0.5 * log2(1 + ratio);  // 额外的大小奖励 0-0.5
+    float reward = base_reward + size_bonus;
+    totalRew += reward;
+    return reward;
+}
+
+// // 更新链路双向可用时间
+// inline void UpdateLinkAvailableTime(uint32_t node1, uint32_t node2, Time time) {
+//     nextAvailableTime[node1][node2] = time;
+//     nextAvailableTime[node2][node1] = time; // 双向链路时间同步
+// }
+
+// // 处理单条路径的数据传输（更新链路时间、累加传输时间）
+// inline void ProcessPathTransmission(const PathInfo& p, double allocatedData, double& flowCompletionATime, double& totalTime) {
+//     // 计算传输时间（单位：秒）
+//     double transmissionTime = (allocatedData * 8) / p.bw;
+//     // 更新流完成时间（取最长传输时间）
+//     flowCompletionATime = max(transmissionTime, flowCompletionATime);
+//     // 更新路径上所有链路的可用时间
+//     for (size_t j = 1; j < p.path.size(); ++j) {
+//         uint32_t node1 = p.path[j-1]->GetId();
+//         uint32_t node2 = p.path[j]->GetId();
+//         UpdateLinkAvailableTime(node1, node2, Simulator::Now() + Seconds(transmissionTime));
+//     }
+//     // 累加总传输时间
+//     totalTime += transmissionTime;
+// }
+
+// float calculateEleLinkReward(vector<PathInfo> paths) {
+//     NS_LOG_DEBUG("Calculating electric link reward"); // 补充调试日志
+//     const uint32_t linkNumber = paths.size();
+//     vector<bool> flowLinkEnable(linkNumber, true);
+//     uint32_t failedFlowLinkNumber = 0;
+
+//     // 检查各路径是否可用（链路是否被占用）
+//     for (size_t i = 0; i < linkNumber; ++i) {
+//         const PathInfo& p = paths[i];
+//         for (size_t j = 1; j < p.path.size(); ++j) {
+//             uint32_t node1 = p.path[j-1]->GetId();
+//             uint32_t node2 = p.path[j]->GetId();
+//             // 链路下一次可用时间晚于当前时间，标记为不可用
+//             if (nextAvailableTime[node1][node2] > Simulator::Now()) {
+//                 flowLinkEnable[i] = false;
+//                 ++failedFlowLinkNumber;
+//                 break; // 一条链路不可用则整个路径不可用，跳出内层循环
+//             }
+//         }
+//     }
+
+//     // 所有路径均不可用的情况
+//     if (failedFlowLinkNumber == linkNumber) {
+//         ++failedFlowCount;
+//         return -1.0;
+//     }
+
+//     // 初始化流完成时间
+//     double flowCompletionATime = 0.0;
+
+//     // 处理RPS启用的情况（生成随机数据包分配）
+//     if (isRPSEnable) {
+//         const uint32_t validLinkNumber = linkNumber - failedFlowLinkNumber;
+//         vector<uint32_t> randomPacketCount = generateRandomNumbersWithFixedSum(validLinkNumber, curflow.maxPacketCount);
+//         uint32_t rpsIndex = 0;
+
+//         // 分配数据并更新链路状态
+//         for (size_t i = 0; i < linkNumber; ++i) {
+//             const PathInfo& p = paths[i];
+//             if (flowLinkEnable[i]) {
+//                 double allocatedData = randomPacketCount[rpsIndex++] * packet_payload_size;
+//                 ProcessPathTransmission(p, allocatedData, flowCompletionATime, totalTime);
+//             }
+//         }
+//     }
+//     // 处理RPS未启用的情况
+//     else {
+//         if (failedFlowLinkNumber == 0) { // 所有路径均可用
+//             for (size_t i = 0; i < linkNumber; ++i) {
+//                 const PathInfo& p = paths[i];
+//                 double allocatedData = currentAction[i] * curflow.maxPacketCount * packet_payload_size;
+//                 ProcessPathTransmission(p, allocatedData, flowCompletionATime, totalTime);
+//             }
+//         } else { // 部分路径可用，选择第一条可用路径传输全部数据
+//             for (size_t i = 0; i < linkNumber; ++i) {
+//                 const PathInfo& p = paths[i];
+//                 if (flowLinkEnable[i]) {
+//                     double allocatedData = curflow.maxPacketCount * packet_payload_size;
+//                     ProcessPathTransmission(p, allocatedData, flowCompletionATime, totalTime);
+//                     break; // 只使用第一条可用路径，跳出循环
+//                 }
+//             }
+//         }
+//     }
+
+//     // 记录流完成时间到节点对抖动映射表
+//     const pair<uint32_t, uint32_t> nodePair(curflow.src, curflow.dst);
+//     nodePairJitterMap[nodePair].emplace_back(flowCompletionATime); // map不存在key时会自动构造空vector
+
+//     // 计算奖励
+//     const float ratio = static_cast<float>(curflow.maxPacketCount) / maxPacketSize;
+//     const float base_reward = 1.0f / (1.0f + exp(-10 * ratio)) - 0.5f; // 压缩到0-0.5
+//     const float size_bonus = 0.5f * log2(1 + ratio); // 额外奖励0-0.5
+//     const float reward = base_reward + size_bonus;
+
+//     // 更新总奖励并返回
+//     totalRew += reward;
+//     return reward;
+// }
+
+/**
+ * 计算当前流走光链路的奖励值
+ * @param isExistOptLink: 当前节点对是否存在光链路 
+ */
+float calculateOptLinkReward(bool isExistOptLink) {
+    // 光链路是端到端独占的，不存在复用，因此不存在竞争
+    // 当前节点对不存在光链路，则为当前节点对创建光链路
+    if (!isExistOptLink) {
+        optLinkMap[curflow.src][curflow.dst] = true;
+        cout << "Construct a optical link from node " << curflow.src << " to " << curflow.dst << endl;
+    }
+    double allocatedData = curflow.maxPacketCount * packet_payload_size;
+    double transmissionTime = (allocatedData * 8) / optLinkBw;
+    // 如果当前节点对不存在光链路，则需要进行光链路切换，并增加切换时间
+    if (!isExistOptLink) transmissionTime += optEleConvertionTime;
+    totalTime += transmissionTime;
+    totalFCT += transmissionTime;
+
+    pair<uint32_t, uint32_t> nodePair(curflow.src, curflow.dst);
+    if (nodePairJitterMap.find(nodePair) == nodePairJitterMap.end()) {
+        vector<double> jitterList = {transmissionTime};
+        nodePairJitterMap.emplace(nodePair, jitterList);
+    } else {
+        nodePairJitterMap[nodePair].emplace_back(transmissionTime);
+    }
+
+    successFlowCount++;
+    largeFlowSuccess++;
+
+    float ratio = float(curflow.maxPacketCount) / float(maxPacketSize);
+    float base_reward = 1.0 / (1.0 + exp(-10 * ratio)) - 0.5;  // sigmoid函数压缩到 0-0.5
+    float size_bonus = 0.5 * log2(1 + ratio);  // 额外的大小奖励 0-0.5
+    float reward = base_reward + size_bonus;
+    // 当前节点对不存在光链路，则奖励值打7折
+    if (!isExistOptLink) reward *= 0.7;
+    totalRew += reward;
+    return max(reward, float(0.05));
+}
+
+/**
+ * 查询当前节点对之间的流是否出现周期性
+ * @param src: 源节点id
+ * @param dst: 目的节点id
+ */
+bool queryFlowPeriod(uint32_t src, uint32_t dst)  {
+    pair<uint32_t, uint32_t> nodePair = std::make_pair(src, dst);
+    pair<uint32_t, uint32_t> reverseNodePair = std::make_pair(dst, src);
+    // 流日志表中不存在所查询的节点对和逆节点对
+    if (flowLogMap.find(nodePair) == flowLogMap.end() && flowLogMap.find(reverseNodePair) == flowLogMap.end()) {
+        cout << "Not find node " << src << " to " << dst << " flow log." << endl;
+        return false;
+    }
+    vector<FlowLog> flowLog;
+    vector<FlowLog> nflowLog;
+    if (flowLogMap.find(nodePair) != flowLogMap.end() && flowLogMap.find(reverseNodePair) == flowLogMap.end()) {
+        flowLog = flowLogMap[nodePair];
+    } else if (flowLogMap.find(reverseNodePair) == flowLogMap.end() && flowLogMap.find(reverseNodePair) != flowLogMap.end()) {
+        flowLog = flowLogMap[reverseNodePair];
+    } else {
+        flowLog = flowLogMap[nodePair];
+        nflowLog = flowLogMap[reverseNodePair];
+        // 合并两个流日志到一个列表中
+        flowLog.insert(flowLog.end(), 
+            std::make_move_iterator(nflowLog.begin()),
+            std::make_move_iterator(nflowLog.end()));
+    } 
+    
+    if (flowLog.size() < flowPeriodThreshold) {
+        cout << "Num of flow from " << src << " to " << dst << " is insufficient to judge periodicity." << endl;
+        return false;
+    }
+
+    // 额外的流的包数量
+    uint32_t extraFlowPacketCount = 1000000;
+    
+    // 周期性判断
+    for (auto it = prev(flowLog.end(), flowPeriodThreshold); it != flowLog.end(); it++) {
+        // 最近的几条流的流大小为较大流
+        // 大于光链路流包数阈值加额外流包数之和则为较大流
+        if (it->maxPacketCount < optFlowPacketCountThreshold + extraFlowPacketCount) return false;
+    }
+    return true;
+}
+
+double iterationStartTime = 0, iterationEndTime = 0;
+
 /**
  * 定义reward：根据当前分配记录和最新的网络状态计算奖励。
  * 实际执行动作的代码在此函数中
@@ -402,8 +806,10 @@ float MyGetReward(void)
         abortedFlowCount++;
         return 0.0;
     }
-    Ptr<Node> srcNode = n.Get(curflow.src);
-    Ptr<Node> dstNode = n.Get(curflow.dst);
+    uint32_t src = curflow.src;
+    uint32_t dst = curflow.dst;
+    Ptr<Node> srcNode = n.Get(src);
+    Ptr<Node> dstNode = n.Get(dst);
     auto outerIt = allPaths.find(srcNode);
     if (outerIt == allPaths.end())
     {
@@ -418,47 +824,50 @@ float MyGetReward(void)
     }
     vector<PathInfo> paths = innerIt->second;
 
-    // 检查是否足够被分配
-    for (size_t i = 0; i < paths.size(); i++)
-    {
-        const PathInfo &p = paths[i];
-        for (size_t j = 1; j < p.path.size(); j++)
-        {
-            uint32_t node1 = p.path[j - 1]->GetId();
-            uint32_t node2 = p.path[j]->GetId();
-            // 链路的下一次可用时间大于当前时间，表明当前链路被占用
-            if (nextAvailableTime[node1][node2] > Simulator::Now())
-            {
-                failedFlowCount++;
-                return -0.1;
+    uint64_t bw = optLinkEnable ? 800 * 1e9 : 100 * 1e9;
+
+    if (src == 0 && curflow.maxPacketCount == iterationFlowPacketCount) {
+        iterationStartTime = curflow.start_time;
+    }
+
+    if (dst == 0 && curflow.maxPacketCount == iterationFlowPacketCount) {
+        iterationEndTime = curflow.start_time + (curflow.maxPacketCount * packet_payload_size) * 8 / bw;
+        totalEpisodesTime += iterationEndTime - iterationStartTime;
+        // cout << iterationEndTime << " " << iterationStartTime << endl;
+        realEpisodes++;
+    }
+
+    // 当前流的包数量是否超过阈值
+    if (curflow.maxPacketCount >= optFlowPacketCountThreshold && optLinkEnable) {
+        // 当前流是否出现周期性
+        if (queryFlowPeriod(src, dst)) {
+            // 计算走光链路的奖励值
+            return calculateOptLinkReward(optLinkMap[src][dst]);
+        } else { // 没检测到周期性，则记录该条流到流日志表，并继续走电链路
+            pair<uint32_t, uint32_t> nodePair = std::make_pair(src, dst);
+            FlowLog flowLog = {0};
+            
+            flowLog.idx = curflow.idx;
+            flowLog.maxPacketCount = curflow.maxPacketCount;
+            flowLog.port = curflow.port;
+            flowLog.start_time = curflow.start_time;
+
+            // 流日志表不存在当前节点对的流日志
+            if (flowLogMap.find(nodePair) == flowLogMap.end()) {
+                vector<FlowLog> nodePairFlowList = {flowLog};
+                flowLogMap.emplace(nodePair, nodePairFlowList);
+            } else {
+                flowLogMap[nodePair].emplace_back(flowLog);
             }
+
+            // 计算走电链路的奖励值
+            return calculateEleLinkReward(paths);
         }
+        
+    } else { // 不超过阈值，直接走电链路
+        return calculateEleLinkReward(paths);
     }
-
-    // 更新分配记录
-    for (size_t i = 0; i < paths.size(); i++)
-    {
-        const PathInfo &p = paths[i]; 
-        double allocatedData = currentAction[i] * curflow.maxPacketCount * 128;
-        double transmissionTime = (allocatedData * 8) / p.bw;
-
-        for (size_t j = 1; j < p.path.size(); j ++)
-        {
-            uint32_t node1 = p.path[j - 1]->GetId();
-            uint32_t node2 = p.path[j]->GetId();
-            nextAvailableTime[node1][node2] = Simulator::Now() + Seconds(transmissionTime);
-            nextAvailableTime[node2][node1] = nextAvailableTime[node1][node2];
-        }
-        totalTime += transmissionTime;
-    }
-
-    successFlowCount++;
-    float ratio = float(curflow.maxPacketCount) / float(maxPacketSize);
-    float base_reward = 1.0 / (1.0 + exp(-10 * ratio)) - 0.5;  // sigmoid函数压缩到 0-0.5
-    float size_bonus = 0.5 * log2(1 + ratio);  // 额外的大小奖励 0-0.5
-    float reward = base_reward + size_bonus;
-    totalRew += reward;
-    return reward;
+    return 0.0;
 }
 
 void ScheduleNextStateRead(double envStepTime, Ptr<OpenGymInterface> openGymInterface)
@@ -612,6 +1021,8 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q)
     uint32_t total_bytes = q->m_size + ((q->m_size - 1) / packet_payload_size + 1) * (CustomHeader::GetStaticWholeHeaderSize() - IntHeader::GetStaticSize());
     uint64_t standalone_fct = base_rtt + total_bytes * 800000000lu / b;
 
+    cout << "currFlowId: " << curflow.idx << " FCT: " << standalone_fct << endl;
+
     // 从接收端删除RxQP(接收队列)   QP 完成后，它的接收队列不再需要存在。
     Ptr<Node> dstNode = n.Get(did);
     Ptr<RdmaDriver> rdma = dstNode->GetObject<RdmaDriver>();
@@ -693,12 +1104,45 @@ void BuildPathsFromNextHop(Ptr<Node> curr, Ptr<Node> dst, vector<Ptr<Node>> &cur
  * 该函数遍历 `NodeContainer` 中的所有节点，调用 `FindAllPaths` 查找每对节点之间的所有路径，
  * 并记录路径时延、传输时延、带宽等信息。
  */
+// void CalculateAllPaths(NodeContainer &n)
+// {
+//     for (uint32_t i = 0; i < Settings::host_num; i++)
+//     {
+//         Ptr<Node> src = n.Get(i);
+//         for (uint32_t j = 0; j < Settings::host_num; j++)
+//         {
+//             if (i == j)
+//                 continue;
+//             Ptr<Node> dst = n.Get(j);
+//             vector<Ptr<Node>> currentPath;
+//             vector<vector<Ptr<Node>>> allPossiblePaths;
+//             currentPath.push_back(src);
+
+//             // 使用 nextHop 直接构建路径
+//             BuildPathsFromNextHop(src, dst, currentPath, allPossiblePaths);
+
+//             for (auto path : allPossiblePaths)
+//             {
+//                 PathInfo pathInfo;
+//                 pathInfo.path = path;
+//                 pathInfo.delay = pairDelay[src][dst];
+//                 pathInfo.txDelay = pairTxDelay[src][dst];
+//                 pathInfo.bw = pairBw[src][dst];
+//                 pathInfo.hops = path.size();
+//                 pathInfo.pathCount = allPaths[src][dst].size() + 1;
+//                 allPaths[src][dst].push_back(pathInfo);
+//             }
+//         }
+//     }
+//     WriteAllPaths();
+// }
+
 void CalculateAllPaths(NodeContainer &n)
 {
-    for (uint32_t i = 0; i < Settings::host_num; i++)
+    for (uint32_t i = 0; i < Settings::host_num + Settings::switch_num; i++)
     {
         Ptr<Node> src = n.Get(i);
-        for (uint32_t j = 0; j < Settings::host_num; j++)
+        for (uint32_t j = 0; j < Settings::host_num + Settings::switch_num; j++)
         {
             if (i == j)
                 continue;
@@ -1517,6 +1961,9 @@ int main(int argc, char *argv[])
     map<string, uint32_t> topo2bdpMap;
     topo2bdpMap[string("fat_k8_100G_OS2")] = 156000;         // RTT=12480 --> all 100G links
     topo2bdpMap[string("leaf_spine_128_100G_OS2")] = 104000; // RTT=8320
+    topo2bdpMap[string("fat_k10_100G_OS2")] = 156000;
+    topo2bdpMap[string("leaf_spine_512_100G_OS2")] = 104000;
+    topo2bdpMap[string("cyc_link_topology")] = 108000;
 
     // 拓扑文件  是否找到匹配的拓扑  irn_bdp 存储
     bool found_topo2bdpMap = false;

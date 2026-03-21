@@ -15,9 +15,8 @@ import argparse
 from datetime import date
 
 # randomID
-# 修改代码：使用时间戳作为种子
-random.seed(int(datetime.now().timestamp()))
 # random.seed(datetime.now())
+random.seed(datetime.now().timestamp())
 MAX_RAND_RANGE = 1000000000
 
 # config template
@@ -94,6 +93,7 @@ LOAD {load}
 RANDOM_SEED 1
 """
 
+
 # LB/CC mode matching
 cc_modes = {
     "dcqcn": 1,
@@ -117,9 +117,9 @@ topo2bdp = {
 
 FLOWGEN_DEFAULT_TIME = 2.0  # see /traffic_gen/traffic_gen.py::base_t
 
+
 def main():
     # make directory if not exists
-    # 输出文件
     isExist = os.path.exists(os.getcwd() + "/mix/output/")
     if not isExist:
         os.makedirs(os.getcwd() + "/mix/output/")
@@ -143,7 +143,7 @@ def main():
     parser.add_argument('--bw', dest="bw", action='store',
                         default='100', help="the NIC bandwidth (Gbps) (default: 100)")
     parser.add_argument('--topo', dest='topo', action='store',
-                        default='leaf_spine_128_100G', help="the name of the topology file (default: leaf_spine_128_100G_OS2)")
+                        default='leaf_spine_128_100G_OS2', help="the name of the topology file (default: leaf_spine_128_100G_OS2)")
     parser.add_argument('--cdf', dest='cdf', action='store',
                         default='AliStorage2019', help="the name of the cdf file (default: AliStorage2019)")
     parser.add_argument('--enforce_win', dest='enforce_win', action='store',
@@ -189,10 +189,9 @@ def main():
     sw_monitoring_interval = int(args.sw_monitoring_interval)
 
     # get over-subscription ratio from topoogy name
+
     netload = args.netload
-    print("Network Topology: {}".format(topo))
     oversub = int(topo.replace("\n", "").split("OS")[-1].replace(".txt", ""))
-    print("Network Topology oversub: {}".format(oversub))
     assert (int(args.netload) % oversub == 0)
     hostload = int(args.netload) / oversub
     assert (hostload > 0)
@@ -213,13 +212,11 @@ def main():
     # sniff number of servers
     with open("config/{topo}.txt".format(topo=args.topo), 'r') as f_topo:
         line = f_topo.readline().split(" ")
-        # 计算主机数量
         n_host = int(line[0]) - int(line[1])
 
     assert (hostload >= 0 and hostload < 100)
     flow = "L_{load:.2f}_CDF_{cdf}_N_{n_host}_T_{time}ms_B_{bw}_flow".format(
         load=hostload, cdf=args.cdf, n_host=n_host, time=int(float(args.simul_time)*1000), bw=bw)
-    print("Flow name:{}".format(flow))
 
     # check the file exists
     if (exists(os.getcwd() + "/config/" + flow + ".txt")):
@@ -244,7 +241,6 @@ def main():
             output=os.getcwd() + "/config/" + flow + ".txt"))
 
     # sanity check - bandwidth
-    # 带宽合理性检查 检查拓扑文件中的带宽是否与输入的带宽一致
     with open("config/{topo}.txt".format(topo=args.topo), 'r') as f_topo:
         first_line = f_topo.readline().split(" ")
         n_host = int(first_line[0]) - int(first_line[1])
@@ -255,8 +251,6 @@ def main():
             if (i > n_link):
                 break
             parsed = line.split(" ")
-            # print("PARSED--------",parsed)
-            # print("src1 dst1 rate delay error_rate",parsed[0],parsed[1],parsed[2],parsed[3],parsed[4])
             if len(parsed) > 2 and (int(parsed[0]) < n_host or int(parsed[1]) < n_host):
                 assert (int(parsed[2].replace("Gbps", "")) == int(bw))
     print("All NIC bandwidth is {bw}Gbps".format(bw=bw))
@@ -264,24 +258,18 @@ def main():
     ##################################################################
     ##########              ConWeave parameters             ##########
     ##################################################################
-    # 如果负载平衡模式（lb_mode）是 9，则设置 ConWeave 参数
     if (lb_mode == 9):
         cwh_extra_reply_deadline = 4  # 4us, NOTE: this is "extra" term to base RTT
         cwh_path_pause_time = 16  # 8us (K_min) or 16us
 
-        # 如果拓扑是 2 层的 leaf-spine 结构
         if "leaf_spine" in topo:  # 2-tier
             cwh_extra_voq_flush_time = 16
             cwh_default_voq_waiting_time = 200
             cwh_tx_expiry_time = 300  # 300us
-
-        # 如果拓扑是 3 层 fat 拓扑，且启用了 IRN，且未启用 PFC
         elif "fat" in topo and enabled_pfc == 0 and enabled_irn == 1:  # 3-tier, IRN
             cwh_extra_voq_flush_time = 16
             cwh_default_voq_waiting_time = 300
             cwh_tx_expiry_time = 1000  # 1ms
-
-        # 如果拓扑是 3 层 fat 拓扑，且启用了 PFC，且未启用IRN 
         elif "fat" in topo and enabled_pfc == 1 and enabled_irn == 0:  # 3-tier, Lossless
             cwh_extra_voq_flush_time = 64
             cwh_default_voq_waiting_time = 600
@@ -303,9 +291,7 @@ def main():
     isExist = os.path.exists(os.getcwd() + "/mix/output/" + config_ID + "/")
     assert (not isExist)
     # if not isExist:
-    # os.makedirs(os.getcwd() + "/mix/output/" + config_ID + "/")
-    os.makedirs(os.getcwd() + "/mix/output/" + config_ID + "/", exist_ok=True)
-    # os.makedirs(os.getcwd() + "/mix/output/" + config_ID + "/")
+    os.makedirs(os.getcwd() + "/mix/output/" + config_ID + "/")
     print("The new directory is created  - {}".format(os.getcwd() +
           "/mix/output/" + config_ID + "/"))
 
@@ -322,7 +308,6 @@ def main():
             print("### INFO: Enforced to use window scheme! ###")
 
     # record to history
-    # 运行记录
     simulday = datetime.now().strftime("%m/%d/%y")
     with open("./mix/.history", "a") as history:
         history.write("{simulday},{config_ID},{cc_mode},{lb_mode},{cwh_tx_expiry_time},{cwh_extra_reply_deadline},{cwh_path_pause_time},{cwh_extra_voq_flush_time},{cwh_default_voq_waiting_time},{pfc},{irn},{has_win},{var_win},{topo},{bw},{cdf},{load},{time}\n".format(
@@ -395,53 +380,34 @@ def main():
     # run program
     print("Running simulation...")
     output_log = config_name.replace(".txt", ".log")
-    run_command = "./waf --run 'scratch/load-balance {config_name}' > {output_log} 2>&1".format(
+    run_command = "./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
         config_name=config_name, output_log=output_log)
     with open("./mix/.history", "a") as history:
         history.write(run_command + "\n")
         history.write(
-            "./waf --run 'scratch/load-balance' --command-template='gdb --args %s {config_name}'\n".format(
+            "./waf --run 'scratch/network-load-balance' --command-template='gdb --args %s {config_name}'\n".format(
                 config_name=config_name)
         )
         history.write("\n")
 
-    print("run_command",run_command)
-    print("load-balance 仿真开始运行----------------------------------")
-    os.system("./waf --run 'scratch/load-balance {config_name}' > {output_log} 2>&1".format(
+    print(run_command)
+    os.system("./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
         config_name=config_name, output_log=output_log))
-    print("load-balance 仿真运行结束----------------------------------")
-    # run_command = "./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
-    #     config_name=config_name, output_log=output_log)
-    # with open("./mix/.history", "a") as history:
-    #     history.write(run_command + "\n")
-    #     history.write(
-    #         "./waf --run 'scratch/network-load-balance' --command-template='gdb --args %s {config_name}'\n".format(
-    #             config_name=config_name)
-    #     )
-    #     history.write("\n")
-
-    # print("run_command",run_command)
-    # os.system("./waf --run 'scratch/network-load-balance {config_name}' > {output_log} 2>&1".format(
-    #     config_name=config_name, output_log=output_log))
-    # print("network-load-balance run done----------------------------------")
-
-
 
     ####################################################
     #                 Analyze the output FCT           #
     ####################################################
-    # # NOTE: collect data except warm-up and cold-finish period
-    # fct_analysis_time_limit_begin = int(
-    #     flowgen_start_time * 1e9) + int(0.005 * 1e9)  # warmup
-    # fct_analysistime_limit_end = int(
-    #     flowgen_stop_time * 1e9) + int(0.05 * 1e9)  # extra term
+    # NOTE: collect data except warm-up and cold-finish period
+    fct_analysis_time_limit_begin = int(
+        flowgen_start_time * 1e9) + int(0.005 * 1e9)  # warmup
+    fct_analysistime_limit_end = int(
+        flowgen_stop_time * 1e9) + int(0.05 * 1e9)  # extra term
 
-    # print("Analyzing output FCT...")
-    # print("python3 fctAnalysis.py -id {config_ID} -dir {dir} -bdp {bdp} -sT {fct_analysis_time_limit_begin} -fT {fct_analysistime_limit_end} > /dev/null 2>&1".format(
-    #     config_ID=config_ID, dir=os.getcwd(), bdp=bdp, fct_analysis_time_limit_begin=fct_analysis_time_limit_begin, fct_analysistime_limit_end=fct_analysistime_limit_end))
-    # os.system("python3 fctAnalysis.py -id {config_ID} -dir {dir} -bdp {bdp} -sT {fct_analysis_time_limit_begin} -fT {fct_analysistime_limit_end} > /dev/null 2>&1".format(
-    #     config_ID=config_ID, dir=os.getcwd(), bdp=bdp, fct_analysis_time_limit_begin=fct_analysis_time_limit_begin, fct_analysistime_limit_end=fct_analysistime_limit_end))
-    # print("fctAnalysis-----------------------error")
+    print("Analyzing output FCT...")
+    print("python3 fctAnalysis.py -id {config_ID} -dir {dir} -bdp {bdp} -sT {fct_analysis_time_limit_begin} -fT {fct_analysistime_limit_end} > /dev/null 2>&1".format(
+        config_ID=config_ID, dir=os.getcwd(), bdp=bdp, fct_analysis_time_limit_begin=fct_analysis_time_limit_begin, fct_analysistime_limit_end=fct_analysistime_limit_end))
+    os.system("python3 fctAnalysis.py -id {config_ID} -dir {dir} -bdp {bdp} -sT {fct_analysis_time_limit_begin} -fT {fct_analysistime_limit_end} > /dev/null 2>&1".format(
+        config_ID=config_ID, dir=os.getcwd(), bdp=bdp, fct_analysis_time_limit_begin=fct_analysis_time_limit_begin, fct_analysistime_limit_end=fct_analysistime_limit_end))
 
     if lb_mode == 9: # ConWeave Logging
         ################################################################
@@ -463,4 +429,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

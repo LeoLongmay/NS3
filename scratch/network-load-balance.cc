@@ -194,7 +194,6 @@ uint32_t flow_num;
 
 /**
  * Read flow input from file "flowf"
- * 读取流输入文件
  */
 void ReadFlowInput() {
     if (flow_input.idx < flow_num) {
@@ -212,13 +211,10 @@ void ReadFlowInput() {
 
 /**
  * Scheduling flows given in /config/L_XX....txt file
- * 调度流
  */
 void ScheduleFlowInputs(FILE *infile) {
     NS_LOG_DEBUG("ScheduleFlowInputs at " << Simulator::Now());
     while (flow_input.idx < flow_num && Seconds(flow_input.start_time) == Simulator::Now()) {
-        // uint32_t pg, src, dst, sport, dport, maxPacketCount, target_len;
-        // 修改代码，删除未使用的变量 maxPacketCount, 
         uint32_t pg, src, dst, sport, dport, target_len;
         pg = flow_input.pg;
         src = flow_input.src;
@@ -242,8 +238,6 @@ void ScheduleFlowInputs(FILE *infile) {
          * Turn on if you want to record all input streams into output file for logging.
          * But, the input stream can be found in config. We do not recommend to do this
          * as it consumes storage resource, redundantly.
-         * 如果需要记录所有输入流到输出文件用于日志记录，请启用此功能。
-         * 但是，输入流信息已经可以在配置文件中找到。我们不推荐开启此功能，因为它会占用额外的存储资源，且冗余
          */
         if (0) {  // logging input streams to "XXXX_out_in.txt"
             /************************
@@ -493,19 +487,18 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q) {
             standalone_fct);
 
     // for debugging
-    // 修改代码：
-    NS_LOG_DEBUG(Settings::ip_to_node_id(q->sip) << " " 
-               << Settings::ip_to_node_id(q->dip) << " " 
-               << q->sport << " " 
-               << q->dport << " " 
-               << q->m_size << " " 
-               << q->startTime.GetTimeStep() << " " 
-               << (Simulator::Now() - q->startTime).GetTimeStep() << " " 
-               << standalone_fct);
     // NS_LOG_DEBUG("%u %u %u %u %lu %lu %lu %lu\n" %
     //              (Settings::ip_to_node_id(q->sip), Settings::ip_to_node_id(q->dip), q->sport,
     //               q->dport, q->m_size, q->startTime.GetTimeStep(),
     //               (Simulator::Now() - q->startTime).GetTimeStep(), standalone_fct));
+    NS_LOG_DEBUG("" << Settings::ip_to_node_id(q->sip) << " "
+                << Settings::ip_to_node_id(q->dip) << " "
+                << q->sport << " "
+                << q->dport << " "
+                << q->m_size << " "
+                << q->startTime.GetTimeStep() << " "
+                << (Simulator::Now() - q->startTime).GetTimeStep() << " "
+                << standalone_fct);
     Settings::cnt_finished_flows++;
     fflush(fout);
 }
@@ -718,8 +711,7 @@ void TakeDownLink(NodeContainer n, Ptr<Node> a, Ptr<Node> b) {
 }
 
 uint64_t get_nic_rate(NodeContainer &n) {
-    // uint64_t avg_nic_rate;
-    uint64_t avg_nic_rate = 0;  // 初始化 avg_nic_rate 变量
+    uint64_t avg_nic_rate = 0;
     uint64_t n_servers = 0;
     for (uint32_t i = 0; i < n.GetN(); i++) {
         if (n.Get(i)->GetNodeType() == 0) {
@@ -738,7 +730,6 @@ uint64_t get_nic_rate(NodeContainer &n) {
 /************************************************************************/
 
 int main(int argc, char *argv[]) {
-    // 修改代码：注释掉了一些不需要的变量
     // uint32_t *workload_cdf = nullptr;
     clock_t begint, endt;
     begint = clock();
@@ -1282,11 +1273,9 @@ int main(int argc, char *argv[]) {
         nbr2if[dnode][snode].bw = DynamicCast<QbbNetDevice>(d.Get(1))->GetDataRate().GetBitRate();
 
         // This is just to set up the connectivity between nodes. The IP addresses are useless
-        char ipstring[16];
+        char ipstring[32];
         Ipv4Address x;
-        // sprintf(ipstring, "10.%d.%d.0", i / 254 + 1, i % 254 + 1);
-        // 设置ip地址 大于1 小于254
-        sprintf(ipstring, "10.%d.%d.0", i / 254 + 1 > 254 ? 254 : i / 254 + 1, i % 254 + 1 > 254 ? 254 : i % 254 + 1);
+        sprintf(ipstring, "10.%d.%d.0", i / 254 + 1, i % 254 + 1);
         ipv4.SetBase(ipstring, "255.255.255.0");
         ipv4.Assign(d);
 
@@ -1317,7 +1306,6 @@ int main(int argc, char *argv[]) {
     for (uint32_t i = 0; i < node_num; i++) {
         if (n.Get(i)->GetNodeType() == 1) {  // is switch
             Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
-            // 修改代码：注释掉未使用的变量
             // uint32_t shift = 3;  // by default 1/8
             for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
                 Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
@@ -1343,15 +1331,11 @@ int main(int argc, char *argv[]) {
             sw->m_mmu->ConfigBufferSize(buffer_size * 1024 *
                                         1024);  // default 0, specify in run.py!!
             sw->m_mmu->node_id = sw->GetId();
-            // 修改代码：
-            NS_LOG_INFO("Node " << i 
-            << " : Broadcom switch (" 
-            << (sw->GetNDevices() - 1) 
-            << " ports / " 
-            << (sw->m_mmu->GetMmuBufferBytes() / 1000000.) 
-            << "MB MMU)");
             // NS_LOG_INFO("Node %u : Broadcom switch (%u ports / %gMB MMU)\n" %
             //             (i, sw->GetNDevices() - 1, sw->m_mmu->GetMmuBufferBytes() / 1000000.));
+            NS_LOG_INFO("Node " << i << " : Broadcom switch (" 
+            << (sw->GetNDevices() - 1) << " ports / " 
+            << (sw->m_mmu->GetMmuBufferBytes() / 1000000.0) << "MB MMU)");
         }
     }
 
@@ -1458,7 +1442,7 @@ int main(int argc, char *argv[]) {
             node->AggregateObject(rdma);
             rdma->Init();
             rdma->TraceConnectWithoutContext("QpComplete",
-                                             MakeBoundCallback(qp_finish, fct_output));
+                                             MakeBoundCallback(&qp_finish, fct_output));
         }
     }
 
@@ -1507,13 +1491,10 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Configuring switches" << std::endl;
     /* config ToR Switch */
-    printf("link_pairs.size() = %lu\n", link_pairs.size());
-    int k = 0;
     for (auto &pair : link_pairs) {
         Ptr<Node> probably_host = n.Get(pair.first);
         Ptr<Node> probably_switch = n.Get(pair.second);
-        printf("进入pair------------------------------------%d\n",k++);
-        printf("%d\n",probably_host->GetNodeType() == 0 && probably_switch->GetNodeType() == 1);
+
         // host-switch link
         if (probably_host->GetNodeType() == 0 && probably_switch->GetNodeType() == 1) {
             Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(probably_switch);
@@ -1525,9 +1506,8 @@ int main(int argc, char *argv[]) {
             };
         }
     }
-    printf("for循环结束------------------------------------\n");
+
     /* config load balancer's switches using ToR-to-ToR routing */
-    printf("lb_model = %d\n", lb_mode);
     if (lb_mode == 3 || lb_mode == 6 || lb_mode == 9) {  // Conga, Letflow, Conweave
         NS_LOG_INFO("Configuring Load Balancer's Switches");
         for (auto &pair : link_pairs) {
@@ -1688,15 +1668,12 @@ int main(int argc, char *argv[]) {
             if (i->first->GetNodeType() == 1) {                    // switch
                 Ptr<Node> node = i->first;
                 Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(node);  // switch
-                // 修改代码：注释掉未使用的变量
                 // uint32_t swId = sw->GetId();
 
                 auto table = i->second;
                 for (auto j = table.begin(); j != table.end(); j++) {
                     Ptr<Node> dst = j->first;  // dst
-                    // 修改代码：注释掉未使用的变量
                     // uint32_t dstIP = Settings::hostId2IpMap[dst->GetId()];
-                    // 修改代码：注释掉未使用的变量
                     // uint32_t swDstId = Settings::hostIp2SwitchId[dstIP];
 
                     for (auto next : j->second) {
@@ -1714,9 +1691,8 @@ int main(int argc, char *argv[]) {
             if (i->first->GetNodeType() == 1) {
                 Ptr<Node> node = i->first;
                 Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(node);  // switch
-                // 修改代码
-                NS_LOG_INFO("Switch Info - ID:" << sw->GetId() << ", ToR:" << sw->m_isToR);
                 // NS_LOG_INFO("Switch Info - ID:%u, ToR:%d\n" % (sw->GetId(), sw->m_isToR));
+                NS_LOG_INFO("Switch Info - ID:" << sw->GetId() << ", ToR:" << sw->m_isToR);
                 if (lb_mode == 3) {
                     sw->m_mmu->m_congaRouting.SetConstants(conga_dreTime, conga_agingTime,
                                                            conga_flowletTimeout, conga_quantizeBit,
@@ -1755,7 +1731,7 @@ int main(int argc, char *argv[]) {
 
     // populate routing tables (although we use our custom impl in switch_node.cc)
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
-    printf("全局路由配置:Routing tables populated\n");
+
     // maintain port number for each host
     for (uint32_t i = 0; i < node_num; i++) {
         if (n.Get(i)->GetNodeType() == 0) {
@@ -1820,7 +1796,7 @@ int main(int argc, char *argv[]) {
     // Now, do the actual simulation.
     //
     std::cout << "------------------------------------------" << std::endl;
-    std::cout << "Running Simulation.\n";
+    std::cout << "Running Simulation_wxb.\n";
     fflush(stdout);
     NS_LOG_INFO("Run Simulation.");
     Simulator::Schedule(Seconds(flowgen_start_time),
@@ -1832,6 +1808,7 @@ int main(int argc, char *argv[]) {
     /*----- we don't need below. Just we can enforce to close this simulation. -----*/
     /*-----------------------------------------------------------------------------*/
     Simulator::Destroy();
+    fclose(fct_output);
     NS_LOG_INFO("Total number of packets: " << RdmaHw::nAllPkts);
     NS_LOG_INFO("Done.");
     endt = clock();

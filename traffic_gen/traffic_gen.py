@@ -5,15 +5,12 @@ import heapq
 from optparse import OptionParser
 from custom_rand import CustomRand
 
-# 定义网络流量：flow
-# init：初始化实例，src：源主机，dst:目的主机，size:流量大小，t:流量发生的时间
 class Flow:
 	def __init__(self, src, dst, size, t):
 		self.src, self.dst, self.size, self.t = src, dst, size, t
 	def __str__(self):
 		return "%d %d 3 %d %.9f"%(self.src, self.dst, self.size, self.t)
 
-# 带宽转换函数：将带宽字符串如G或M转换为 bit 比特
 def translate_bandwidth(b):
 	if b == None:
 		return None
@@ -27,7 +24,6 @@ def translate_bandwidth(b):
 		return float(b[:-1])*1e3
 	return float(b)
 
-# possion函数实现了泊松分布的生成：生成泊松分布的随机值，得到一个符合泊松分布的随机时间间隔。
 def poisson(lam):
 	return -math.log(1-random.random())*lam
 
@@ -44,7 +40,6 @@ if __name__ == "__main__":
 
 	base_t = 2000000000 # 2000000000
 
-	# 参数转换
 	if not options.nhost:
 		print("please use -n to enter number of hosts")
 		sys.exit(0)
@@ -79,7 +74,6 @@ if __name__ == "__main__":
 	avg_inter_arrival = 1/(bandwidth*load/8./avg)*1000000000
 	n_flow_estimate = int(time / avg_inter_arrival * nhost)
 	n_flow = 0
-	print("n_flow_estimate: %d",n_flow_estimate)
 	ofile.write("%d \n"%n_flow_estimate)
 	host_list = [(base_t + int(poisson(avg_inter_arrival)), i) for i in range(nhost)]
 	heapq.heapify(host_list)

@@ -1,5 +1,6 @@
 import scipy.io as io
 import gym
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 from ns3gym import ns3env
@@ -30,6 +31,9 @@ simTime = 10
 startSim = True
 stepTime = 0.05 
 seed = 0
+steps = 50 # 每轮训练步数
+episodes = 1000 # 训练轮数
+total_steps = steps * episodes # 总训练步数
 # simArgs = {"--simTime": simTime,
 #            "--testArg": 123,
 #            "--nodeNum": 5,
@@ -52,9 +56,9 @@ def train_PPO():
         env,
         verbose=1,
         ent_coef=0.01,        
-        learning_rate=3e-4,   
+        learning_rate=4e-4,   
         clip_range=0.2,      
-        n_steps=2048, 
+        n_steps=steps, 
         tensorboard_log=tensorboard_log_path,        
         device='cpu'
     ) 
@@ -62,10 +66,15 @@ def train_PPO():
 
     model.learn(
         # total_timesteps=int(10), 
-        total_timesteps=3e5, 
+        total_timesteps=total_steps, 
+        # total_timesteps=steps * episodes,
         callback = reward_callback,
     )
-    model.save("ppo_rdma_3e5")
+    model_name = "ppo_" + str(total_steps) + "_" + time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(time.time()))
+
+    # model.save("ppo_rdma_3e5_test")
+    model.save("model/" + model_name)
+
 
 if __name__ == "__main__":
     train_PPO()

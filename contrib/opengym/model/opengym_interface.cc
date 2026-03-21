@@ -189,12 +189,14 @@ OpenGymInterface::Init()
   // send init msg to python
   zmq::message_t request(simInitMsg.ByteSize());;
   simInitMsg.SerializeToArray(request.data(), simInitMsg.ByteSize());
-  m_zmq_socket.send (request);
+  // m_zmq_socket.send (request);
+  m_zmq_socket.send(request, zmq::send_flags::none);
 
   // receive init ack msg form python
   ns3opengym::SimInitAck simInitAck;
   zmq::message_t reply;
-  m_zmq_socket.recv (&reply);
+  // m_zmq_socket.recv (&reply);
+  m_zmq_socket.recv (reply, zmq::recv_flags::none);
   simInitAck.ParseFromArray(reply.data(), reply.size());
 
   bool done = simInitAck.done();
@@ -256,12 +258,14 @@ OpenGymInterface::NotifyCurrentState()
   // send env state msg to python
   zmq::message_t request(envStateMsg.ByteSize());;
   envStateMsg.SerializeToArray(request.data(), envStateMsg.ByteSize());
-  m_zmq_socket.send (request);
+  // m_zmq_socket.send (request);
+  m_zmq_socket.send (request, zmq::send_flags::none);
 
   // receive act msg form python
   ns3opengym::EnvActMsg envActMsg;
   zmq::message_t reply;
-  m_zmq_socket.recv (&reply);
+  // m_zmq_socket.recv (&reply);
+  m_zmq_socket.recv (reply, zmq::recv_flags::none);
   envActMsg.ParseFromArray(reply.data(), reply.size());
 
   if (m_simEnd) {
@@ -274,7 +278,13 @@ OpenGymInterface::NotifyCurrentState()
     NS_LOG_DEBUG("---Stop requested: " << stopSim);
     m_stopEnvRequested = true;
     Simulator::Stop();
-    Simulator::Destroy ();
+    // Simulator::Destroy ();
+    // std::exit(0);
+
+    std::cout << "Run over, Destroy at: " << Simulator::Now().GetNanoSeconds() << "ns" << std::endl;
+    NotifySimulationEnd();
+    Simulator::Destroy();
+    std::cout << "Destroy over at: " << Simulator::Now().GetNanoSeconds() << "ns" << std::endl;
     std::exit(0);
   }
 
