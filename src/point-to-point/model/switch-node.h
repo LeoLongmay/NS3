@@ -7,6 +7,7 @@
 #include "switch-mmu.h"
 #include "rdma-flow-table.h"
 #include "pint.h"
+#include "ns3/nstime.h"
 
 namespace ns3 {
 
@@ -28,6 +29,31 @@ class SwitchNode : public Node{
 	uint64_t m_lastPktTs[pCnt]; // ns
 	double m_u[pCnt];
 
+	struct BifrostState {
+		bool enabled;
+		uint64_t deltaBytes;
+		uint64_t reservedBytesH;
+		Time slotTime;
+		uint64_t slotBytes;
+		uint32_t k;
+		uint64_t fBytes;
+		uint64_t lastRxBytes;
+		uint64_t tickCount;
+		EventId tickEvent;
+
+		BifrostState()
+			: enabled(false),
+			  deltaBytes(0),
+			  reservedBytesH(0),
+			  slotTime(Time(0)),
+			  slotBytes(0),
+			  k(1),
+			  fBytes(0),
+			  lastRxBytes(0),
+			  tickCount(0),
+			  tickEvent() {}
+	};
+
 protected:
 	bool m_ecnEnabled;
 	uint32_t m_ccMode;
@@ -38,6 +64,12 @@ protected:
 	// vamsi
 	bool PowerEnabled;
 	uint32_t m_epsilon; // lpcc epsilon
+	uint32_t m_flowControlMode;
+	uint32_t m_transportMode;
+	uint32_t m_bifrostTimeSlotUs;
+	uint32_t m_bifrostK;
+	uint32_t m_bifrostLonghaulDelayCutoffUs;
+	uint32_t m_bifrostHMarginSlots;
 
 private:
 	int GetOutDev(Ptr<const Packet>, CustomHeader &ch);
@@ -45,9 +77,12 @@ private:
 	static uint32_t EcmpHash(const uint8_t* key, size_t len, uint32_t seed);
 	void CheckAndSendPfc(uint32_t inDev, uint32_t qIndex);
 	void CheckAndSendResume(uint32_t inDev, uint32_t qIndex);
+	void ScheduleBifrostTick(uint32_t inDev, uint32_t qIndex);
+	void RunBifrostTick(uint32_t inDev, uint32_t qIndex);
 
     Ptr<RDMAFlowTable> m_flowTable; // flow table
     EventId m_cleanFlowEvent;
+	BifrostState m_bifrost[pCnt][qCnt];
 
     // callback for scheduled flow table cleanup
     void ScheduleCleanFlowTable();
@@ -63,6 +98,8 @@ public:
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
 	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
+	void ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k);
+	void SetBifrostPortEnabled(uint32_t inPort, bool enabled);
 	// static uint32_t cnp_count;
 	// static uint32_t fcnp_count;
 

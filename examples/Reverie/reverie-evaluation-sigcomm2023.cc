@@ -177,7 +177,7 @@ void ScheduleFlowInputs() {
     while (flow_input.idx < flow_num && Seconds(flow_input.start_time) <= Simulator::Now()) {
         // std::cout << "Flow " << flow_input.src << " " << flow_input.dst << " " << flow_input.pg << " " << flow_input.dport << " " << flow_input.maxPacketCount << " " << flow_input.start_time << " " << Simulator::Now().GetSeconds() << std::endl;
         uint32_t port = portNumder[flow_input.src][flow_input.dst]++; // get a new port number
-        RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]) : 0, global_t == 1 ? maxRtt : pairRtt[flow_input.src][flow_input.dst], Simulator::GetMaximumSimulationTime());
+        RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]) : 0, global_t == 1 ? maxRtt : pairRtt[flow_input.src][flow_input.dst], pairBw[flow_input.src][flow_input.dst], Simulator::GetMaximumSimulationTime());
         ApplicationContainer appCon = clientHelper.Install(n.Get(flow_input.src));
 //      appCon.Start(Seconds(flow_input.start_time));
         appCon.Start(Seconds(0)); // setting the correct time here conflicts with Sim time since there is already a schedule event that triggered this function at desired time.
@@ -418,7 +418,7 @@ void incast_rdma (int fromLeafId, double requestRate, uint32_t requestSize, stru
                 query += flowSize;
                 flowCount++;
 
-                RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime()-MicroSeconds(1));
+                RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], pairBw[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime()-MicroSeconds(1));
                 ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
                 // std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
                 appCon.Start(Seconds(startTime));
@@ -471,7 +471,7 @@ void workload_rdma (int fromLeafId, double requestRate, struct cdf_table *cdfTab
             flowCount += 1;
 
 
-            RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
+            RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], pairBw[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
             ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
             // std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
             appCon.Start(Seconds(startTime));

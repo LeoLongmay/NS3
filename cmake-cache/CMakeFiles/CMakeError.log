@@ -1,15 +1,15 @@
 Performing C++ SOURCE FILE Test MISSING_OSTREAM_NULLPTR_OPERATOR failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY
+Change Dir: /home/master01/CC_Exp/cmake-cache/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/ninja cmTC_af6b6 && [1/2] Building CXX object CMakeFiles/cmTC_af6b6.dir/src.cxx.o
-FAILED: CMakeFiles/cmTC_af6b6.dir/src.cxx.o 
-/usr/bin/c++ -DMISSING_OSTREAM_NULLPTR_OPERATOR  -fPIE -std=c++17 -o CMakeFiles/cmTC_af6b6.dir/src.cxx.o -c /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx: In function ‘int main()’:
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:11:12: error: ambiguous overload for ‘operator<<’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream<char>’} and ‘std::nullptr_t’)
+Run Build Command(s):/usr/bin/ninja cmTC_7282b && [1/2] Building CXX object CMakeFiles/cmTC_7282b.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_7282b.dir/src.cxx.o 
+/usr/bin/c++    -DMISSING_OSTREAM_NULLPTR_OPERATOR -fPIE   -std=c++17 -o CMakeFiles/cmTC_7282b.dir/src.cxx.o -c src.cxx
+src.cxx: In function ‘int main()’:
+src.cxx:11:12: error: ambiguous overload for ‘operator<<’ (operand types are ‘std::ostream’ {aka ‘std::basic_ostream<char>’} and ‘std::nullptr_t’)
    11 |         os << std::nullptr_t();
       |         ~~~^~~~~~~~~~~~~~~~~~~
 In file included from /usr/include/c++/9/iostream:39,
-                 from /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:2:
+                 from src.cxx:2:
 /usr/include/c++/9/ostream:108:7: note: candidate: ‘std::basic_ostream<_CharT, _Traits>::__ostream_type& std::basic_ostream<_CharT, _Traits>::operator<<(std::basic_ostream<_CharT, _Traits>::__ostream_type& (*)(std::basic_ostream<_CharT, _Traits>::__ostream_type&)) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__ostream_type = std::basic_ostream<char>]’
   108 |       operator<<(__ostream_type& (*__pf)(__ostream_type&))
       |       ^~~~~~~~
@@ -27,21 +27,21 @@ In file included from /usr/include/c++/9/iostream:39,
       |       ^~~~~~~~
 In file included from /usr/include/c++/9/ostream:702,
                  from /usr/include/c++/9/iostream:39,
-                 from /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:2:
+                 from src.cxx:2:
 /usr/include/c++/9/bits/ostream.tcc:119:5: note: candidate: ‘std::basic_ostream<_CharT, _Traits>& std::basic_ostream<_CharT, _Traits>::operator<<(std::basic_ostream<_CharT, _Traits>::__streambuf_type*) [with _CharT = char; _Traits = std::char_traits<char>; std::basic_ostream<_CharT, _Traits>::__streambuf_type = std::basic_streambuf<char>]’
   119 |     basic_ostream<_CharT, _Traits>::
       |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:4:26: note: candidate: ‘std::ostream& operator<<(std::ostream&, std::nullptr_t)’
+src.cxx:4:26: note: candidate: ‘std::ostream& operator<<(std::ostream&, std::nullptr_t)’
     4 |     inline std::ostream& operator << (std::ostream& os, std::nullptr_t ptr)
       |                          ^~~~~~~~
 In file included from /usr/include/c++/9/ostream:702,
                  from /usr/include/c++/9/iostream:39,
-                 from /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:2:
+                 from src.cxx:2:
 /usr/include/c++/9/bits/ostream.tcc:321:5: note: candidate: ‘std::basic_ostream<_CharT, _Traits>& std::operator<<(std::basic_ostream<_CharT, _Traits>&, const char*) [with _CharT = char; _Traits = std::char_traits<char>]’
   321 |     operator<<(basic_ostream<_CharT, _Traits>& __out, const char* __s)
       |     ^~~~~~~~
 In file included from /usr/include/c++/9/iostream:39,
-                 from /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-W8QHoY/src.cxx:2:
+                 from src.cxx:2:
 /usr/include/c++/9/ostream:565:5: note: candidate: ‘std::basic_ostream<char, _Traits>& std::operator<<(std::basic_ostream<char, _Traits>&, const char*) [with _Traits = std::char_traits<char>]’
   565 |     operator<<(basic_ostream<char, _Traits>& __out, const char* __s)
       |     ^~~~~~~~
@@ -69,19 +69,17 @@ Source file was:
         return 0;
     }
     
-
 Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-bmyrbZ
+Change Dir: /home/master01/CC_Exp/cmake-cache/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/ninja cmTC_7f321 && [1/2] Building C object CMakeFiles/cmTC_7f321.dir/src.c.o
-[2/2] Linking C executable cmTC_7f321
-FAILED: cmTC_7f321 
-: && /usr/bin/cc   CMakeFiles/cmTC_7f321.dir/src.c.o -o cmTC_7f321   && :
-/usr/bin/ld: CMakeFiles/cmTC_7f321.dir/src.c.o: in function `main':
+Run Build Command(s):/usr/bin/ninja cmTC_2a641 && [1/2] Building C object CMakeFiles/cmTC_2a641.dir/src.c.o
+[2/2] Linking C executable cmTC_2a641
+FAILED: cmTC_2a641 
+: && /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD   CMakeFiles/cmTC_2a641.dir/src.c.o  -o cmTC_2a641   && :
+/usr/bin/ld: CMakeFiles/cmTC_2a641.dir/src.c.o: in function `main':
 src.c:(.text+0x46): undefined reference to `pthread_create'
 /usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
-/usr/bin/ld: src.c:(.text+0x5e): undefined reference to `pthread_cancel'
-/usr/bin/ld: src.c:(.text+0x6f): undefined reference to `pthread_join'
+/usr/bin/ld: src.c:(.text+0x63): undefined reference to `pthread_join'
 collect2: error: ld returned 1 exit status
 ninja: build stopped: subcommand failed.
 
@@ -89,7 +87,7 @@ ninja: build stopped: subcommand failed.
 Source file was:
 #include <pthread.h>
 
-static void* test_func(void* data)
+void* test_func(void* data)
 {
   return data;
 }
@@ -99,7 +97,6 @@ int main(void)
   pthread_t thread;
   pthread_create(&thread, NULL, test_func, NULL);
   pthread_detach(thread);
-  pthread_cancel(thread);
   pthread_join(thread, NULL);
   pthread_atfork(NULL, NULL, NULL);
   pthread_exit(NULL);
@@ -107,14 +104,13 @@ int main(void)
   return 0;
 }
 
-
 Determining if the function pthread_create exists in the pthreads failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-R1AYQW
+Change Dir: /home/master01/CC_Exp/cmake-cache/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/ninja cmTC_36837 && [1/2] Building C object CMakeFiles/cmTC_36837.dir/CheckFunctionExists.c.o
-[2/2] Linking C executable cmTC_36837
-FAILED: cmTC_36837 
-: && /usr/bin/cc -DCHECK_FUNCTION_EXISTS=pthread_create  CMakeFiles/cmTC_36837.dir/CheckFunctionExists.c.o -o cmTC_36837  -lpthreads && :
+Run Build Command(s):/usr/bin/ninja cmTC_d440a && [1/2] Building C object CMakeFiles/cmTC_d440a.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_d440a
+FAILED: cmTC_d440a 
+: && /usr/bin/cc -DCHECK_FUNCTION_EXISTS=pthread_create   CMakeFiles/cmTC_d440a.dir/CheckFunctionExists.c.o  -o cmTC_d440a  -lpthreads && :
 /usr/bin/ld: cannot find -lpthreads
 collect2: error: ld returned 1 exit status
 ninja: build stopped: subcommand failed.
@@ -122,24 +118,24 @@ ninja: build stopped: subcommand failed.
 
 
 Performing C++ SOURCE FILE Test HAVE_UINT128_T failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY
+Change Dir: /home/master01/CC_Exp/cmake-cache/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/ninja cmTC_a4e35 && [1/2] Building CXX object CMakeFiles/cmTC_a4e35.dir/src.cxx.o
-FAILED: CMakeFiles/cmTC_a4e35.dir/src.cxx.o 
-/usr/bin/c++ -DHAVE_UINT128_T  -fPIE -std=c++17 -o CMakeFiles/cmTC_a4e35.dir/src.cxx.o -c /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx: In function ‘int main()’:
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx:4:18: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
+Run Build Command(s):/usr/bin/ninja cmTC_1c8ef && [1/2] Building CXX object CMakeFiles/cmTC_1c8ef.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_1c8ef.dir/src.cxx.o 
+/usr/bin/c++    -DHAVE_UINT128_T -fPIE   -std=c++17 -o CMakeFiles/cmTC_1c8ef.dir/src.cxx.o -c src.cxx
+src.cxx: In function ‘int main()’:
+src.cxx:4:18: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
     4 |             if ((uint128_t *) 0) return 0;
       |                  ^~~~~~~~~
       |                  uint32_t
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx:4:29: error: expected primary-expression before ‘)’ token
+src.cxx:4:29: error: expected primary-expression before ‘)’ token
     4 |             if ((uint128_t *) 0) return 0;
       |                             ^
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx:4:30: error: expected ‘)’ before numeric constant
+src.cxx:4:30: error: expected ‘)’ before numeric constant
     4 |             if ((uint128_t *) 0) return 0;
       |                ~             ^~
       |                              )
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-iffyXY/src.cxx:5:25: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
+src.cxx:5:25: error: ‘uint128_t’ was not declared in this scope; did you mean ‘uint32_t’?
     5 |             if (sizeof (uint128_t)) return 0;
       |                         ^~~~~~~~~
       |                         uint32_t
@@ -154,35 +150,13 @@ Source file was:
             if (sizeof (uint128_t)) return 0;
             return 1;
          }
-
-Determining if files boost/units/quantity.hpp;boost/units/systems/si.hpp exist failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-bMRK8X
-
-Run Build Command(s):/usr/bin/ninja cmTC_46d1a && [1/2] Building CXX object CMakeFiles/cmTC_46d1a.dir/HAVE_BOOST_UNITS.cpp.o
-FAILED: CMakeFiles/cmTC_46d1a.dir/HAVE_BOOST_UNITS.cpp.o 
-/usr/bin/c++   -fPIE -std=c++17 -o CMakeFiles/cmTC_46d1a.dir/HAVE_BOOST_UNITS.cpp.o -c /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-bMRK8X/HAVE_BOOST_UNITS.cpp
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-bMRK8X/HAVE_BOOST_UNITS.cpp:2:10: fatal error: boost/units/quantity.hpp: No such file or directory
-    2 | #include <boost/units/quantity.hpp>
-      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~
-compilation terminated.
-ninja: build stopped: subcommand failed.
-
-
-Source:
-/* */
-#include <boost/units/quantity.hpp>
-#include <boost/units/systems/si.hpp>
-
-
-int main(void){return 0;}
-
 Determining if the include file net/netmap_user.h exists failed with the following output:
-Change Dir: /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-PdwH4V
+Change Dir: /home/master01/CC_Exp/cmake-cache/CMakeFiles/CMakeTmp
 
-Run Build Command(s):/usr/bin/ninja cmTC_10e6b && [1/2] Building C object CMakeFiles/cmTC_10e6b.dir/CheckIncludeFile.c.o
-FAILED: CMakeFiles/cmTC_10e6b.dir/CheckIncludeFile.c.o 
-/usr/bin/cc   -fPIE -o CMakeFiles/cmTC_10e6b.dir/CheckIncludeFile.c.o -c /home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-PdwH4V/CheckIncludeFile.c
-/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/CMakeFiles/CMakeScratch/TryCompile-PdwH4V/CheckIncludeFile.c:1:10: fatal error: net/netmap_user.h: No such file or directory
+Run Build Command(s):/usr/bin/ninja cmTC_b0ece && [1/2] Building C object CMakeFiles/cmTC_b0ece.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_b0ece.dir/CheckIncludeFile.c.o 
+/usr/bin/cc   -fPIE -o CMakeFiles/cmTC_b0ece.dir/CheckIncludeFile.c.o   -c CheckIncludeFile.c
+CheckIncludeFile.c:1:10: fatal error: net/netmap_user.h: No such file or directory
     1 | #include <net/netmap_user.h>
       |          ^~~~~~~~~~~~~~~~~~~
 compilation terminated.

@@ -12,6 +12,7 @@
 #include "ns3/int-header.h"
 #include "ns3/simulator.h"
 #include <cmath>
+#include <algorithm>
 #include "ns3/tcp-header.h"
 #include "ns3/udp-header.h"
 #include "ns3/custom-priority-tag.h"
@@ -19,6 +20,12 @@
 #include "ns3/unsched-tag.h"
 
 namespace ns3 {
+namespace {
+constexpr uint32_t FLOW_CONTROL_PFC = 0;
+constexpr uint32_t FLOW_CONTROL_BIFROST = 1;
+constexpr uint32_t TRANSPORT_MODE_RDMA = 0;
+constexpr uint32_t TRANSPORT_MODE_TCP_BBR = 1;
+}
 // uint32_t SwitchNode::cnp_count = 0;
 // uint32_t SwitchNode::fcnp_count = 0;
 
@@ -52,6 +59,36 @@ TypeId SwitchNode::GetTypeId (void)
 	                                  BooleanValue(false),
 	                                  MakeBooleanAccessor(&SwitchNode::PowerEnabled),
 	                                  MakeBooleanChecker())
+						.AddAttribute("FlowControlMode",
+	                                  "Lossless flow control mode. 0=PFC, 1=Bifrost",
+	                                  UintegerValue(FLOW_CONTROL_PFC),
+	                                  MakeUintegerAccessor(&SwitchNode::m_flowControlMode),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("TransportMode",
+	                                  "Transport mode. 0=RDMA, 1=TCP_BBR",
+	                                  UintegerValue(TRANSPORT_MODE_RDMA),
+	                                  MakeUintegerAccessor(&SwitchNode::m_transportMode),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BifrostTimeSlotUs",
+	                                  "Bifrost pause control slot in microseconds.",
+	                                  UintegerValue(10),
+	                                  MakeUintegerAccessor(&SwitchNode::m_bifrostTimeSlotUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BifrostK",
+	                                  "Bifrost periodic correction interval.",
+	                                  UintegerValue(1),
+	                                  MakeUintegerAccessor(&SwitchNode::m_bifrostK),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BifrostLonghaulDelayCutoffUs",
+	                                  "Ports with delay above this cutoff are treated as DCI links for Bifrost.",
+	                                  UintegerValue(100),
+	                                  MakeUintegerAccessor(&SwitchNode::m_bifrostLonghaulDelayCutoffUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BifrostHMarginSlots",
+	                                  "Extra RsT slots reserved on top of Delta for Bifrost.",
+	                                  UintegerValue(3),
+	                                  MakeUintegerAccessor(&SwitchNode::m_bifrostHMarginSlots),
+	                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("Epsilon",
 	                                  "lpcc epsilon",
 	                                  UintegerValue(3000),
@@ -88,6 +125,89 @@ void SwitchNode::ScheduleCleanFlowTable() {
 
     m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(100),
                                            &SwitchNode::ScheduleCleanFlowTable, this);
+}
+
+void SwitchNode::ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k) {
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[inPort]);
+	uint64_t slotBytes = dev->GetDataRate().GetBitRate() * slot.GetTimeStep() / 8000000000ULL;
+	for (uint32_t qIndex = 1; qIndex < qCnt; qIndex++) {
+		BifrostState &state = m_bifrost[inPort][qIndex];
+		state.deltaBytes = bdpBytes;
+		state.reservedBytesH = reservedBytesH;
+		state.slotTime = slot;
+		state.slotBytes = slotBytes;
+		state.k = std::max(1u, k);
+		state.fBytes = state.deltaBytes + state.slotBytes;
+		state.lastRxBytes = m_mmu->GetIngressRxBytes(inPort, qIndex);
+		state.tickCount = 0;
+		if (!state.tickEvent.IsExpired()) {
+			Simulator::Cancel(state.tickEvent);
+		}
+		state.tickEvent = EventId();
+	}
+}
+
+void SwitchNode::SetBifrostPortEnabled(uint32_t inPort, bool enabled) {
+	m_mmu->SetBifrostEnabled(inPort, enabled);
+	for (uint32_t qIndex = 1; qIndex < qCnt; qIndex++) {
+		BifrostState &state = m_bifrost[inPort][qIndex];
+		state.enabled = enabled;
+		if (!state.tickEvent.IsExpired()) {
+			Simulator::Cancel(state.tickEvent);
+		}
+		state.tickEvent = EventId();
+		if (enabled && m_flowControlMode == FLOW_CONTROL_BIFROST && state.slotTime.IsPositive()) {
+			state.lastRxBytes = m_mmu->GetIngressRxBytes(inPort, qIndex);
+			state.fBytes = state.deltaBytes + state.slotBytes;
+			state.tickCount = 0;
+			state.tickEvent = Simulator::Schedule(state.slotTime, &SwitchNode::RunBifrostTick, this, inPort, qIndex);
+		}
+	}
+}
+
+void SwitchNode::ScheduleBifrostTick(uint32_t inDev, uint32_t qIndex) {
+	BifrostState &state = m_bifrost[inDev][qIndex];
+	if (!state.enabled || m_flowControlMode != FLOW_CONTROL_BIFROST || !state.slotTime.IsPositive()) {
+		return;
+	}
+	if (state.tickEvent.IsExpired()) {
+		state.tickEvent = Simulator::Schedule(state.slotTime, &SwitchNode::RunBifrostTick, this, inDev, qIndex);
+	}
+}
+
+void SwitchNode::RunBifrostTick(uint32_t inDev, uint32_t qIndex) {
+	BifrostState &state = m_bifrost[inDev][qIndex];
+	if (!state.enabled || m_flowControlMode != FLOW_CONTROL_BIFROST) {
+		return;
+	}
+
+	uint64_t L = m_mmu->GetIngressBytes(inDev, qIndex);
+	uint64_t rxNow = m_mmu->GetIngressRxBytes(inDev, qIndex);
+	uint64_t r = rxNow >= state.lastRxBytes ? rxNow - state.lastRxBytes : 0;
+	state.lastRxBytes = rxNow;
+
+	int64_t grantSpace = static_cast<int64_t>(state.reservedBytesH) - static_cast<int64_t>(L) - static_cast<int64_t>(state.fBytes);
+	uint64_t c = std::min<uint64_t>(state.slotBytes, std::max<int64_t>(0, grantSpace));
+	uint64_t cAdj = c;
+	if (state.k > 0 && state.tickCount % state.k == 0 && L + state.fBytes > state.reservedBytesH) {
+		uint64_t excess = L + state.fBytes - state.reservedBytesH;
+		cAdj = excess >= c ? 0 : c - excess;
+	}
+
+	if (state.slotBytes > 0) {
+		double grantRatio = std::min(1.0, double(cAdj) / double(state.slotBytes));
+		double pauseUs = state.slotTime.GetMicroSeconds() * (1.0 - grantRatio);
+		if (pauseUs > 0) {
+			Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[inDev]);
+			dev->SendPfc(qIndex, MicroSeconds(static_cast<uint64_t>(std::min<double>(pauseUs, state.slotTime.GetMicroSeconds()))));
+		}
+	}
+
+	int64_t nextF = static_cast<int64_t>(state.fBytes) - static_cast<int64_t>(r) + static_cast<int64_t>(cAdj);
+	state.fBytes = std::min<uint64_t>(state.deltaBytes + state.slotBytes, std::max<int64_t>(0, nextF));
+	state.tickCount++;
+	state.tickEvent = EventId();
+	ScheduleBifrostTick(inDev, qIndex);
 }
 
 int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch) {
@@ -128,6 +248,9 @@ int SwitchNode::GetOutDev(Ptr<const Packet> p, CustomHeader &ch) {
 }
 
 void SwitchNode::CheckAndSendPfc(uint32_t inDev, uint32_t qIndex) {
+	if (m_flowControlMode == FLOW_CONTROL_BIFROST && m_bifrost[inDev][qIndex].enabled) {
+		return;
+	}
 	Ptr<QbbNetDevice> device = DynamicCast<QbbNetDevice>(m_devices[inDev]);
 	if (m_mmu->CheckShouldPause(inDev, qIndex)) {
 		device->SendPfc(qIndex, 0);
@@ -136,6 +259,9 @@ void SwitchNode::CheckAndSendPfc(uint32_t inDev, uint32_t qIndex) {
 	}
 }
 void SwitchNode::CheckAndSendResume(uint32_t inDev, uint32_t qIndex) {
+	if (m_flowControlMode == FLOW_CONTROL_BIFROST && m_bifrost[inDev][qIndex].enabled) {
+		return;
+	}
 	Ptr<QbbNetDevice> device = DynamicCast<QbbNetDevice>(m_devices[inDev]);
 	if (m_mmu->CheckShouldResume(inDev, qIndex)) {
 		device->SendPfc(qIndex, 1);
@@ -153,6 +279,10 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 		MyPriorityTag priotag;
 		// IMPORTANT: MyPriorityTag should only be attached by lossy traffic. This tag indicates the qIndex but also indicates that it is "lossy". Never attach MyPriorityTag on lossless traffic.
 		bool found = p->PeekPacketTag(priotag);
+		bool tcpBbrLossy = (m_transportMode == TRANSPORT_MODE_TCP_BBR && ch.l3Prot == 0x06);
+		if (tcpBbrLossy) {
+			found = true;
+		}
 
 		// UnSchedTag is used by ABM. End-hosts explicitly tag packets of the first BDP so that ABM then prioritizes these packets in the buffer allocation.
 		uint32_t unsched = 0;
@@ -171,6 +301,9 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 		}
 		else {
 			qIndex = (ch.l3Prot == 0x06 ? 1 : ch.udp.pg); // For TCP/IP if the stack did not attach MyPriorityTag, put to queue 1.
+		}
+		if (tcpBbrLossy) {
+			qIndex = 1;
 		}
 
 		// admission control
@@ -467,6 +600,13 @@ int SwitchNode::log2apprx(int x, int b, int m, int l) {
 
 SwitchNode::~SwitchNode() {
     Simulator::Cancel(m_cleanFlowEvent);
+	for (uint32_t i = 0; i < pCnt; i++) {
+		for (uint32_t q = 1; q < qCnt; q++) {
+			if (!m_bifrost[i][q].tickEvent.IsExpired()) {
+				Simulator::Cancel(m_bifrost[i][q].tickEvent);
+			}
+		}
+	}
 }
 
 } /* namespace ns3 */

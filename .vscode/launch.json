@@ -1,28 +1,58 @@
 {
-    "version": "0.2.0",
-    "configurations": [
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Build and debug active file",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "/home/master01/CC_Exp/build/examples/PowerTCP/ns3.39-${fileBasenameNoExtension}-debug",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "/home/master01/CC_Exp",
+      "environment": [],
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "NS3: build",
+      "setupCommands": [
         {
-            "name": "waf - Build and debug active file",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "/home/leo/PowerTCP-RAW/ns-3.39/build/examples/PowerTCP/ns3.39-${fileBasenameNoExtension}-debug",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "/home/leo/PowerTCP-RAW/ns-3.39",
-            "environment": [],
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "NS3: waf 生成活动文件",
-            "miDebuggerPath": "/usr/bin/gdb",
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
         }
-    ]
+      ]
+    }
+  ]
 }
+
+
+
+
+
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "waf - Build and debug active file",
+//             "type": "cppdbg",
+//             "request": "launch",
+//             "program": "/home/master01/CC_Exp/build/examples/PowerTCP/ns3.39-${fileBasenameNoExtension}-debug",
+//             "args": [],
+//             "stopAtEntry": false,
+//             "cwd": "/home/master01/CC_Exp/ns-3.39",
+//             "environment": [],
+//             "MIMode": "gdb",
+//             "setupCommands": [
+//                 {
+//                     "description": "Enable pretty-printing for gdb",
+//                     "text": "-enable-pretty-printing",
+//                     "ignoreFailures": true
+//                 }
+//             ],
+//             "preLaunchTask": "NS3: waf 生成活动文件",
+//             "miDebuggerPath": "/usr/bin/gdb",
+//         }
+//     ]
+// }
 
 
 // {

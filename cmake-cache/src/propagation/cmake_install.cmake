@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/propagation
+# Install script for directory: /home/master01/CC_Exp/src/propagation
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-propagation-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-propagation-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-propagation-debug.so")
@@ -62,33 +57,33 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/channel-condition-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/cost231-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/itu-r-1411-los-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/itu-r-1411-nlos-over-rooftop-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/jakes-process.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/jakes-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/kun-2600-mhz-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/okumura-hata-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/probabilistic-v2v-channel-condition-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/propagation-cache.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/propagation-delay-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/propagation-environment.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/three-gpp-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/propagation/model/three-gpp-v2v-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/propagation-module.h"
+    "/home/master01/CC_Exp/src/propagation/model/channel-condition-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/cost231-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/itu-r-1411-los-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/itu-r-1411-nlos-over-rooftop-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/jakes-process.h"
+    "/home/master01/CC_Exp/src/propagation/model/jakes-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/kun-2600-mhz-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/okumura-hata-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/probabilistic-v2v-channel-condition-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/propagation-cache.h"
+    "/home/master01/CC_Exp/src/propagation/model/propagation-delay-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/propagation-environment.h"
+    "/home/master01/CC_Exp/src/propagation/model/propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/three-gpp-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/propagation/model/three-gpp-v2v-propagation-loss-model.h"
+    "/home/master01/CC_Exp/build/include/ns3/propagation-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/propagation/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/propagation/examples/cmake_install.cmake")
 
 endif()
 

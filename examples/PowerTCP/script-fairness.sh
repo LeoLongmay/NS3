@@ -4,10 +4,16 @@ RES_DUMP=$NS3/examples/PowerTCP/dump_fairness
 
 mkdir -p $RES_DUMP
 
-algs=(0)
+algs=(0 1 2)
 
-algNames=("lpcc")
-CCMODE=(9)
+algNames=("dcqcn" "bifrost" "bbr")
+CCMODE=(1 1 0)
+FLOWCTL=(0 1 0)
+TRANSPORT=(0 0 1)
+
+# algs=(0 1)
+# algNames=("lpcc" "gemini")
+# CCMODE=(9 11)
 
 # algs=(0)
 
@@ -55,7 +61,7 @@ for algorithm in ${algs[@]};do
 		delay=false
 	fi
 
-	if [[ ${algNames[$algorithm]} == "timely" || ${algNames[$algorithm]} == "dcqcn" || ${algNames[$algorithm]} == "lpcc" ]];then
+	if [[ ${algNames[$algorithm]} == "timely" || ${algNames[$algorithm]} == "dcqcn" || ${algNames[$algorithm]} == "lpcc" || ${algNames[$algorithm]} == "bifrost" || ${algNames[$algorithm]} == "bbr" ]];then
 		window=0
 	else
 		window=1
@@ -63,7 +69,7 @@ for algorithm in ${algs[@]};do
 
 	sleep 5
 	# Check how many cores are being used.
-	while [[ $(ps aux|grep "powertcp-evaluation-fairness-optimized"|wc -l) -gt 10 ]];do
+	while [[ $(ps aux | grep "ns3.39-powertcp-evaluation-fairness-debug" | grep -v grep | wc -l) -gt 10 ]];do
 	# while [[ $(ps aux|grep "powertcp-evaluation-fairness-debug"|wc -l) -gt 10 ]];do
 		echo "Waiting for cpu cores.... $N-th experiment "
 		sleep 60
@@ -75,13 +81,13 @@ for algorithm in ${algs[@]};do
 	RESULT_FILE="$RES_DUMP/evaluation-${algNames[$algorithm]}.out"
 	# echo "time ./waf --run "evaluation-fairness --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window""
 	# time ./waf --run "powertcp-evaluation-fairness --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window" > $RESULT_FILE  2> $RESULT_FILE &
-	time ./build/examples/PowerTCP/ns3.39-powertcp-evaluation-fairness-debug --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window > $RESULT_FILE  2> $RESULT_FILE &
+	time ./build/examples/PowerTCP/ns3.39-powertcp-evaluation-fairness-debug --conf=$configFile --algorithm=${CCMODE[$algorithm]} --transportMode=${TRANSPORT[$algorithm]} --flowControlMode=${FLOWCTL[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window > $RESULT_FILE  2> $RESULT_FILE &
 done
 
 
 
 
-while [[ $(ps aux|grep "powertcp-evaluation-fairness-optimized"|wc -l) -gt 1 ]];do
+while [[ $(ps aux | grep "ns3.39-powertcp-evaluation-fairness-debug" | grep -v grep | wc -l) -gt 0 ]];do
 # while [[ $(ps aux|grep "powertcp-evaluation-fairness-debug"|wc -l) -gt 1 ]];do
 	echo "Waiting for cpu cores.... $N-th experiment "
 	sleep 5

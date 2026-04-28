@@ -1,18 +1,18 @@
-NS3=/home/leo/PowerTCP-RAW/ns-3.39
+source config.sh
 RES_DUMP=$NS3/examples/PowerTCP/dump_workload
 RES_RESULTS=$NS3/examples/PowerTCP/results_workload
 
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
-# algs=(0 1 2 3 4 5 6)
+# algs=(0 1 2 3 4 5 6 7)
 
-# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc")
-# CCMODE=(1 3 3 3 7 8 9)
+# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc" "gemini")
+# CCMODE=(1 3 3 3 7 8 9 11)
 
 algs=(0 1 2)
 
-algNames=("dcqcn" "timely" "lpcc")
-CCMODE=(1 7 9)
+algNames=("dcqcn" "bifrost" "bbr")
+CCMODE=(1 1 0)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
@@ -114,4 +114,3 @@ done
 echo "##########################################"
 echo "#      FINISHED BURST-4 EXPERIMENTS      #"
 echo "##########################################"
-

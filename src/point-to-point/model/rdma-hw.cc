@@ -165,14 +165,39 @@ TypeId RdmaHw::GetTypeId (void)
 	                                  UintegerValue(20000),
 	                                  MakeUintegerAccessor(&RdmaHw::m_tmly_minRtt),
 	                                  MakeUintegerChecker<uint64_t>())
-	                    .AddAttribute("DctcpRateAI",
-	                                  "DCTCP's Rate increment unit in AI period",
-	                                  DataRateValue(DataRate("1000Mb/s")),
-	                                  MakeDataRateAccessor(&RdmaHw::m_dctcp_rai),
-	                                  MakeDataRateChecker())
-	                    .AddAttribute("PintSmplThresh",
-	                                  "PINT's sampling threshold in rand()%65536",
-	                                  UintegerValue(65536),
+		                    .AddAttribute("DctcpRateAI",
+		                                  "DCTCP's Rate increment unit in AI period",
+		                                  DataRateValue(DataRate("1000Mb/s")),
+		                                  MakeDataRateAccessor(&RdmaHw::m_dctcp_rai),
+		                                  MakeDataRateChecker())
+		                    .AddAttribute("GeminiDelayThreshNs",
+		                                  "GEMINI WAN delay threshold in ns",
+		                                  UintegerValue(5000000),
+		                                  MakeUintegerAccessor(&RdmaHw::m_geminiDelayThreshNs),
+		                                  MakeUintegerChecker<uint64_t>())
+		                    .AddAttribute("GeminiWanBeta",
+		                                  "GEMINI WAN multiplicative decrease factor",
+		                                  DoubleValue(0.2),
+		                                  MakeDoubleAccessor(&RdmaHw::m_geminiWanBeta),
+		                                  MakeDoubleChecker<double>())
+		                    .AddAttribute("GeminiH",
+		                                  "GEMINI additive increase factor",
+		                                  DoubleValue(1.2e-7),
+		                                  MakeDoubleAccessor(&RdmaHw::m_geminiH),
+		                                  MakeDoubleChecker<double>())
+		                    .AddAttribute("GeminiKBytes",
+		                                  "GEMINI ECN marking threshold in bytes",
+		                                  UintegerValue(64000),
+		                                  MakeUintegerAccessor(&RdmaHw::m_geminiKBytes),
+		                                  MakeUintegerChecker<uint32_t>())
+		                    .AddAttribute("GeminiDcnPortDelayCutoff",
+		                                  "Propagation delay cutoff used to identify DCN links",
+		                                  TimeValue(MicroSeconds(100)),
+		                                  MakeTimeAccessor(&RdmaHw::m_geminiDcnPortDelayCutoff),
+		                                  MakeTimeChecker(Time(0), Time::Max()))
+		                    .AddAttribute("PintSmplThresh",
+		                                  "PINT's sampling threshold in rand()%65536",
+		                                  UintegerValue(65536),
 	                                  MakeUintegerAccessor(&RdmaHw::pint_smpl_thresh),
 	                                  MakeUintegerChecker<uint32_t>())
 	                    .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
@@ -240,12 +265,12 @@ Ptr<RdmaQueuePair> RdmaHw::GetQp(uint32_t dip, uint16_t sport, uint16_t pg) {
 		return it->second;
 	return NULL;
 }
-void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport, uint32_t win, uint64_t baseRtt, Callback<void> notifyAppFinish, Time stopTime) {
+void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport, uint32_t win, uint64_t baseRtt, uint64_t pathBwBps, Callback<void> notifyAppFinish, Time stopTime) {
 	// create qp
 	Ptr<RdmaQueuePair> qp = CreateObject<RdmaQueuePair>(pg, sip, dip, sport, dport);
 	qp->SetSize(size);
-	qp->SetWin(win);
 	qp->SetBaseRtt(baseRtt);
+	qp->pathBwBps = pathBwBps;
 	qp->SetVarWin(m_var_win);
 	qp->SetAppNotifyCallback(notifyAppFinish);
 	qp->stopTime = stopTime;
@@ -271,7 +296,14 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		std::cout << "sip " << sip << " dip " << dip << " sport " << sport  << " dport " << dport << std::endl;
 	}
 	DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
-	if(win)
+	uint64_t effectivePathBw = pathBwBps > 0 ? pathBwBps : m_bps.GetBitRate();
+	uint32_t initWin = win;
+	if (m_cc_mode == 11 && initWin == 0) {
+		uint64_t bdpWin = effectivePathBw * baseRtt / 8000000000ULL;
+		initWin = std::max<uint64_t>(2 * m_mtu, bdpWin);
+	}
+	qp->SetWin(initWin);
+	if (win && m_cc_mode != 11)
 		qp->SetWin(m_bps.GetBitRate() * 1 * baseRtt * 1e-9 / 8);
 	qp->m_rate = m_bps;
 	qp->m_max_rate = m_bps;
@@ -285,12 +317,20 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		}
 	} else if (m_cc_mode == 7) {
 		qp->tmly.m_curRate = m_bps;
-	} else if (m_cc_mode == 9) {
-		// qp->lpcc.m_curRate = m_bps;
-        qp->lpcc.m_targetRate = m_bps;
-	} else if (m_cc_mode == 10) {
-		qp->hpccPint.m_curRate = m_bps;
-	}
+		} else if (m_cc_mode == 9) {
+			// qp->lpcc.m_curRate = m_bps;
+	        qp->lpcc.m_targetRate = m_bps;
+		} else if (m_cc_mode == 11) {
+			qp->useExplicitWin = true;
+			qp->explicitWinBytes = qp->m_win;
+			qp->gemini.cwndBytes = qp->m_win;
+			qp->gemini.rttBaseNs = qp->m_baseRtt;
+			qp->gemini.rttMinWindowNs = qp->m_baseRtt;
+			qp->gemini.alpha = 1;
+			qp->gemini.batchSizePkts = std::max(1u, uint32_t(std::max<uint64_t>(1, qp->m_win / m_mtu)));
+		} else if (m_cc_mode == 10) {
+			qp->hpccPint.m_curRate = m_bps;
+		}
 
 	// Notify Nic
 	m_nic[nic_idx].dev->NewQp(qp);
@@ -484,14 +524,16 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 		HandleAckHp(qp, p, ch);
 	} else if (m_cc_mode == 7) {
 		HandleAckTimely(qp, p, ch);
-	} else if (m_cc_mode == 8) {
-		HandleAckDctcp(qp, p, ch);
-	} else if (m_cc_mode == 9) { // lpcc
-	    HandleAckLpcc(qp, p, ch);
-        // HandleAckTimely(qp, p, ch);	
-	} else if (m_cc_mode == 10) {
-		HandleAckHpPint(qp, p, ch);
-	}
+		} else if (m_cc_mode == 8) {
+			HandleAckDctcp(qp, p, ch);
+		} else if (m_cc_mode == 9) { // lpcc
+		    HandleAckLpcc(qp, p, ch);
+	        // HandleAckTimely(qp, p, ch);	
+		} else if (m_cc_mode == 11) {
+			HandleAckGemini(qp, p, ch);
+		} else if (m_cc_mode == 10) {
+			HandleAckHpPint(qp, p, ch);
+		}
 	// ACK may advance the on-the-fly window, allowing more packets to send
 	dev->TriggerTransmit();
 	return 0;
@@ -1324,6 +1366,98 @@ void RdmaHw::HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &
 	// additive inc
 	if (qp->dctcp.m_caState == 0 && new_batch)
 		qp->m_rate = std::min(qp->m_max_rate, qp->m_rate + m_dctcp_rai);
+}
+
+/**********************
+ * GEMINI
+ *********************/
+void RdmaHw::HandleAckGemini(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
+	bool congestedDcn = false;
+	bool congestedWan = false;
+	if (UpdateStateGeminiOnAck(qp, ch, congestedDcn, congestedWan)) {
+		if (congestedDcn || congestedWan) {
+			ApplyGeminiWindowReduction(qp, congestedDcn, congestedWan);
+		} else {
+			ApplyGeminiAi(qp);
+		}
+		SyncGeminiRateAndWindow(qp);
+	}
+}
+
+bool RdmaHw::UpdateStateGeminiOnAck(Ptr<RdmaQueuePair> qp, CustomHeader &ch, bool &congestedDcn, bool &congestedWan) {
+	uint32_t ackSeq = ch.ack.seq;
+	uint8_t cnp = (ch.ack.flags >> qbbHeader::FLAG_CNP) & 1;
+	uint64_t rttSample = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
+
+	if (qp->gemini.rttBaseNs == 0) {
+		qp->gemini.rttBaseNs = qp->m_baseRtt > 0 ? qp->m_baseRtt : rttSample;
+	}
+	qp->gemini.rttBaseNs = std::min(qp->gemini.rttBaseNs, rttSample);
+	if (qp->gemini.rttMinWindowNs == 0) {
+		qp->gemini.rttMinWindowNs = rttSample;
+	} else {
+		qp->gemini.rttMinWindowNs = std::min(qp->gemini.rttMinWindowNs, rttSample);
+	}
+	qp->gemini.ecnCntPkts += (cnp > 0);
+
+	if (ackSeq <= qp->gemini.m_lastUpdateSeq) {
+		return false;
+	}
+
+	if (qp->gemini.m_lastUpdateSeq == 0) {
+		qp->gemini.m_lastUpdateSeq = qp->snd_nxt;
+		qp->gemini.batchSizePkts = std::max(1u, uint32_t(qp->snd_nxt / m_mtu + 1));
+		qp->gemini.rttMinWindowNs = rttSample;
+		return false;
+	}
+
+	double frac = std::min(1.0, double(qp->gemini.ecnCntPkts) / std::max(1u, qp->gemini.batchSizePkts));
+	qp->gemini.alpha = (1 - m_g) * qp->gemini.alpha + m_g * frac;
+	congestedDcn = frac > 0;
+	congestedWan = qp->gemini.rttMinWindowNs > qp->gemini.rttBaseNs + m_geminiDelayThreshNs;
+
+	qp->gemini.m_lastUpdateSeq = qp->snd_nxt;
+	qp->gemini.batchSizePkts = std::max(1u, uint32_t((qp->snd_nxt - ackSeq) / m_mtu + 1));
+	qp->gemini.ecnCntPkts = 0;
+	qp->gemini.rttMinWindowNs = rttSample;
+	return true;
+}
+
+void RdmaHw::ApplyGeminiWindowReduction(Ptr<RdmaQueuePair> qp, bool congestedDcn, bool congestedWan) {
+	uint64_t nowNs = Simulator::Now().GetTimeStep();
+	if (qp->gemini.lastReductionTsNs != 0 && nowNs - qp->gemini.lastReductionTsNs <= qp->gemini.rttBaseNs) {
+		return;
+	}
+
+	uint64_t pathBwBps = qp->pathBwBps > 0 ? qp->pathBwBps : qp->m_max_rate.GetBitRate();
+	uint64_t bdpBytes = std::max<uint64_t>(2 * m_mtu, pathBwBps * qp->gemini.rttBaseNs / 8000000000ULL);
+	double F = 4.0 * m_geminiKBytes / double(bdpBytes + m_geminiKBytes);
+	double fDcn = congestedDcn ? qp->gemini.alpha * F : 0.0;
+	double fWan = congestedWan ? m_geminiWanBeta : 0.0;
+	double reduction = std::min(0.95, std::max(fDcn, fWan));
+	uint64_t newCwnd = std::max<uint64_t>(2 * m_mtu, uint64_t(qp->gemini.cwndBytes * (1.0 - reduction)));
+	qp->gemini.cwndBytes = newCwnd;
+	qp->gemini.lastReductionTsNs = nowNs;
+}
+
+void RdmaHw::ApplyGeminiAi(Ptr<RdmaQueuePair> qp) {
+	uint64_t pathBwBps = qp->pathBwBps > 0 ? qp->pathBwBps : qp->m_max_rate.GetBitRate();
+	uint64_t bdpBytes = std::max<uint64_t>(2 * m_mtu, pathBwBps * qp->gemini.rttBaseNs / 8000000000ULL);
+	double h = m_geminiH * double(bdpBytes);
+	double minH = 0.1 * m_mtu;
+	double maxH = 5.0 * m_mtu;
+	h = std::max(minH, std::min(maxH, h));
+	double cwnd = std::max<double>(qp->gemini.cwndBytes, 2 * m_mtu);
+	qp->gemini.cwndBytes = std::max<uint64_t>(2 * m_mtu, uint64_t(cwnd + h / cwnd));
+}
+
+void RdmaHw::SyncGeminiRateAndWindow(Ptr<RdmaQueuePair> qp) {
+	qp->explicitWinBytes = qp->gemini.cwndBytes;
+	qp->useExplicitWin = true;
+	uint64_t rateBps = qp->gemini.rttBaseNs > 0 ? qp->gemini.cwndBytes * 8ULL * 1000000000ULL / qp->gemini.rttBaseNs : qp->m_max_rate.GetBitRate();
+	rateBps = std::max<uint64_t>(m_minRate.GetBitRate(), std::min<uint64_t>(qp->m_max_rate.GetBitRate(), rateBps));
+	DataRate newRate(rateBps);
+	ChangeRate(qp, newRate);
 }
 
 /*********************

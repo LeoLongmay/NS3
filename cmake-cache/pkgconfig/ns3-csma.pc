@@ -8,6 +8,6 @@ URL:
 Version: 3.39
 Requires:  ns3-network
 Requires.private: 
-Cflags: -I"${includedir}" 
+Cflags: -I"${includedir}"  -I/usr/include
 Libs: -L"${libdir}" -lns3.39-csma-debug  -lns3.39-network-debug -l-lpthread
 Libs.private: -L"${libdir}" 

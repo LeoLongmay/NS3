@@ -75,12 +75,13 @@ private:
   uint16_t m_pg;
 
   Ipv4Address m_sip, m_dip;
-  uint16_t m_sport, m_dport;
-  uint32_t m_win; // bound of on-the-fly packets
-  uint64_t m_baseRtt; // base Rtt
+	  uint16_t m_sport, m_dport;
+	  uint32_t m_win; // bound of on-the-fly packets
+	  uint64_t m_baseRtt; // base Rtt
+	  uint64_t m_pathBwBps;
 
-  Time stopTime;
-};
+	  Time stopTime;
+	};
 
 } // namespace ns3
 

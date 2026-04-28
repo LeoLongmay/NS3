@@ -29,9 +29,14 @@ public:
 	void SetPause(uint32_t port, uint32_t qIndex);
 	void SetResume(uint32_t port, uint32_t qIndex);
 
-	bool ShouldSendCN(uint32_t ifindex, uint32_t qIndex);
+		bool ShouldSendCN(uint32_t ifindex, uint32_t qIndex);
 
-	void ConfigEcn(uint32_t port, uint32_t _kmin, uint32_t _kmax, double _pmax);
+		void ConfigEcn(uint32_t port, uint32_t _kmin, uint32_t _kmax, double _pmax);
+		void ConfigEcnFixed(uint32_t port, uint32_t kBytes);
+		void SetEcnEnabled(uint32_t port, bool enabled);
+		void SetBifrostEnabled(uint32_t port, bool enabled);
+		uint64_t GetIngressBytes(uint32_t port, uint32_t qIndex) const;
+		uint64_t GetIngressRxBytes(uint32_t port, uint32_t qIndex) const;
 
 	void SetBufferModel(std::string model){bufferModel = model;}
 
@@ -112,9 +117,13 @@ public:
 	uint64_t GetTotalUsedBuffer();
 
 	// config
-	uint32_t node_id;
-	uint32_t kmin[pCnt], kmax[pCnt];
-	double pmax[pCnt];
+		uint32_t node_id;
+		uint32_t kmin[pCnt], kmax[pCnt];
+		double pmax[pCnt];
+		bool ecnEnabled[pCnt];
+		bool ecnUseFixed[pCnt];
+		uint32_t ecnFixedKBytes[pCnt];
+		bool bifrostEnabled[pCnt];
 
 	// Buffer model
 	std::string bufferModel;
@@ -166,6 +175,7 @@ public:
 	double dequeueRateIngress[pCnt][qCnt];
 	double dequeueRateEgress[pCnt][qCnt];
 	uint64_t txBytesIngress[pCnt][qCnt];
+	uint64_t rxBytesIngress[pCnt][qCnt];
 	uint64_t txBytesEgress[pCnt][qCnt];
 	uint64_t bandwidth[pCnt];
 	uint32_t congestionIndicator;
@@ -182,4 +192,3 @@ public:
 } /* namespace ns3 */
 
 #endif /* SWITCH_MMU_H */
-

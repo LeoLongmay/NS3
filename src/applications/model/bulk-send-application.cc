@@ -309,12 +309,12 @@ void BulkSendApplication::SendData (const Address &from, const Address &to)
 
       // Flow ID Tag
       FlowIdTag flowid(m_flowId);
-      packet->AddPacketTag(flowid);
+      packet->ReplacePacketTag(flowid);
 
       // Custom priority tag
       MyPriorityTag a;
       a.SetPriority(m_priorCustom);
-      packet->AddPacketTag(a);
+      packet->ReplacePacketTag(a);
 
       /* Modification */
 

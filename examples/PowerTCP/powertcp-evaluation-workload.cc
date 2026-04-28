@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include <unordered_map>
 #include <time.h>
 #include "ns3/core-module.h"
@@ -30,6 +31,7 @@
 #include "ns3/ipv4-static-routing-helper.h"
 #include "ns3/packet.h"
 #include "ns3/error-model.h"
+#include "ns3/tcp-socket-factory.h"
 #include <ns3/rdma.h>
 #include <ns3/rdma-client.h>
 #include <ns3/rdma-client-helper.h>
@@ -55,6 +57,11 @@ using namespace std;
 
 NS_LOG_COMPONENT_DEFINE("GENERIC_SIMULATION");
 
+namespace {
+constexpr uint32_t TRANSPORT_MODE_RDMA = 0;
+constexpr uint32_t TRANSPORT_MODE_TCP_BBR = 1;
+}
+
 extern "C"
 {
 #include "cdf.h"
@@ -62,6 +69,7 @@ extern "C"
 #define LINK_CAPACITY_BASE    1000000000          // 1Gbps
 
 uint32_t cc_mode = 1;
+uint32_t transport_mode = TRANSPORT_MODE_RDMA;
 bool enable_qcn = true;
 uint32_t packet_payload_size = 1000, l2_chunk_size = 0, l2_ack_interval = 0;
 double pause_time = 5, simulator_stop_time = 3.01;
@@ -74,6 +82,15 @@ double rate_decrease_interval = 4;
 uint32_t fast_recovery_times = 5;
 std::string rate_ai, rate_hai, min_rate = "100Mb/s";
 std::string dctcp_rate_ai = "1000Mb/s";
+uint64_t gemini_delay_thresh_ns = 5000000;
+double gemini_beta = 0.2;
+double gemini_h = 1.2e-7;
+uint32_t gemini_dcn_delay_cutoff_us = 100;
+uint32_t flow_control_mode = 0;
+uint32_t bifrost_timeslot_us = 10;
+uint32_t bifrost_k = 1;
+uint32_t bifrost_longhaul_delay_cutoff_us = 100;
+uint32_t bifrost_h_margin_slots = 3;
 
 bool clamp_target_rate = false, l2_back_to_zero = false;
 double error_rate_per_link = 0.0;
@@ -103,6 +120,7 @@ string qlen_mon_file;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
 unordered_map<uint64_t, double> rate2pmax;
+unordered_map<uint64_t, uint32_t> rate2geminiK;
 
 /************************************************
  * Runtime varibles
@@ -158,6 +176,11 @@ struct FlowInput {
 };
 FlowInput flow_input = {0};
 uint32_t flow_num;
+uint64_t tcp_flow_id = 0;
+FILE *g_fct_output = nullptr;
+
+Ipv4Address node_id_to_ip(uint32_t id);
+void InstallTcpFlow(uint32_t srcId, uint32_t dstId, uint16_t sport, uint16_t dport, uint64_t flowSize, double startTime, double stopTime);
 
 void ReadFlowInput() {
 	if (flow_input.idx < flow_num) {
@@ -169,10 +192,13 @@ void ReadFlowInput() {
 void ScheduleFlowInputs() {
 	while (flow_input.idx < flow_num && Seconds(flow_input.start_time) <= Simulator::Now()) {
 		uint32_t port = portNumder[flow_input.src][flow_input.dst]++; // get a new port number
-		RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]) : 0, global_t == 1 ? maxRtt : pairRtt[flow_input.src][flow_input.dst], Simulator::GetMaximumSimulationTime());
-		ApplicationContainer appCon = clientHelper.Install(n.Get(flow_input.src));
-//		appCon.Start(Seconds(flow_input.start_time));
-		appCon.Start(Seconds(0)); // setting the correct time here conflicts with Sim time since there is already a schedule event that triggered this function at desired time.
+		if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
+			InstallTcpFlow(flow_input.src, flow_input.dst, port, flow_input.dport, flow_input.maxPacketCount, flow_input.start_time, Simulator::GetMaximumSimulationTime().GetSeconds());
+		} else {
+			RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]) : 0, global_t == 1 ? maxRtt : pairRtt[flow_input.src][flow_input.dst], pairBw[flow_input.src][flow_input.dst], Simulator::GetMaximumSimulationTime());
+			ApplicationContainer appCon = clientHelper.Install(n.Get(flow_input.src));
+			appCon.Start(Seconds(0)); // setting the correct time here conflicts with Sim time since there is already a schedule event that triggered this function at desired time.
+		}
 		// get the next flow input
 		flow_input.idx++;
 		ReadFlowInput();
@@ -205,6 +231,48 @@ void qp_finish(FILE* fout, Ptr<RdmaQueuePair> q) {
 	Ptr<Node> dstNode = n.Get(did);
 	Ptr<RdmaDriver> rdma = dstNode->GetObject<RdmaDriver> ();
 	rdma->m_rdma->DeleteRxQp(q->sip.Get(), q->m_pg, q->sport);
+}
+
+void tcp_flow_finish(FILE* fout, uint32_t sid, uint32_t did, uint16_t sport, uint16_t dport, double totalSize, double start, bool, uint32_t) {
+	uint64_t flowSize = static_cast<uint64_t>(totalSize);
+	uint64_t baseRtt = pairRtt[sid][did];
+	uint64_t bw = pairBw[sid][did];
+	uint64_t standaloneFct = baseRtt + flowSize * 8 * 1e9 / bw;
+	uint64_t startNs = static_cast<uint64_t>(start);
+	uint64_t fct = Simulator::Now().GetNanoSeconds() - startNs;
+	fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu\n",
+			node_id_to_ip(sid).Get(), node_id_to_ip(did).Get(), sport, dport, flowSize, startNs, fct, standaloneFct);
+	fflush(fout);
+	std::cout << "FCT " << fct << " size " << flowSize << " baseFCT " << standaloneFct << std::endl;
+}
+
+void InstallTcpFlow(uint32_t srcId, uint32_t dstId, uint16_t sport, uint16_t dport, uint64_t flowSize, double startTime, double stopTime) {
+	Ptr<BulkSendApplication> sender = CreateObject<BulkSendApplication>();
+	sender->SetAttribute("Protocol", TypeIdValue(TcpSocketFactory::GetTypeId()));
+	sender->SetAttribute("SendSize", UintegerValue(packet_payload_size));
+	sender->SetAttribute("MaxBytes", UintegerValue(flowSize));
+	sender->SetAttribute("FlowId", UintegerValue(++tcp_flow_id));
+	sender->SetAttribute("priorityCustom", UintegerValue(1));
+	sender->SetAttribute("priority", UintegerValue(1));
+	sender->SetAttribute("Remote", AddressValue(InetSocketAddress(serverAddress[dstId], dport)));
+	sender->SetAttribute("Local", AddressValue(InetSocketAddress(serverAddress[srcId], sport)));
+	n.Get(srcId)->AddApplication(sender);
+	sender->SetStartTime(Seconds(startTime));
+	sender->SetStopTime(Seconds(stopTime));
+
+	PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), dport));
+	ApplicationContainer sinkApp = sink.Install(n.Get(dstId));
+	sinkApp.Get(0)->SetAttribute("TotalQueryBytes", UintegerValue(flowSize));
+	sinkApp.Get(0)->SetAttribute("recvAt", TimeValue(Seconds(startTime)));
+	sinkApp.Get(0)->SetAttribute("priority", UintegerValue(1));
+	sinkApp.Get(0)->SetAttribute("priorityCustom", UintegerValue(1));
+	sinkApp.Get(0)->SetAttribute("senderPriority", UintegerValue(1));
+	sinkApp.Get(0)->SetAttribute("flowId", UintegerValue(tcp_flow_id));
+	sinkApp.Get(0)->TraceConnectWithoutContext(
+		"FlowFinish",
+		MakeBoundCallback(&tcp_flow_finish, g_fct_output, srcId, dstId, sport, dport));
+	sinkApp.Start(Seconds(startTime));
+	sinkApp.Stop(Seconds(stopTime));
 }
 
 
@@ -446,11 +514,14 @@ void install_applications_queryNew (int fromLeafId, double requestRate, uint32_t
 				query += flowSize;
 				flowCount++;
 
-				RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
-				ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
-				std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
-				//		appCon.Start(Seconds(flow_input.start_time));
-				appCon.Start(Seconds(startTime));
+				if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
+					InstallTcpFlow(fromServerIndex, destServerIndex, sport, dport, flowSize, startTime, END_TIME);
+				} else {
+					RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], pairBw[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
+					ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
+					std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
+					appCon.Start(Seconds(startTime));
+				}
 
 
 			}
@@ -495,11 +566,14 @@ void install_applications (int fromLeafId, double requestRate, struct cdf_table 
 			flowCount += 1;
 
 
-			RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
-			ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
-			std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
-//		appCon.Start(Seconds(flow_input.start_time));
-			appCon.Start(Seconds(startTime));
+			if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
+				InstallTcpFlow(fromServerIndex, destServerIndex, sport, dport, flowSize, startTime, END_TIME);
+			} else {
+				RdmaClientHelper clientHelper(3, serverAddress[fromServerIndex], serverAddress[destServerIndex], sport, dport, flowSize, has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(fromServerIndex)][n.Get(destServerIndex)]) : 0, global_t == 1 ? maxRtt : pairRtt[fromServerIndex][destServerIndex], pairBw[fromServerIndex][destServerIndex], Simulator::GetMaximumSimulationTime());
+				ApplicationContainer appCon = clientHelper.Install(n.Get(fromServerIndex));
+				std::cout << " from " << fromServerIndex << " to " << destServerIndex <<  " fromLeadId " << fromLeafId << " serverCount " << SERVER_COUNT << " leafCount " << LEAF_COUNT <<  std::endl;
+				appCon.Start(Seconds(startTime));
+			}
 
 			startTime += poission_gen_interval (requestRate);
 		}
@@ -576,6 +650,8 @@ int main(int argc, char *argv[])
 
 	uint32_t algorithm = 3;
 	uint32_t windowCheck = 1;
+	uint32_t transportModeArg = transport_mode;
+	uint32_t flowControlModeArg = flow_control_mode;
 
 	std::string confFile = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/config-workload.txt";
 	std::string cdfFileName = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/websearch.txt";
@@ -607,6 +683,8 @@ int main(int argc, char *argv[])
 
 	cmd.AddValue ("algorithm", "specify CC mode. This is added for my convinience since I prefer cmd rather than parsing files.", algorithm);
 	cmd.AddValue("windowCheck", "windowCheck", windowCheck);
+	cmd.AddValue("transportMode", "specify transport mode. 0=RDMA, 1=TCP_BBR", transportModeArg);
+	cmd.AddValue("flowControlMode", "specify flow control mode. 0=PFC, 1=Bifrost", flowControlModeArg);
 
 	cmd.AddValue("incast", "incast", incast);
 
@@ -877,6 +955,48 @@ int main(int argc, char *argv[])
 				std::cout << ' ' << rate << ' ' << p;
 			}
 			std::cout << '\n';
+		} else if (key.compare("GEMINI_DELAY_THRESH_NS") == 0) {
+			conf >> gemini_delay_thresh_ns;
+			std::cout << "GEMINI_DELAY_THRESH_NS\t\t\t" << gemini_delay_thresh_ns << '\n';
+		} else if (key.compare("GEMINI_BETA") == 0) {
+			conf >> gemini_beta;
+			std::cout << "GEMINI_BETA\t\t\t\t" << gemini_beta << '\n';
+		} else if (key.compare("GEMINI_H") == 0) {
+			conf >> gemini_h;
+			std::cout << "GEMINI_H\t\t\t\t" << gemini_h << '\n';
+		} else if (key.compare("GEMINI_DCN_DELAY_CUTOFF_US") == 0) {
+			conf >> gemini_dcn_delay_cutoff_us;
+			std::cout << "GEMINI_DCN_DELAY_CUTOFF_US\t\t" << gemini_dcn_delay_cutoff_us << '\n';
+		} else if (key.compare("FLOW_CONTROL_MODE") == 0) {
+			conf >> flow_control_mode;
+			std::cout << "FLOW_CONTROL_MODE\t\t\t" << flow_control_mode << '\n';
+		} else if (key.compare("BIFROST_TIMESLOT_US") == 0) {
+			conf >> bifrost_timeslot_us;
+			std::cout << "BIFROST_TIMESLOT_US\t\t\t" << bifrost_timeslot_us << '\n';
+		} else if (key.compare("BIFROST_K") == 0) {
+			conf >> bifrost_k;
+			std::cout << "BIFROST_K\t\t\t\t" << bifrost_k << '\n';
+		} else if (key.compare("BIFROST_LONGHAUL_DELAY_CUTOFF_US") == 0) {
+			conf >> bifrost_longhaul_delay_cutoff_us;
+			std::cout << "BIFROST_LONGHAUL_DELAY_CUTOFF_US\t" << bifrost_longhaul_delay_cutoff_us << '\n';
+		} else if (key.compare("BIFROST_H_MARGIN_SLOTS") == 0) {
+			conf >> bifrost_h_margin_slots;
+			std::cout << "BIFROST_H_MARGIN_SLOTS\t\t\t" << bifrost_h_margin_slots << '\n';
+		} else if (key.compare("TRANSPORT_MODE") == 0) {
+			conf >> transport_mode;
+			std::cout << "TRANSPORT_MODE\t\t\t" << transport_mode << '\n';
+		} else if (key.compare("GEMINI_K_MAP") == 0) {
+			int n_k;
+			conf >> n_k;
+			std::cout << "GEMINI_K_MAP\t\t\t\t";
+			for (int i = 0; i < n_k; i++) {
+				uint64_t rate;
+				uint32_t k;
+				conf >> rate >> k;
+				rate2geminiK[rate] = k;
+				std::cout << ' ' << rate << ' ' << k;
+			}
+			std::cout << '\n';
 		} else if (key.compare("BUFFER_SIZE") == 0) {
 			conf >> buffer_size;
 			std::cout << "BUFFER_SIZE\t\t\t\t" << buffer_size << '\n';
@@ -930,16 +1050,30 @@ int main(int argc, char *argv[])
 
 	// overriding config file. I prefer to use cmd arguments
 	cc_mode = algorithm; // overrides configuration file
+	transport_mode = transportModeArg;
 	has_win = windowCheck; // overrides configuration file
+	flow_control_mode = flowControlModeArg; // overrides configuration file
 	FAN = incast;
+	if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
+		flow_control_mode = 0;
+	}
 
 	Config::SetDefault("ns3::QbbNetDevice::PauseTime", UintegerValue(pause_time));
 	Config::SetDefault("ns3::QbbNetDevice::QcnEnabled", BooleanValue(enable_qcn));
+	if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
+		Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue("ns3::TcpBbr"));
+		Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(packet_payload_size));
+		Config::SetDefault("ns3::TcpSocket::InitialCwnd", UintegerValue(10));
+		Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(4 * 1024 * 1024));
+		Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(6 * 1024 * 1024));
+	}
 
 	// set int_multi
 	IntHop::multi = int_multi;
 	// IntHeader::mode
-	if (cc_mode == 7 || cc_mode == 9) // timely or lpcc, use ts
+	if (transport_mode == TRANSPORT_MODE_TCP_BBR)
+		IntHeader::mode = IntHeader::NONE;
+	else if (cc_mode == 7 || cc_mode == 9 || cc_mode == 11) // timely, lpcc or gemini, use ts
 		IntHeader::mode = IntHeader::TS;
 	else if (cc_mode == 3) // hpcc, powertcp, use int
 		IntHeader::mode = IntHeader::NORMAL;
@@ -1134,6 +1268,7 @@ int main(int argc, char *argv[])
 	}
 
 	nic_rate = get_nic_rate(n);
+	uint32_t geminiKBytes = rate2geminiK.count(nic_rate) ? rate2geminiK[nic_rate] : 64000;
 
 	// config switch
 	// The switch mmu runs Dynamic Thresholds (DT) by default.
@@ -1145,18 +1280,42 @@ int main(int argc, char *argv[])
 			sw->m_mmu->SetAlphaIngress(alpha);
 			uint64_t totalHeadroom = 0;
 			for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
+				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
+				uint64_t rate = dev->GetDataRate().GetBitRate();
+				uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
+				bool useBifrostPort = flow_control_mode == 1 && delay >= bifrost_longhaul_delay_cutoff_us * 1000ULL;
+				if (cc_mode == 11) {
+					bool isDcnPort = delay <= gemini_dcn_delay_cutoff_us * 1000ULL;
+					sw->m_mmu->SetEcnEnabled(j, isDcnPort);
+					if (isDcnPort) {
+						uint32_t portGeminiK = rate2geminiK.count(rate) ? rate2geminiK[rate] : geminiKBytes;
+						sw->m_mmu->ConfigEcnFixed(j, portGeminiK);
+					}
+				}
+				uint64_t deltaBytes = 2 * rate * delay / 8000000000ULL;
+				uint64_t slotBytes = rate * bifrost_timeslot_us * 1000ULL / 8000000000ULL;
+				uint64_t mtuOnWire = packet_payload_size + CustomHeader::GetStaticWholeHeaderSize();
+				uint64_t extraHeadroom = bifrost_k * mtuOnWire;
+				uint64_t hMarginSlots = std::max<uint32_t>(2, bifrost_h_margin_slots);
+				uint64_t reservedBytesH = deltaBytes + hMarginSlots * slotBytes;
+				uint64_t thresholdBytes = reservedBytesH > extraHeadroom ? reservedBytesH - extraHeadroom : 0;
+				if (useBifrostPort) {
+					sw->ConfigureBifrostPort(j, deltaBytes, reservedBytesH, MicroSeconds(bifrost_timeslot_us), bifrost_k);
+				}
 
 				for (uint32_t qu = 0; qu < 8; qu++) {
-					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
-					// set ecn
-					uint64_t rate = dev->GetDataRate().GetBitRate();
-					NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
-					NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
-					NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
-					sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
+					if (cc_mode != 11) {
+						NS_ASSERT_MSG(rate2kmin.find(rate) != rate2kmin.end(), "must set kmin for each link speed");
+						NS_ASSERT_MSG(rate2kmax.find(rate) != rate2kmax.end(), "must set kmax for each link speed");
+						NS_ASSERT_MSG(rate2pmax.find(rate) != rate2pmax.end(), "must set pmax for each link speed");
+						sw->m_mmu->ConfigEcn(j, rate2kmin[rate], rate2kmax[rate], rate2pmax[rate]);
+					}
 					// set pfc
-					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
-					uint32_t headroom = rate * delay / 8 / 1000000000 * 3;
+					uint64_t headroom = rate * delay / 8 / 1000000000 * 3;
+					if (useBifrostPort && qu != 0) {
+						sw->m_mmu->SetReserved(thresholdBytes, j, qu, "ingress");
+						headroom = extraHeadroom;
+					}
 
 					sw->m_mmu->SetHeadroom(headroom, j, qu);
 					totalHeadroom += headroom;
@@ -1171,7 +1330,7 @@ int main(int argc, char *argv[])
 	}
 
 #if ENABLE_QP
-	FILE *fct_output = fopen(fct_output_file.c_str(), "w");
+	g_fct_output = fopen(fct_output_file.c_str(), "w");
 	//
 	// install RDMA driver
 	//
@@ -1204,6 +1363,11 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 			rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
 			rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
+			rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
+			rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
+			rdmaHw->SetAttribute("GeminiH", DoubleValue(gemini_h));
+			rdmaHw->SetAttribute("GeminiKBytes", UintegerValue(geminiKBytes));
+			rdmaHw->SetAttribute("GeminiDcnPortDelayCutoff", TimeValue(MicroSeconds(gemini_dcn_delay_cutoff_us)));
 			rdmaHw->SetPintSmplThresh(pint_prob);
 			// create and install RdmaDriver
 			Ptr<RdmaDriver> rdma = CreateObject<RdmaDriver>();
@@ -1213,7 +1377,7 @@ int main(int argc, char *argv[])
 
 			node->AggregateObject (rdma);
 			rdma->Init();
-			rdma->TraceConnectWithoutContext("QpComplete", MakeBoundCallback (qp_finish, fct_output));
+			rdma->TraceConnectWithoutContext("QpComplete", MakeBoundCallback (qp_finish, g_fct_output));
 		}
 	}
 
@@ -1267,7 +1431,22 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("CcMode", UintegerValue(cc_mode));
 			sw->SetAttribute("MaxRtt", UintegerValue(maxRtt));
 			sw->SetAttribute("PowerEnabled", BooleanValue(wien));
+			sw->SetAttribute("TransportMode", UintegerValue(transport_mode));
+			sw->SetAttribute("FlowControlMode", UintegerValue(flow_control_mode));
+			sw->SetAttribute("BifrostTimeSlotUs", UintegerValue(bifrost_timeslot_us));
+			sw->SetAttribute("BifrostK", UintegerValue(bifrost_k));
+			sw->SetAttribute("BifrostLonghaulDelayCutoffUs", UintegerValue(bifrost_longhaul_delay_cutoff_us));
+			sw->SetAttribute("BifrostHMarginSlots", UintegerValue(bifrost_h_margin_slots));
 			sw->SetAttribute("Epsilon", UintegerValue(epsilon));
+			if (flow_control_mode == 1) {
+				for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
+					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
+					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
+					if (delay >= bifrost_longhaul_delay_cutoff_us * 1000ULL) {
+						sw->SetBifrostPortEnabled(j, true);
+					}
+				}
+			}
 		}
 	}
 

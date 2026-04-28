@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control
+# Install script for directory: /home/master01/CC_Exp/src/traffic-control
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-traffic-control-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-traffic-control-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-traffic-control-debug.so")
@@ -62,37 +57,37 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/helper/queue-disc-container.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/helper/traffic-control-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/cobalt-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/codel-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/fifo-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/fq-cobalt-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/fq-codel-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/fq-pie-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/mq-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/packet-filter.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/pfifo-fast-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/pie-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/prio-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/red-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/tbf-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/traffic-control-layer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/gen-queue-disc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/traffic-control/model/shared-memory.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/traffic-control-module.h"
+    "/home/master01/CC_Exp/src/traffic-control/helper/queue-disc-container.h"
+    "/home/master01/CC_Exp/src/traffic-control/helper/traffic-control-helper.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/cobalt-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/codel-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/fifo-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/fq-cobalt-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/fq-codel-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/fq-pie-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/mq-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/packet-filter.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/pfifo-fast-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/pie-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/prio-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/red-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/tbf-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/traffic-control-layer.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/gen-queue-disc.h"
+    "/home/master01/CC_Exp/src/traffic-control/model/shared-memory.h"
+    "/home/master01/CC_Exp/build/include/ns3/traffic-control-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/traffic-control/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/traffic-control/examples/cmake_install.cmake")
 
 endif()
 

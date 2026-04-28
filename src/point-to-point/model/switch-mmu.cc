@@ -114,6 +114,7 @@ SwitchMmu::SwitchMmu(void) {
 			congestedIngress[port][q] = 0; // This keeps track of the number of congested queues at the ingress
 			congestedEgress[port][q] = 0; // This keeps track of the number of congested queues at the egress
 			txBytesIngress[port][q] = 0; // used for calculating dequeue rates. counter for tx bytes of ingress queues
+			rxBytesIngress[port][q] = 0; // cumulative admitted ingress bytes
 			txBytesEgress[port][q] = 0; // used for calculating dequeue rates. counter for tx bytes of egress queues
 			dequeueRateIngress[port][q] = 1; // normalized dequeue rate of an ingress queue
 			dequeueRateEgress[port][q]  = 1; // normalized dequeue rate of an egress queue
@@ -126,6 +127,10 @@ SwitchMmu::SwitchMmu(void) {
 	}
 	for (uint32_t portId = 0; portId < pCnt; portId++) {
 		bandwidth[portId] = 25 * 1e9;
+		ecnEnabled[portId] = true;
+		ecnUseFixed[portId] = false;
+		ecnFixedKBytes[portId] = 0;
+		bifrostEnabled[portId] = false;
 	}
 	congestionIndicator = 20 * 1024;
 
@@ -840,6 +845,7 @@ void SwitchMmu::UpdateIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t 
 	// This includes bytes from ingresspool as well as from headroom and also reserved. ingress_bytes[port][qIndex] - xoffUsed[port][qIndex] gives us the occupancy in ingressPool.
 	// ingress_bytes[port][qIndex] - xoffUsed[port][qIndex] - GetIngressReservedUsed(port,qIndex) gives us the occupancy in ingress shared pool.
 	ingress_bytes[port][qIndex] += psize;
+	rxBytesIngress[port][qIndex] += psize;
 	totalUsed += psize; // IMPORTANT: totalUsed is only updated in the ingress. No need to update in egress. Avoid double counting.
 
 	totalIngressReservedUsed += GetIngressReservedUsed(port, qIndex); // updating with the new reserved used.
@@ -1012,11 +1018,15 @@ uint64_t SwitchMmu::GetHdrmBytes(uint32_t port, uint32_t qIndex) {
 }
 
 bool SwitchMmu::CheckShouldPause(uint32_t port, uint32_t qIndex) {
+	if (bifrostEnabled[port])
+		return false;
 	return !paused[port][qIndex] && (GetHdrmBytes(port, qIndex) > 0);
 }
 
 bool SwitchMmu::CheckShouldResume(uint32_t port, uint32_t qIndex) {
 	std::string model = bufferModel;
+	if (bifrostEnabled[port])
+		return false;
 	if (!paused[port][qIndex])
 		return false;
 	if (model == "sonic") {
@@ -1040,9 +1050,15 @@ void SwitchMmu::SetResume(uint32_t port, uint32_t qIndex) {
 bool SwitchMmu::ShouldSendCN(uint32_t ifindex, uint32_t qIndex) {
 	if (qIndex == 0)
 		return false;
+	if (!ecnEnabled[ifindex])
+		return false;
+	if (ecnUseFixed[ifindex])
+		return egress_bytes[ifindex][qIndex] > ecnFixedKBytes[ifindex];
 	if (egress_bytes[ifindex][qIndex] > kmax[ifindex])
 		return true;
 	if (egress_bytes[ifindex][qIndex] > kmin[ifindex]) {
+		if (kmax[ifindex] <= kmin[ifindex])
+			return true;
 		double p = pmax[ifindex] * double(egress_bytes[ifindex][qIndex] - kmin[ifindex]) / (kmax[ifindex] - kmin[ifindex]);
 		if (UniformVariable(0, 1).GetValue() < p)
 			return true;
@@ -1053,6 +1069,26 @@ void SwitchMmu::ConfigEcn(uint32_t port, uint32_t _kmin, uint32_t _kmax, double 
 	kmin[port] = _kmin * 1000;
 	kmax[port] = _kmax * 1000;
 	pmax[port] = _pmax;
+	ecnUseFixed[port] = false;
+}
+void SwitchMmu::ConfigEcnFixed(uint32_t port, uint32_t kBytes) {
+	ecnFixedKBytes[port] = kBytes * 1000;
+	ecnUseFixed[port] = true;
+}
+void SwitchMmu::SetEcnEnabled(uint32_t port, bool enabled) {
+	ecnEnabled[port] = enabled;
+}
+
+void SwitchMmu::SetBifrostEnabled(uint32_t port, bool enabled) {
+	bifrostEnabled[port] = enabled;
+}
+
+uint64_t SwitchMmu::GetIngressBytes(uint32_t port, uint32_t qIndex) const {
+	return ingress_bytes[port][qIndex];
+}
+
+uint64_t SwitchMmu::GetIngressRxBytes(uint32_t port, uint32_t qIndex) const {
+	return rxBytesIngress[port][qIndex];
 }
 
 uint64_t SwitchMmu::GetTotalUsedBuffer() {

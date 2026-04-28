@@ -52,6 +52,7 @@
 #include "ns3/unsched-tag.h"
 
 #include <iostream>
+#include <limits>
 
 NS_LOG_COMPONENT_DEFINE("QbbNetDevice");
 
@@ -309,6 +310,7 @@ QbbNetDevice::QbbNetDevice()
 
 	for (uint32_t i = 0; i < qCnt; i++) {
 		m_paused[i] = false;
+		m_pauseResumeEvent[i] = EventId();
 		dummy_paused[i] = false;
 		m_rdmaEQ->dummy_paused[i] = dummy_paused[i];
 	}
@@ -324,6 +326,9 @@ void
 QbbNetDevice::DoDispose()
 {
 	NS_LOG_FUNCTION(this);
+	for (uint32_t i = 0; i < qCnt; i++) {
+		CancelPauseTimer(i);
+	}
 
 	PointToPointNetDevice::DoDispose();
 }
@@ -485,11 +490,33 @@ void
 QbbNetDevice::Resume(unsigned qIndex)
 {
 	NS_LOG_FUNCTION(this << qIndex);
-	NS_ASSERT_MSG(m_paused[qIndex], "Must be PAUSEd");
+	if (!m_paused[qIndex]) {
+		return;
+	}
 	m_paused[qIndex] = false;
 	NS_LOG_INFO("Node " << m_node->GetId() << " dev " << m_ifIndex << " queue " << qIndex <<
 	            " resumed at " << Simulator::Now().GetSeconds());
 	DequeueAndTransmit();
+}
+
+void
+QbbNetDevice::ApplyPause(uint32_t qIndex, Time duration)
+{
+	NS_LOG_FUNCTION(this << qIndex << duration);
+	m_paused[qIndex] = true;
+	CancelPauseTimer(qIndex);
+	if (duration.IsPositive()) {
+		m_pauseResumeEvent[qIndex] = Simulator::Schedule(duration, &QbbNetDevice::Resume, this, qIndex);
+	}
+}
+
+void
+QbbNetDevice::CancelPauseTimer(uint32_t qIndex)
+{
+	NS_LOG_FUNCTION(this << qIndex);
+	if (!m_pauseResumeEvent[qIndex].IsExpired()) {
+		Simulator::Cancel(m_pauseResumeEvent[qIndex]);
+	}
 }
 
 void
@@ -567,9 +594,10 @@ QbbNetDevice::Receive(Ptr<Packet> packet)
 		unsigned qIndex = ch.pfc.qIndex;
 		if (ch.pfc.time > 0) {
 			m_tracePfc(1);
-			m_paused[qIndex] = true;
+			ApplyPause(qIndex, MicroSeconds(ch.pfc.time));
 		} else {
 			m_tracePfc(0);
+			CancelPauseTimer(qIndex);
 			Resume(qIndex);
 		}
 	} else { // non-PFC packets (data, ACK, NACK, CNP...)
@@ -654,8 +682,16 @@ bool QbbNetDevice::SwitchSend (uint32_t qIndex, Ptr<Packet> packet, CustomHeader
 }
 
 void QbbNetDevice::SendPfc(uint32_t qIndex, uint32_t type) {
+	SendPfc(qIndex, type == 0 ? MicroSeconds(m_pausetime) : Time(0));
+}
+
+void QbbNetDevice::SendPfc(uint32_t qIndex, Time pauseDuration) {
 	Ptr<Packet> p = Create<Packet>(0);
-	PauseHeader pauseh((type == 0 ? m_pausetime : 0), m_queue->GetNBytes(qIndex), qIndex);
+	uint64_t pauseUs = pauseDuration.IsPositive() ? pauseDuration.GetMicroSeconds() : 0;
+	if (pauseUs > std::numeric_limits<uint32_t>::max()) {
+		pauseUs = std::numeric_limits<uint32_t>::max();
+	}
+	PauseHeader pauseh(static_cast<uint32_t>(pauseUs), m_queue->GetNBytes(qIndex), qIndex);
 	p->AddHeader(pauseh);
 	Ipv4Header ipv4h;  // Prepare IPv4 header
 	ipv4h.SetProtocol(0xFE);
@@ -668,7 +704,7 @@ void QbbNetDevice::SendPfc(uint32_t qIndex, uint32_t type) {
 	AddHeader(p, 0x800);
 	CustomHeader ch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
 	p->PeekHeader(ch);
-	m_tracePfc(type+2); // 2 indicates PFC PAUSE sent.3 indicates RESUME sent
+	m_tracePfc(pauseUs > 0 ? 2 : 3); // 2 indicates PFC PAUSE sent.3 indicates RESUME sent
 	SwitchSend(0, p, ch);
 }
 
@@ -730,8 +766,10 @@ void QbbNetDevice::TakeDown() {
 		m_rdmaLinkDownCb(this);
 	} else { // switch
 		// clean the queue
-		for (uint32_t i = 0; i < qCnt; i++)
+		for (uint32_t i = 0; i < qCnt; i++) {
+			CancelPauseTimer(i);
 			m_paused[i] = false;
+		}
 		while (1) {
 			Ptr<Packet> p = m_queue->DequeueRR(m_paused);
 			if (!p)

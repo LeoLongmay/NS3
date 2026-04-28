@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/uan
+# Install script for directory: /home/master01/CC_Exp/src/uan
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-uan-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-uan-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-uan-debug.so")
@@ -62,41 +57,41 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/helper/acoustic-modem-energy-model-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/helper/uan-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/acoustic-modem-energy-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-channel.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-header-common.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-header-rc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-mac-aloha.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-mac-cw.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-mac-rc-gw.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-mac-rc.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-mac.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-net-device.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-noise-model-default.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-noise-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-phy-dual.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-phy-gen.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-phy.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-prop-model-ideal.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-prop-model-thorp.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-prop-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-transducer-hd.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-transducer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/uan/model/uan-tx-mode.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/uan-module.h"
+    "/home/master01/CC_Exp/src/uan/helper/acoustic-modem-energy-model-helper.h"
+    "/home/master01/CC_Exp/src/uan/helper/uan-helper.h"
+    "/home/master01/CC_Exp/src/uan/model/acoustic-modem-energy-model.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-channel.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-header-common.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-header-rc.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-mac-aloha.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-mac-cw.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-mac-rc-gw.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-mac-rc.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-mac.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-net-device.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-noise-model-default.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-noise-model.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-phy-dual.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-phy-gen.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-phy.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-prop-model-ideal.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-prop-model-thorp.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-prop-model.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-transducer-hd.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-transducer.h"
+    "/home/master01/CC_Exp/src/uan/model/uan-tx-mode.h"
+    "/home/master01/CC_Exp/build/include/ns3/uan-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/uan/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/uan/examples/cmake_install.cmake")
 
 endif()
 

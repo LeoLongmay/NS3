@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/antenna
+# Install script for directory: /home/master01/CC_Exp/src/antenna
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-antenna-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-antenna-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-antenna-debug.so")
@@ -62,20 +57,20 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/angles.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/antenna-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/cosine-antenna-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/isotropic-antenna-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/parabolic-antenna-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/phased-array-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/three-gpp-antenna-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/antenna/model/uniform-planar-array.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/antenna-module.h"
+    "/home/master01/CC_Exp/src/antenna/model/angles.h"
+    "/home/master01/CC_Exp/src/antenna/model/antenna-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/cosine-antenna-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/isotropic-antenna-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/parabolic-antenna-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/phased-array-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/three-gpp-antenna-model.h"
+    "/home/master01/CC_Exp/src/antenna/model/uniform-planar-array.h"
+    "/home/master01/CC_Exp/build/include/ns3/antenna-module.h"
     )
 endif()
 

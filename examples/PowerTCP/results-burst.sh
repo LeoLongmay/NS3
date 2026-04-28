@@ -5,10 +5,10 @@ RES_RESULTS=$NS3/examples/PowerTCP/results_burst
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
 
-# algs=(0 1 2 3 4 5 6)
+# algs=(0 1 2 3 4 5 6 7)
 
-# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc")
-# CCMODE=(1 3 3 3 7 8 9)
+# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc" "gemini")
+# CCMODE=(1 3 3 3 7 8 9 11)
 
 # algs=(0 1 2 3 4 5)
 
@@ -25,10 +25,10 @@ mkdir $RES_RESULTS
 # algNames=("timely")
 # CCMODE=(7)
 
-algs=(0)
+algs=(0 1 2 3)
 
-algNames=("lpcc")
-CCMODE=(9)
+algNames=("dcqcn" "gemini" "bifrost" "bbr")
+CCMODE=(1 11 1 0)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 

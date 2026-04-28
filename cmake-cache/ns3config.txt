@@ -1,6 +1,6 @@
 ---- Summary of ns-3 settings:
 Build profile                 : debug
-Build directory               : /home/leo/PowerTCP-RAW/ns-3.39/build
+Build directory               : /home/master01/CC_Exp/build
 Build with runtime asserts    : [32mON[0m
 Build with runtime logging    : [32mON[0m
 Build version embedding       : OFF (not requested)
@@ -23,7 +23,7 @@ SQLite support                : [31mOFF (missing dependency)[0m
 Eigen3 support                : [31mOFF (missing dependency)[0m
 Tap Bridge                    : [32mON[0m
 Tap FdNetDevice               : [32mON[0m
-Tests                         : OFF (not requested)
+Tests                         : [32mON[0m
 
 
 Modules configured to be built:
@@ -37,12 +37,11 @@ mesh                      mobility                  netanim
 network                   nix-vector-routing        olsr                      
 point-to-point            point-to-point-layout     propagation               
 sixlowpan                 spectrum                  stats                     
-tap-bridge                topology-read             traffic-control           
-uan                       virtual-net-device        wifi                      
-wimax                     
+tap-bridge                test                      topology-read             
+traffic-control           uan                       virtual-net-device        
+wifi                      wimax                     
 
 Modules that cannot be built:
 brite                     click                     mpi                       
-openflow                  test                      visualizer                
-
+openflow                  visualizer                
 

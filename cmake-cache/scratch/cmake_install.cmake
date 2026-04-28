@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/scratch
+# Install script for directory: /home/master01/CC_Exp/scratch
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,14 +37,9 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/scratch/nested-subdir/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/scratch/nested-subdir/cmake_install.cmake")
 
 endif()
 

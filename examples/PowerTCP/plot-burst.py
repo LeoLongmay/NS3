@@ -21,7 +21,7 @@ os.makedirs(plots_dir,exist_ok=True)
 plt.rcParams.update({'font.size': 18})
 
 
-# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "lpcc"])
+# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "lpcc", "gemini"])
 # algnames={}
 # algnames["dcqcn"]="DCQCN"
 # algnames["powerInt"]="PowerTCP"
@@ -30,6 +30,7 @@ plt.rcParams.update({'font.size': 18})
 # algnames["timely"]="TIMELY"
 # algnames["DCTCP"]="DCTCP"
 # algnames["lpcc"]="LPCC"
+# algnames["gemini"]="GEMINI"
 
 
 # algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
@@ -50,9 +51,12 @@ plt.rcParams.update({'font.size': 18})
 # algnames={}
 # algnames["timely"]="TIMELY"
 
-algs=list(["lpcc"])
+algs=list(["dcqcn", "gemini", "bifrost", "bbr"])
 algnames={}
-algnames["lpcc"]="LPCC"
+algnames["dcqcn"]="DCQCN"
+algnames["bifrost"]="Bifrost"
+algnames["bbr"]="BBR"
+algnames["gemini"]="GEMINI"
 
 #%%
 
@@ -83,7 +87,7 @@ for alg in algs:
     # ax.set_yticks([10e9,25e9,40e9,55e9,70e9,85e9,100e9])
     # ax.set_yticklabels(["10","25","40","55","70","85","100"])
     ax.set_yticks([0, 50e9,100e9,150e9,200e9])
-    ax.set_yticklabels(["0","50","100","150","200","205"])
+    ax.set_yticklabels(["0","50","100","150","200"])
     ax.set_ylabel("Throughput (Gbps)")
 
     start=0.14

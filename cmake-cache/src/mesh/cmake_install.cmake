@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/mesh
+# Install script for directory: /home/master01/CC_Exp/src/mesh
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-mesh-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-mesh-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mesh-debug.so")
@@ -62,48 +57,48 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/helper/dot11s/dot11s-installer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/helper/flame/flame-installer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/helper/mesh-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/helper/mesh-stack-installer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/dot11s-mac-header.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/hwmp-protocol.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/hwmp-rtable.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-beacon-timing.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-configuration.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-id.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-metric-report.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-peer-management.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-peering-protocol.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-perr.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-prep.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-preq.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/ie-dot11s-rann.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/peer-link-frame.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/peer-link.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/dot11s/peer-management-protocol.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/flame/flame-header.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/flame/flame-protocol-mac.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/flame/flame-protocol.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/flame/flame-rtable.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-information-element-vector.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-l2-routing-protocol.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-point-device.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-wifi-beacon.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-wifi-interface-mac-plugin.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mesh/model/mesh-wifi-interface-mac.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/mesh-module.h"
+    "/home/master01/CC_Exp/src/mesh/helper/dot11s/dot11s-installer.h"
+    "/home/master01/CC_Exp/src/mesh/helper/flame/flame-installer.h"
+    "/home/master01/CC_Exp/src/mesh/helper/mesh-helper.h"
+    "/home/master01/CC_Exp/src/mesh/helper/mesh-stack-installer.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/dot11s-mac-header.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/hwmp-protocol.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/hwmp-rtable.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-beacon-timing.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-configuration.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-id.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-metric-report.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-peer-management.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-peering-protocol.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-perr.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-prep.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-preq.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/ie-dot11s-rann.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/peer-link-frame.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/peer-link.h"
+    "/home/master01/CC_Exp/src/mesh/model/dot11s/peer-management-protocol.h"
+    "/home/master01/CC_Exp/src/mesh/model/flame/flame-header.h"
+    "/home/master01/CC_Exp/src/mesh/model/flame/flame-protocol-mac.h"
+    "/home/master01/CC_Exp/src/mesh/model/flame/flame-protocol.h"
+    "/home/master01/CC_Exp/src/mesh/model/flame/flame-rtable.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-information-element-vector.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-l2-routing-protocol.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-point-device.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-wifi-beacon.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-wifi-interface-mac-plugin.h"
+    "/home/master01/CC_Exp/src/mesh/model/mesh-wifi-interface-mac.h"
+    "/home/master01/CC_Exp/build/include/ns3/mesh-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/mesh/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/mesh/examples/cmake_install.cmake")
 
 endif()
 

@@ -14,20 +14,21 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.lines import Line2D
 
-NS3="/home/leo/PowerTCP-RAW/ns-3.39/"
+NS3="./"
 plots_dir="./plot_fairness/"
 os.makedirs(plots_dir,exist_ok=True)
 # plots_dir="/home/vamsi/Powertcp-NSDI/"
 plt.rcParams.update({'font.size': 18})
 
 
-# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
+# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "gemini"])
 # algnames={}
 # algnames["dcqcn"]="DCQCN"
 # algnames["powerInt"]="PowerTCP"
 # algnames["hpcc"]="HPCC"
 # algnames["powerDelay"]=r'$\theta-PowerTCP$'
 # algnames["timely"]="TIMELY"
+# algnames["gemini"]="GEMINI"
 # algnames["DCTCP"]="DCTCP"
 
 # algs=list(["dcqcn"])
@@ -39,16 +40,20 @@ plt.rcParams.update({'font.size': 18})
 # algnames={}
 # algnames["timely"]="TIMELY"
 
-algs=list(["lpcc"])
+algs=list(["dcqcn", "bifrost", "bbr"])
 algnames={}
+algnames["dcqcn"]="DCQCN"
+algnames["bifrost"]="Bifrost"
+algnames["bbr"]="BBR"
 algnames["lpcc"]="LPCC"
+algnames["gemini"]="GEMINI"
 
 
 ######## FAIRNESS #############
 
 # algs=list(["lpcc"])
 # algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp"])
-results=NS3+"examples/PowerTCP/results_fairness/"
+results=NS3+"results_fairness/"
 
 plt.rcParams.update({'font.size': 30})
 

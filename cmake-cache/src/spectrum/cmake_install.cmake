@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/spectrum
+# Install script for directory: /home/master01/CC_Exp/src/spectrum
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-spectrum-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-spectrum-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-spectrum-debug.so")
@@ -62,57 +57,57 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/helper/adhoc-aloha-noack-ideal-phy-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/helper/spectrum-analyzer-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/helper/spectrum-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/helper/tv-spectrum-transmitter-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/helper/waveform-generator-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/aloha-noack-mac-header.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/aloha-noack-net-device.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/constant-spectrum-propagation-loss.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/friis-spectrum-propagation-loss.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/half-duplex-ideal-phy-signal-parameters.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/half-duplex-ideal-phy.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/ism-spectrum-value-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/matrix-based-channel-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/microwave-oven-spectrum-value-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/two-ray-spectrum-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/multi-model-spectrum-channel.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/non-communicating-net-device.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/single-model-spectrum-channel.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-analyzer.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-channel.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-converter.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-error-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-interference.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-model-300kHz-300GHz-log.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-model-ism2400MHz-res1MHz.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-phy.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-transmit-filter.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/phased-array-spectrum-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-signal-parameters.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/spectrum-value.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/three-gpp-channel-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/three-gpp-spectrum-propagation-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/trace-fading-loss-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/tv-spectrum-transmitter.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/waveform-generator.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/model/wifi-spectrum-value-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/spectrum/test/spectrum-test.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/spectrum-module.h"
+    "/home/master01/CC_Exp/src/spectrum/helper/adhoc-aloha-noack-ideal-phy-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/helper/spectrum-analyzer-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/helper/spectrum-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/helper/tv-spectrum-transmitter-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/helper/waveform-generator-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/model/aloha-noack-mac-header.h"
+    "/home/master01/CC_Exp/src/spectrum/model/aloha-noack-net-device.h"
+    "/home/master01/CC_Exp/src/spectrum/model/constant-spectrum-propagation-loss.h"
+    "/home/master01/CC_Exp/src/spectrum/model/friis-spectrum-propagation-loss.h"
+    "/home/master01/CC_Exp/src/spectrum/model/half-duplex-ideal-phy-signal-parameters.h"
+    "/home/master01/CC_Exp/src/spectrum/model/half-duplex-ideal-phy.h"
+    "/home/master01/CC_Exp/src/spectrum/model/ism-spectrum-value-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/model/matrix-based-channel-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/microwave-oven-spectrum-value-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/model/two-ray-spectrum-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/multi-model-spectrum-channel.h"
+    "/home/master01/CC_Exp/src/spectrum/model/non-communicating-net-device.h"
+    "/home/master01/CC_Exp/src/spectrum/model/single-model-spectrum-channel.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-analyzer.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-channel.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-converter.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-error-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-interference.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-model-300kHz-300GHz-log.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-model-ism2400MHz-res1MHz.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-phy.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-transmit-filter.h"
+    "/home/master01/CC_Exp/src/spectrum/model/phased-array-spectrum-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-signal-parameters.h"
+    "/home/master01/CC_Exp/src/spectrum/model/spectrum-value.h"
+    "/home/master01/CC_Exp/src/spectrum/model/three-gpp-channel-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/three-gpp-spectrum-propagation-loss-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/trace-fading-loss-model.h"
+    "/home/master01/CC_Exp/src/spectrum/model/tv-spectrum-transmitter.h"
+    "/home/master01/CC_Exp/src/spectrum/model/waveform-generator.h"
+    "/home/master01/CC_Exp/src/spectrum/model/wifi-spectrum-value-helper.h"
+    "/home/master01/CC_Exp/src/spectrum/test/spectrum-test.h"
+    "/home/master01/CC_Exp/build/include/ns3/spectrum-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/spectrum/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/spectrum/examples/cmake_install.cmake")
 
 endif()
 

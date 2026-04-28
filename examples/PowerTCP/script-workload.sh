@@ -5,20 +5,22 @@ configFile=$NS3/examples/PowerTCP/config-workload.txt #config-burst works just f
 
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
-# algs=(0 1 2 3 4 5 6)
+# algs=(0 1 2 3 4 5 6 7)
 
-# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc")
-# CCMODE=(1 3 3 3 7 8 9)
+# algNames=("dcqcn" "powerInt" "hpcc" "powerDelay" "timely" "dctcp" "lpcc" "gemini")
+# CCMODE=(1 3 3 3 7 8 9 11)
 
 # algs=(0 1 2 3 4 5)
 
 # algNames=("dcqcn" "powerInt" "hpcc" "timely" "dctcp" "lpcc")
 # CCMODE=(1 3 3 7 8 9)
 
-algs=(0)
+algs=(0 1 2)
 
-algNames=("lpcc")
-CCMODE=(9)
+algNames=("dcqcn" "bifrost" "bbr")
+CCMODE=(1 1 0)
+FLOWCTL=(0 1 0)
+TRANSPORT=(0 0 1)
 
 # at the moment, power int and delay are called from hpcc ACK function separately and hence cc mode is still 3.
 
@@ -71,7 +73,7 @@ for load in ${LOADS[@]};do
 			delay=false
 		fi
 
-		if [[ ${algNames[$algorithm]} == "timely" || ${algNames[$algorithm]} == "dcqcn" || ${algNames[$algorithm]} == "lpcc" ]];then
+		if [[ ${algNames[$algorithm]} == "timely" || ${algNames[$algorithm]} == "dcqcn" || ${algNames[$algorithm]} == "lpcc" || ${algNames[$algorithm]} == "bifrost" || ${algNames[$algorithm]} == "bbr" ]];then
 			window=0
 		else
 			window=1
@@ -79,7 +81,7 @@ for load in ${LOADS[@]};do
 
 		sleep 5
 		# Check how many cores are being used.
-		while [[ $(ps aux|grep "powertcp-evaluation-workload-optimized"|wc -l) -gt 10 ]];do
+		while [[ $(ps aux | grep "ns3.39-powertcp-evaluation-workload-debug" | grep -v grep | wc -l) -gt 10 ]];do
 			echo "Waiting for cpu cores.... $N-th experiment "
 			sleep 60
 		done
@@ -89,7 +91,7 @@ for load in ${LOADS[@]};do
 		RESULT_FILE="$RES_DUMP/evaluation-${algNames[$algorithm]}-$load-$req-$query.out"
 		# echo "time ./waf --run "evaluation-fairness --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window""
 		# time ./waf --run "powertcp-evaluation-workload --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window --queryRequestRate=$req --load=$load --START_TIME=$START --END_TIME=$END --FLOW_LAUNCH_END_TIME=$FLOWEND --incast=10 --cdfFileName=$cdf --request=$query" > $RESULT_FILE  2> $RESULT_FILE &
-		time ./build/examples/PowerTCP/ns3.39-powertcp-evaluation-workload-debug --conf=$configFile --algorithm=${CCMODE[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window --queryRequestRate=$req --load=$load --START_TIME=$START --END_TIME=$END --FLOW_LAUNCH_END_TIME=$FLOWEND --incast=10 --cdfFileName=$cdf --request=$query > $RESULT_FILE  2> $RESULT_FILE &
+		time ./build/examples/PowerTCP/ns3.39-powertcp-evaluation-workload-debug --conf=$configFile --algorithm=${CCMODE[$algorithm]} --transportMode=${TRANSPORT[$algorithm]} --flowControlMode=${FLOWCTL[$algorithm]} --wien=$wien --delayWien=$delay --windowCheck=$window --queryRequestRate=$req --load=$load --START_TIME=$START --END_TIME=$END --FLOW_LAUNCH_END_TIME=$FLOWEND --incast=10 --cdfFileName=$cdf --request=$query > $RESULT_FILE  2> $RESULT_FILE &
 		
 		# cat $RESULT_FILE | grep 'FCT' | grep 'flowSize' > $RES_RESULTS/result-${algNames[$algorithm]}-$load-$req.fct
 		# cat $RESULT_FILE | grep 'switch 0' | grep 'total' > $RES_RESULTS/result-${algNames[$algorithm]}-$load-$req.buf

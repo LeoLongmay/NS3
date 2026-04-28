@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/energy
+# Install script for directory: /home/master01/CC_Exp/src/energy
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-energy-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-energy-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-energy-debug.so")
@@ -62,35 +57,35 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/basic-energy-harvester-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/basic-energy-source-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/energy-harvester-container.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/energy-harvester-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/energy-model-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/energy-source-container.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/li-ion-energy-source-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/helper/rv-battery-model-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/basic-energy-harvester.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/basic-energy-source.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/device-energy-model-container.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/device-energy-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/energy-harvester.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/energy-source.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/li-ion-energy-source.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/rv-battery-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/energy/model/simple-device-energy-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/energy-module.h"
+    "/home/master01/CC_Exp/src/energy/helper/basic-energy-harvester-helper.h"
+    "/home/master01/CC_Exp/src/energy/helper/basic-energy-source-helper.h"
+    "/home/master01/CC_Exp/src/energy/helper/energy-harvester-container.h"
+    "/home/master01/CC_Exp/src/energy/helper/energy-harvester-helper.h"
+    "/home/master01/CC_Exp/src/energy/helper/energy-model-helper.h"
+    "/home/master01/CC_Exp/src/energy/helper/energy-source-container.h"
+    "/home/master01/CC_Exp/src/energy/helper/li-ion-energy-source-helper.h"
+    "/home/master01/CC_Exp/src/energy/helper/rv-battery-model-helper.h"
+    "/home/master01/CC_Exp/src/energy/model/basic-energy-harvester.h"
+    "/home/master01/CC_Exp/src/energy/model/basic-energy-source.h"
+    "/home/master01/CC_Exp/src/energy/model/device-energy-model-container.h"
+    "/home/master01/CC_Exp/src/energy/model/device-energy-model.h"
+    "/home/master01/CC_Exp/src/energy/model/energy-harvester.h"
+    "/home/master01/CC_Exp/src/energy/model/energy-source.h"
+    "/home/master01/CC_Exp/src/energy/model/li-ion-energy-source.h"
+    "/home/master01/CC_Exp/src/energy/model/rv-battery-model.h"
+    "/home/master01/CC_Exp/src/energy/model/simple-device-energy-model.h"
+    "/home/master01/CC_Exp/build/include/ns3/energy-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/energy/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/energy/examples/cmake_install.cmake")
 
 endif()
 

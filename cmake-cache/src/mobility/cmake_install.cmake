@@ -1,4 +1,4 @@
-# Install script for directory: /home/leo/PowerTCP-RAW/ns-3.39/src/mobility
+# Install script for directory: /home/master01/CC_Exp/src/mobility
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -37,24 +37,19 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
 endif()
 
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
-endif()
-
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so")
     file(RPATH_CHECK
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so"
          RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
   endif()
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/leo/PowerTCP-RAW/ns-3.39/build/lib/libns3.39-mobility-debug.so")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib" TYPE SHARED_LIBRARY FILES "/home/master01/CC_Exp/build/lib/libns3.39-mobility-debug.so")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so")
     file(RPATH_CHANGE
          FILE "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so"
-         OLD_RPATH "/home/leo/PowerTCP-RAW/ns-3.39/build/lib:"
+         OLD_RPATH "/home/master01/CC_Exp/build/lib:::::::"
          NEW_RPATH "/usr/local/lib:$ORIGIN/:$ORIGIN/../lib")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/libns3.39-mobility-debug.so")
@@ -62,38 +57,38 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT
   endif()
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
 endif()
 
-if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
+if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/include/ns3" TYPE FILE FILES
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/helper/group-mobility-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/helper/mobility-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/helper/ns2-mobility-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/box.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/constant-acceleration-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/constant-position-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/constant-velocity-helper.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/constant-velocity-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/gauss-markov-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/geographic-positions.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/hierarchical-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/position-allocator.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/random-direction-2d-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/random-walk-2d-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/random-waypoint-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/rectangle.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/steady-state-random-waypoint-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/waypoint-mobility-model.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/src/mobility/model/waypoint.h"
-    "/home/leo/PowerTCP-RAW/ns-3.39/build/include/ns3/mobility-module.h"
+    "/home/master01/CC_Exp/src/mobility/helper/group-mobility-helper.h"
+    "/home/master01/CC_Exp/src/mobility/helper/mobility-helper.h"
+    "/home/master01/CC_Exp/src/mobility/helper/ns2-mobility-helper.h"
+    "/home/master01/CC_Exp/src/mobility/model/box.h"
+    "/home/master01/CC_Exp/src/mobility/model/constant-acceleration-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/constant-position-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/constant-velocity-helper.h"
+    "/home/master01/CC_Exp/src/mobility/model/constant-velocity-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/gauss-markov-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/geographic-positions.h"
+    "/home/master01/CC_Exp/src/mobility/model/hierarchical-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/position-allocator.h"
+    "/home/master01/CC_Exp/src/mobility/model/random-direction-2d-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/random-walk-2d-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/random-waypoint-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/rectangle.h"
+    "/home/master01/CC_Exp/src/mobility/model/steady-state-random-waypoint-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/waypoint-mobility-model.h"
+    "/home/master01/CC_Exp/src/mobility/model/waypoint.h"
+    "/home/master01/CC_Exp/build/include/ns3/mobility-module.h"
     )
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("/home/leo/PowerTCP-RAW/ns-3.39/cmake-cache/src/mobility/examples/cmake_install.cmake")
+  include("/home/master01/CC_Exp/cmake-cache/src/mobility/examples/cmake_install.cmake")
 
 endif()
 

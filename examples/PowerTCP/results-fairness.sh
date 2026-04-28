@@ -6,10 +6,14 @@ RES_RESULTS=$NS3/examples/PowerTCP/results_fairness
 mkdir $RES_DUMP
 mkdir $RES_RESULTS
 
-algs=(0)
+algs=(0 1 2)
 
-algNames=("lpcc")
-CCMODE=(9)
+algNames=("dcqcn" "bifrost" "bbr")
+CCMODE=(1 1 0)
+
+# algs=(0 1)
+# algNames=("lpcc" "gemini")
+# CCMODE=(9 11)
 
 # algs=(0)
 

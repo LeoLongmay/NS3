@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.lines import Line2D
 
-NS3="/home/leo/PowerTCP-RAW/ns-3.39/"
+NS3="./"
 plots_dir="./plot_workload/"
 os.makedirs(plots_dir,exist_ok=True)
 # plots_dir="/home/vamsi/Powertcp-NSDI/"
@@ -22,7 +22,7 @@ plt.rcParams.update({'font.size': 18})
 
 
 
-# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "lpcc"])
+# algs=list(["dcqcn", "powerInt", "hpcc", "powerDelay", "timely", "dctcp", "lpcc", "gemini"])
 # algnames={}
 # algnames["dcqcn"]="DCQCN"
 # algnames["powerInt"]="PowerTCP"
@@ -31,18 +31,22 @@ plt.rcParams.update({'font.size': 18})
 # algnames["timely"]="TIMELY"
 # algnames["DCTCP"]="DCTCP"
 # algnames["lpcc"]="LPCC"
+# algnames["gemini"]="GEMINI"
 
-algs=list(["dcqcn", "timely", "lpcc"])
+algs=list(["dcqcn", "bifrost", "bbr"])
 algnames={}
 algnames["dcqcn"]="DCQCN"
+algnames["bifrost"]="Bifrost"
+algnames["bbr"]="BBR"
 algnames["timely"]="TIMELY"
 algnames["lpcc"]="LPCC"
+algnames["gemini"]="GEMINI"
 
 #%%
 
 ########## WORKLOADS ##################
 
-results=NS3+"examples/PowerTCP/results_workload/"
+results=NS3+"results_workload/"
 
 K=1000
 M=K*K
@@ -61,8 +65,11 @@ M=K*K
 
 markers={}
 markers["dcqcn"]="x"
+markers["bifrost"]="o"
+markers["bbr"]="D"
 markers["timely"]="*"
 markers["lpcc"]="."
+markers["gemini"]="s"
 # markers["dcqcn"]="x"
 # markers["powerInt"]="s"
 # markers["hpcc"]="^"
@@ -72,8 +79,11 @@ markers["lpcc"]="."
 
 colors={}
 colors["dcqcn"]='brown'
+colors["bifrost"]='tab:orange'
+colors["bbr"]='tab:blue'
 colors["timely"]='cyan'
 colors["lpcc"]='black'
+colors["gemini"]='tab:orange'
 # colors["dcqcn"]='brown'
 # colors["powerInt"]='red'
 # colors["hpcc"]='blue'

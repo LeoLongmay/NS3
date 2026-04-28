@@ -23,10 +23,13 @@ public:
 	uint64_t snd_nxt, snd_una; // next seq to send, the highest unacked seq
 	uint16_t m_pg;
 	uint16_t m_ipid;
-	uint32_t m_win; // bound of on-the-fly packets
-	uint64_t m_baseRtt; // base RTT of this qp
-	DataRate m_max_rate; // max rate
-	bool m_var_win; // variable window size
+		uint32_t m_win; // bound of on-the-fly packets
+		uint64_t m_baseRtt; // base RTT of this qp
+		uint64_t explicitWinBytes;
+		bool useExplicitWin;
+		uint64_t pathBwBps;
+		DataRate m_max_rate; // max rate
+		bool m_var_win; // variable window size
 	Time m_nextAvail;	//< Soonest time of next send
 	uint32_t wp; // current window of packets
 	uint32_t lastPktSize;
@@ -99,14 +102,24 @@ public:
 		uint32_t m_ecnCnt;
 		uint32_t m_batchSizeOfAlpha;
 	} dctcp;
-	struct{
-		uint32_t m_lastUpdateSeq;
-		DataRate m_curRate;
-		uint32_t m_incStage;
-	}hpccPint;
-	struct {
-        DataRate m_targetRate;  //< Target rate
-        DataRate m_curRate;
+		struct{
+			uint32_t m_lastUpdateSeq;
+			DataRate m_curRate;
+			uint32_t m_incStage;
+		}hpccPint;
+		struct {
+			uint64_t cwndBytes;
+			uint64_t rttBaseNs;
+			uint64_t rttMinWindowNs;
+			uint64_t lastReductionTsNs;
+			uint32_t m_lastUpdateSeq;
+			uint32_t batchSizePkts;
+			uint32_t ecnCntPkts;
+			double alpha;
+		} gemini;
+		struct {
+	        DataRate m_targetRate;  //< Target rate
+	        DataRate m_curRate;
         EventId m_rpTimer;
         bool m_decrease_cnp_arrived; // indicate if CNP arrived in the last slot
         bool m_first_cnp;          // indicate if the current CNP is the first CNP
