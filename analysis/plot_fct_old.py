@@ -6,11 +6,10 @@ import sys
 import argparse
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines  # 导入Line2D用于创建代理对象（备用）
 import matplotlib.ticker as tick
 import math
 from cycler import cycler
-
-
 
 # LB/CC mode matching
 cc_modes = {
@@ -108,8 +107,8 @@ def getFilePath():
     return dir_path
 
 def get_pctl(a, p):
-	i = int(len(a) * p)
-	return a[i]
+    i = int(len(a) * p)
+    return a[i]
 
 def size2str(steps):
     result = []
@@ -180,6 +179,16 @@ def main():
     output_dir = file_dir + "/../mix/output"
     history_filename = file_dir + "/../mix/.history"
 
+    # 创建figures目录（如果不存在）
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
+    # 初始化全局图例元素（用字典存储，避免重复，key=cc_mode, value=Line2D对象）
+    legend_dict = {}
+    legend_collected = False  # 标记是否已收集图例元素
+    # 固定的cc_mode顺序
+    ccmode_order = ['DCQCN', 'HPCC', 'Timely', 'DCTCP', 'PowerTCP', 'LPCC']
+
     # read history file
     map_key_to_id = dict()
 
@@ -211,7 +220,8 @@ def main():
     for k, v in map_key_to_id.items():
 
         ################## AVG plotting ##################
-        fig = plt.figure(figsize=(4, 4))
+        # fig = plt.figure(figsize=(4, 4))
+        fig = plt.figure(figsize=(4, 3))
         ax = fig.add_subplot(111)
         fig.tight_layout()
 
@@ -225,7 +235,6 @@ def main():
         
         xvals = [i for i in range(STEP, 100 + STEP, STEP)]
         
-        ccmode_order = ['DCQCN', 'HPCC', 'Timely', 'DCTCP', 'PowerTCP', 'LPCC']
         for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]
@@ -236,19 +245,25 @@ def main():
                     fct_slowdown = output_dir + "/{id}/{id}_out_fct.txt".format(id=config_id)
                     result = get_steps_from_raw(fct_slowdown, int(time_start), int(time_end), STEP)
 
-                    ax.plot(xvals,
+                    # 绘制曲线（确保返回的是Line2D对象）
+                    line, = ax.plot(xvals,
                         result["avg"],
                         markersize=1.0,
                         linewidth=2.0,
-                        label="{}".format(cc_mode))
+                        label=cc_mode)
+                    
+                    # 只收集一次，且每个cc_mode只保留一个Line2D对象
+                    if not legend_collected and cc_mode not in legend_dict:
+                        legend_dict[cc_mode] = line
                      
-        ax.legend(bbox_to_anchor=(0.0, 1.2), loc="upper left", borderaxespad=0,
-                frameon=False, fontsize=12, facecolor='white', ncol=2,
-                labelspacing=0.4, columnspacing=0.8)
+        # 标记图例已收集（避免后续重复收集）
+        if not legend_collected and len(legend_dict) > 0:
+            legend_collected = True
         
         ax.tick_params(axis="x", rotation=40)
         ax.set_xticks(([0] + xvals)[::2])
-        ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=12)
+        # ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=12)
+        ax.set_xticklabels(["0", "500K", "2M", "5M", "40M", "80M", "500M", "1G", "3G", "10G", "20G"], fontsize=12)
         ax.set_ylim(bottom=1)
         ax.set_yscale("log")
 
@@ -264,7 +279,8 @@ def main():
 
 
         ################## P99 plotting ##################
-        fig = plt.figure(figsize=(4, 4))
+        # fig = plt.figure(figsize=(4, 4))
+        fig = plt.figure(figsize=(4, 3))
         ax = fig.add_subplot(111)
         fig.tight_layout()
 
@@ -278,7 +294,6 @@ def main():
         
         xvals = [i for i in range(STEP, 100 + STEP, STEP)]
 
-        ccmode_order = ['DCQCN', 'HPCC', 'Timely', 'DCTCP', 'PowerTCP', 'LPCC']
         for tgt_ccmode in ccmode_order:
             for vv in v:
                 config_id = vv[0]
@@ -290,19 +305,17 @@ def main():
                     fct_slowdown = output_dir + "/{id}/{id}_out_fct.txt".format(id=config_id)
                     result = get_steps_from_raw(fct_slowdown, int(time_start), int(time_end), STEP)
                     
-                    ax.plot(xvals,
+                    # 绘制曲线（无需收集图例）
+                    line, = ax.plot(xvals,
                         result["p99"],
                         markersize=1.0,
                         linewidth=2.0,
-                        label="{}".format(cc_mode))
+                        label=cc_mode)
                 
-        ax.legend(bbox_to_anchor=(0.0, 1.2), loc="upper left", borderaxespad=0,
-                frameon=False, fontsize=12, facecolor='white', ncol=2,
-                labelspacing=0.4, columnspacing=0.8)
-        
         ax.tick_params(axis="x", rotation=40)
         ax.set_xticks(([0] + xvals)[::2])
-        ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=12)
+        # ax.set_xticklabels(([0] + size2str(result["size"]))[::2], fontsize=12)
+        ax.set_xticklabels(["0", "500K", "2M", "5M", "40M", "80M", "500M", "1G", "3G", "10G", "20G"], fontsize=12)
         ax.set_ylim(bottom=1)
         ax.set_yscale("log")
 
@@ -313,7 +326,53 @@ def main():
         print(fig_filename)
         plt.savefig(fig_filename, transparent=False, bbox_inches='tight')
         plt.close()
-            
+    
+    # ========== 所有图表绘制完成后，生成唯一的图例PDF ==========
+    if len(legend_dict) > 0:
+        # 按固定顺序整理handles和labels（确保顺序正确，且都是有效对象）
+        legend_handles = []
+        legend_labels = []
+        for mode in ccmode_order:
+            if mode in legend_dict:
+                legend_handles.append(legend_dict[mode])
+                legend_labels.append(mode)
+        
+        # 1. 调整画布尺寸为适配6列图例的最小尺寸（避免过大画布导致白边）
+        legend_fig = plt.figure(figsize=(8, 0.8))  # 宽度适配6列，高度仅够容纳一行图例
+        legend_ax = legend_fig.add_subplot(111)
+        legend_ax.axis('off')  # 隐藏坐标轴
+        
+        # 2. 精准设置图例位置：锚定到画布左下角，铺满整个轴域，无额外间距
+        legend = legend_ax.legend(
+            handles=legend_handles,
+            labels=legend_labels,
+            bbox_to_anchor=(0, 0, 1, 1),  # (x0, y0, width, height) 铺满整个轴域
+            loc="center",                  # 图例在bbox内居中
+            borderaxespad=0,               # 轴域和图例无间距
+            frameon=False,                 # 无边框
+            fontsize=10,
+            ncol=6,                        # 6列展示
+            labelspacing=0.2,              # 标签垂直间距
+            columnspacing=1.0,             # 列水平间距
+            handletextpad=0.5              # 图例标记和文本间距
+        )
+        
+        # 3. 保存时关键设置：bbox_inches捕获图例实际边界 + pad_inches=0 去除所有内边距
+        # 获取图例的实际边界框
+        legend_bbox = legend.get_window_extent().transformed(legend_fig.dpi_scale_trans.inverted())
+        legend_filename = fig_dir + "/LEGEND_CC_MODES.pdf"
+        # 保存时仅保留图例实际区域，pad_inches=0 彻底去除白边
+        legend_fig.savefig(
+            legend_filename, 
+            transparent=False, 
+            bbox_inches=legend_bbox,  # 仅保存图例的实际边界
+            pad_inches=0.0,           # 去除保存时的额外内边距
+            dpi=300                   # 可选：提高分辨率，不影响白边
+        )
+        print(f"\n统一的图例文件已保存至: {legend_filename}")
+        plt.close(legend_fig)
+    else:
+        print("\n未收集到有效图例元素，跳过图例文件生成")
 
 if __name__=="__main__":
     setup()
