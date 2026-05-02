@@ -51,7 +51,7 @@ public:
 	static uint64_t GetQpKey(uint32_t dip, uint16_t sport, uint16_t pg); // get the lookup key for m_qpMap
 	Ptr<RdmaQueuePair> GetQp(uint32_t dip, uint16_t sport, uint16_t pg); // get the qp
 	uint32_t GetNicIdxOfQp(Ptr<RdmaQueuePair> qp); // get the NIC index of the qp
-	void AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, uint16_t _sport, uint16_t _dport, uint32_t win, uint64_t baseRtt, Callback<void> notifyAppFinish,Time stopTime); // add a new qp (new send)
+		void AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, uint16_t _sport, uint16_t _dport, uint32_t win, uint64_t baseRtt, uint64_t pathBwBps, Callback<void> notifyAppFinish, Time stopTime); // add a new qp (new send)
 	void DeleteQueuePair(Ptr<RdmaQueuePair> qp);
 
 	Ptr<RdmaRxQueuePair> GetRxQp(uint32_t sip, uint32_t dip, uint16_t sport, uint16_t dport, uint16_t pg, bool create); // get a rxQp
@@ -145,19 +145,60 @@ public:
 	void UpdateRateTimely(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool us);
 	void FastReactTimely(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 
-	/**********************
-	 * DCTCP
-	 *********************/
-	DataRate m_dctcp_rai;
-	void HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
+		/**********************
+		 * DCTCP
+		 *********************/
+		DataRate m_dctcp_rai;
+		void HandleAckDctcp(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 
-	/*********************
-	 * HPCC-PINT
-	 ********************/
+		/**********************
+		 * GEMINI
+		 *********************/
+		uint64_t m_geminiDelayThreshNs;
+		double m_geminiWanBeta;
+		double m_geminiH;
+		uint32_t m_geminiKBytes;
+		Time m_geminiDcnPortDelayCutoff;
+		void HandleAckGemini(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
+		bool UpdateStateGeminiOnAck(Ptr<RdmaQueuePair> qp, CustomHeader &ch, bool &congestedDcn, bool &congestedWan);
+		void ApplyGeminiWindowReduction(Ptr<RdmaQueuePair> qp, bool congestedDcn, bool congestedWan);
+		void ApplyGeminiAi(Ptr<RdmaQueuePair> qp);
+		void SyncGeminiRateAndWindow(Ptr<RdmaQueuePair> qp);
+
+		/*********************
+		 * HPCC-PINT
+		 ********************/
 	uint32_t pint_smpl_thresh;
 	void SetPintSmplThresh(double p);
 	void HandleAckHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 	void UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react);
+
+	/**********************
+    * LPCC
+    *********************/
+
+    uint32_t m_epsilon; // buffer queue length threshold
+    uint64_t m_theta; // fcnp aggregate time window
+	uint64_t m_increaseInterval; // rate increase interval
+    uint32_t m_tau; // RTT detection time window
+	uint64_t last_rtt;
+
+    double m_wr; // min rate adjustment fraction
+    double m_kr; // min rate regulation faction
+	double m_beta; // upper limit factor of rate increase
+    bool m_EcnClampTgtRateLpcc;
+
+	Time m_lastfcnpInvokeTime = ns3::Time::Min();
+	Time m_fcnpInvokeInterval;
+
+    void UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch);
+    void fcnp_received_lpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
+    void HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
+    void ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta);
+    void CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
+    void RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q);
+    void RateIncEventLpcc(Ptr<RdmaQueuePair> q);
+    void UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
 };
 
 } /* namespace ns3 */

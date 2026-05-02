@@ -103,7 +103,7 @@ uint32_t CustomHeader::GetSerializedSize (void) const{
 		else if (l3Prot == 0xF9)
 			len += sizeof(fcnp.pg) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
                    sizeof(fcnp.ecnBits) + sizeof(fcnp.dport) + sizeof(fcnp.timestamp) + 
-                   sizeof(fcnp.m_flowCount);
+                   sizeof(fcnp.m_flowCount) + sizeof(fcnp.linkRateBps);
 	}
 	return len;
 }
@@ -187,6 +187,7 @@ void CustomHeader::Serialize (Buffer::Iterator start) const{
 		  i.WriteHtonU16(fcnp.dport);     // uint16_t → 网络序
 		  i.WriteHtonU64(fcnp.timestamp); // uint64_t → 网络序（匹配Deserialize的ReadNtohU64）
 		  i.WriteHtonU16(fcnp.m_flowCount); // uint16_t → 网络序（你的flownum）
+		  i.WriteHtonU64(fcnp.linkRateBps);
 	  } else if (l3Prot == 0xFC || l3Prot == 0xFD){ // ACK or NACK
 		  i.WriteU16(ack.sport);
 		  i.WriteU16(ack.dport);
@@ -359,11 +360,12 @@ CustomHeader::Deserialize (Buffer::Iterator start)
 		  fcnp.dport = i.ReadNtohU16();      // uint16_t → 主机序
 		  fcnp.timestamp = i.ReadNtohU64();  // uint64_t → 主机序（匹配Serialize）
 		  fcnp.m_flowCount = i.ReadNtohU16(); // 你的flownum，转主机序
+		  fcnp.linkRateBps = i.ReadNtohU64();
 		  
 		  // 3. 修正l4Size计算（匹配GetSerializedSize）
 		  l4Size = sizeof(fcnp.pg) + sizeof(fcnp.qIndex) + sizeof(fcnp.qlen) + 
                    sizeof(fcnp.ecnBits) + sizeof(fcnp.dport) + sizeof(fcnp.timestamp) + 
-                   sizeof(fcnp.m_flowCount);
+                   sizeof(fcnp.m_flowCount) + sizeof(fcnp.linkRateBps);
 	  }
   }
 
@@ -387,4 +389,3 @@ uint32_t CustomHeader::GetStaticWholeHeaderSize(void){
 }
 
 } // namespace ns3
-

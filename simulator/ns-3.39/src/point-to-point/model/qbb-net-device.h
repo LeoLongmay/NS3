@@ -141,6 +141,7 @@ public:
    void TriggerTransmit(void);
 
 	void SendPfc(uint32_t qIndex, uint32_t type); // type: 0 = pause, 1 = resume
+	void SendPfc(uint32_t qIndex, Time pauseDuration);
 
 	TracedCallback<Ptr<const Packet>, uint32_t> m_traceEnqueue;
 	TracedCallback<Ptr<const Packet>, uint32_t> m_traceDequeue;
@@ -189,6 +190,8 @@ protected:
 
   /// Resume a paused queue and call DequeueAndTransmit()
   virtual void Resume(unsigned qIndex);
+  void ApplyPause(uint32_t qIndex, Time duration);
+  void CancelPauseTimer(uint32_t qIndex);
 
   bool ProcessHeader (Ptr<Packet> p, uint16_t& param);
 
@@ -214,6 +217,7 @@ protected:
   bool m_dynamicth;
   uint32_t m_pausetime;	//< Time for each Pause
   bool m_paused[qCnt];	//< Whether a queue paused
+  EventId m_pauseResumeEvent[qCnt];
   bool dummy_paused[qCnt];
 
   //qcn

@@ -33,6 +33,9 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
 	m_ipid = 0;
 	m_win = 0;
 	m_baseRtt = 0;
+	explicitWinBytes = 0;
+	useExplicitWin = false;
+	pathBwBps = 0;
 	m_max_rate = 0;
 	m_var_win = false;
 	m_rate = 0;
@@ -65,9 +68,26 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
 	dctcp.m_ecnCnt = 0;
 	dctcp.m_batchSizeOfAlpha = 0;
 
-	hpccPint.m_lastUpdateSeq = 0;
-	hpccPint.m_incStage = 0;
-}
+    lpcc.m_first_cnp = true;
+    lpcc.m_rpTimeStage = 0;
+    lpcc.m_decrease_cnp_arrived = false;
+    lpcc.m_lastUpdateSeq = 0;
+	lpcc.m_flowCount = 0;
+	lpcc.m_lastCongRateBps = 0;
+	lpcc.m_lastDecreaseRate = 0;
+
+		hpccPint.m_lastUpdateSeq = 0;
+		hpccPint.m_incStage = 0;
+
+		gemini.cwndBytes = 0;
+		gemini.rttBaseNs = 0;
+		gemini.rttMinWindowNs = 0;
+		gemini.lastReductionTsNs = 0;
+		gemini.m_lastUpdateSeq = 0;
+		gemini.batchSizePkts = 0;
+		gemini.ecnCntPkts = 0;
+		gemini.alpha = 1;
+	}
 
 void RdmaQueuePair::SetSize(uint64_t size) {
 	m_size = size;
@@ -124,7 +144,9 @@ bool RdmaQueuePair::IsWinBound() {
 }
 
 uint64_t RdmaQueuePair::GetWin() {
-//	return m_win;
+	if (useExplicitWin) {
+		return explicitWinBytes;
+	}
 	uint64_t w = 0;
 	if (powerEnabled && m_var_win) {
 		w = m_rate.GetBitRate() * m_baseRtt * 1e-9 / 8.0;

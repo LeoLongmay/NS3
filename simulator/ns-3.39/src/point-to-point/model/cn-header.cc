@@ -32,7 +32,7 @@ namespace ns3 {
 NS_OBJECT_ENSURE_REGISTERED (CnHeader);
 
 CnHeader::CnHeader (const uint16_t fid, uint8_t qIndex, uint8_t ecnbits, uint16_t qfb, uint16_t total)
-  : m_fid(fid), m_qIndex(qIndex), m_qfb(qfb), m_ecnBits(ecnbits), m_total(total)
+  : m_fid(fid), m_qIndex(qIndex), m_ecnBits(ecnbits), m_qfb(qfb), m_total(total)
 {
   //NS_LOG_LOGIC("CN got the flow id " << std::hex << m_fid.hi << "+" << m_fid.lo << std::dec);
 }
@@ -46,7 +46,7 @@ CnHeader::CnHeader (const uint16_t fid, uint8_t qIndex, uint8_t qfb)
 */
 
 CnHeader::CnHeader ()
-  : m_fid(), m_qIndex(), m_qfb(0), m_ecnBits(0)
+  : m_fid(), m_qIndex(), m_ecnBits(0), m_qfb(0)
 {}
 
 CnHeader::~CnHeader ()

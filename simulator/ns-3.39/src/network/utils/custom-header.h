@@ -117,6 +117,16 @@ public:
 		  uint8_t ecnBits;
 		  uint16_t total;
 	  } cnp;
+	    struct {
+			  uint16_t pg;
+			  uint8_t qIndex;
+			  uint32_t qlen;
+			  uint8_t ecnBits;
+			  uint16_t dport;
+	      uint64_t timestamp;
+	      uint16_t m_flowCount;
+	      uint64_t linkRateBps;
+	    } fcnp;
 	  // qbbHeader
 	  struct {
 		  uint16_t sport, dport;
@@ -143,4 +153,3 @@ public:
 
 
 #endif /* CUSTOM_HEADER_H */
-

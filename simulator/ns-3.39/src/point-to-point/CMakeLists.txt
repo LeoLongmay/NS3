@@ -35,6 +35,7 @@ build_lib(
     model/rdma-queue-pair.cc
     model/switch-mmu.cc
     model/switch-node.cc
+    model/rdma-flow-table.cc
     helper/qbb-helper.cc
   HEADER_FILES
     ${mpi_headers}
@@ -55,6 +56,7 @@ build_lib(
     model/switch-mmu.h
     model/switch-node.h
     model/trace-format.h
+    model/rdma-flow-table.h
     helper/qbb-helper.h
     helper/sim-setting.h
   LIBRARIES_TO_LINK ${libnetwork}

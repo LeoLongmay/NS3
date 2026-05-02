@@ -84,14 +84,19 @@ RdmaClient::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&RdmaClient::m_win),
                    MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("BaseRtt",
-                   "Base Rtt",
-                   UintegerValue (0),
-                   MakeUintegerAccessor (&RdmaClient::m_baseRtt),
-                   MakeUintegerChecker<uint64_t> ())
-	.AddAttribute ("stopTime", "stopTime", TimeValue (Simulator::GetMaximumSimulationTime()),
-				                      MakeTimeAccessor (&RdmaClient::stopTime),
-				                      MakeTimeChecker ())
+	    .AddAttribute ("BaseRtt",
+	                   "Base Rtt",
+	                   UintegerValue (0),
+	                   MakeUintegerAccessor (&RdmaClient::m_baseRtt),
+	                   MakeUintegerChecker<uint64_t> ())
+		.AddAttribute ("PathBwBps",
+		               "Path bottleneck bandwidth in bps",
+		               UintegerValue (0),
+		               MakeUintegerAccessor (&RdmaClient::m_pathBwBps),
+		               MakeUintegerChecker<uint64_t> ())
+		.AddAttribute ("stopTime", "stopTime", TimeValue (Simulator::GetMaximumSimulationTime()),
+					                      MakeTimeAccessor (&RdmaClient::stopTime),
+					                      MakeTimeChecker ())
 
   ;
   return tid;
@@ -144,8 +149,8 @@ void RdmaClient::StartApplication (void)
   // get RDMA driver and add up queue pair
   Ptr<Node> node = GetNode();
   Ptr<RdmaDriver> rdma = node->GetObject<RdmaDriver>();
-  rdma->AddQueuePair(m_size, m_pg, m_sip, m_dip, m_sport, m_dport, m_win, m_baseRtt, MakeCallback(&RdmaClient::Finish, this),stopTime);
-}
+	  rdma->AddQueuePair(m_size, m_pg, m_sip, m_dip, m_sport, m_dport, m_win, m_baseRtt, m_pathBwBps, MakeCallback(&RdmaClient::Finish, this), stopTime);
+	}
 
 void RdmaClient::StopApplication ()
 {

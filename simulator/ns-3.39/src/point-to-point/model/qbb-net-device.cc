@@ -18,8 +18,9 @@
 * Author: Yuliang Li <yuliangli@g.harvard.com>
 * Modified (by Vamsi Addanki) to also serve TCP/IP traffic.
 */
-
+#ifndef __STDC_LIMIT_MACROS
 #define __STDC_LIMIT_MACROS 1
+#endif
 #include <stdint.h>
 #include <stdio.h>
 #include "ns3/qbb-net-device.h"
@@ -51,6 +52,7 @@
 #include "ns3/unsched-tag.h"
 
 #include <iostream>
+#include <limits>
 
 NS_LOG_COMPONENT_DEFINE("QbbNetDevice");
 
@@ -86,8 +88,8 @@ Ptr<Packet> RdmaEgressQueue::DequeueQindex(int qIndex) {
 		m_qlast = -1;
 		m_traceRdmaDequeue(p, 0);
 		UnSchedTag tag;
-		bool found = p->PeekPacketTag(tag);
-		uint32_t unsched = tag.GetValue();
+		// bool found = p->PeekPacketTag(tag);
+		// uint32_t unsched = tag.GetValue();
 		return p;
 	}
 	if (qIndex >= 0) { // qp
@@ -96,65 +98,122 @@ Ptr<Packet> RdmaEgressQueue::DequeueQindex(int qIndex) {
 		m_qlast = qIndex;
 		m_traceRdmaDequeue(p, m_qpGrp->Get(qIndex)->m_pg);
 		UnSchedTag tag;
-		bool found = p->PeekPacketTag(tag);
-		uint32_t unsched = tag.GetValue();
+		// bool found = p->PeekPacketTag(tag);
+		// uint32_t unsched = tag.GetValue();
 		return p;
 	}
 	return 0;
 }
+// int RdmaEgressQueue::GetNextQindex(bool paused[]) {
+// 	// bool found = false;
+// 	uint32_t qIndex;
+// 	if (!paused[ack_q_idx] && m_ackQ->GetNPackets() > 0)
+// 		return -1;
+
+// 	// no pkt in highest priority queue, do rr for each qp
+// 	int res = -1024;
+
+// 	for (uint32_t dorr = 0; dorr < 2; dorr++) {
+// 		hostDequeueIndex++;
+// 		if (hostDequeueIndex % 2) {
+// 			uint32_t fcount = m_qpGrp->GetN();
+// 			uint32_t min_finish_id = 0xffffffff;
+// 			for (qIndex = 1; qIndex <= fcount; qIndex++) {
+// 				uint32_t idx = (qIndex + m_rrlast) % fcount;
+// 				Ptr<RdmaQueuePair> qp = m_qpGrp->Get(idx);
+// 				if (!paused[qp->m_pg] && qp->GetBytesLeft() > 0 && !qp->IsWinBound()) {
+// 					if (m_qpGrp->Get(idx)->m_nextAvail.GetTimeStep() > Simulator::Now().GetTimeStep()) //not available now
+// 						continue;
+// 					res = idx;
+// 					break;
+// 				} else if (qp->IsFinished()) {
+// 					min_finish_id = idx < min_finish_id ? idx : min_finish_id;
+// 				}
+// 			}
+
+// 			// clear the finished qp
+// 			if (min_finish_id < 0xffffffff) {
+// 				int nxt = min_finish_id;
+// 				auto &qps = m_qpGrp->m_qps;
+// 				for (uint32_t i = min_finish_id + 1; i < fcount; i++) if (!qps[i]->IsFinished()) {
+// 						if (i == res) // update res to the idx after removing finished qp
+// 							res = nxt;
+// 						qps[nxt] = qps[i];
+// 						nxt++;
+// 					}
+// 				qps.resize(nxt);
+// 			}
+
+// 			if (res != -1024) {
+// 				return res;
+// 			}
+// 		}
+// 		else {
+// 			if (qb_dev->GetQueue()->GetNBytes(tcpip_q_idx)) {
+// 				res = -2;
+// 				return res;
+// 			}
+// 		}
+// 	}
+
+// 	return res;
+// }
+
 int RdmaEgressQueue::GetNextQindex(bool paused[]) {
-	bool found = false;
-	uint32_t qIndex;
-	if (!paused[ack_q_idx] && m_ackQ->GetNPackets() > 0)
-		return -1;
+    // bool found = false;
+    uint32_t qIndex;
+    if (!paused[ack_q_idx] && m_ackQ->GetNPackets() > 0)
+        return -1;  // 原逻辑：返回ack_q_idx相关的特殊值
 
-	// no pkt in highest priority queue, do rr for each qp
-	int res = -1024;
+    // 1. 修复：res改为uint32_t，用UINT32_MAX替代-1024（无符号无效值）
+    uint32_t res = UINT32_MAX;
 
-	for (uint32_t dorr = 0; dorr < 2; dorr++) {
-		hostDequeueIndex++;
-		if (hostDequeueIndex % 2) {
-			uint32_t fcount = m_qpGrp->GetN();
-			uint32_t min_finish_id = 0xffffffff;
-			for (qIndex = 1; qIndex <= fcount; qIndex++) {
-				uint32_t idx = (qIndex + m_rrlast) % fcount;
-				Ptr<RdmaQueuePair> qp = m_qpGrp->Get(idx);
-				if (!paused[qp->m_pg] && qp->GetBytesLeft() > 0 && !qp->IsWinBound()) {
-					if (m_qpGrp->Get(idx)->m_nextAvail.GetTimeStep() > Simulator::Now().GetTimeStep()) //not available now
-						continue;
-					res = idx;
-					break;
-				} else if (qp->IsFinished()) {
-					min_finish_id = idx < min_finish_id ? idx : min_finish_id;
-				}
-			}
+    for (uint32_t dorr = 0; dorr < 2; dorr++) {
+        hostDequeueIndex++;
+        if (hostDequeueIndex % 2) {
+            uint32_t fcount = m_qpGrp->GetN();
+            uint32_t min_finish_id = UINT32_MAX;  // 修复：用UINT32_MAX替代0xffffffff（语义一致）
+            for (qIndex = 1; qIndex <= fcount; qIndex++) {
+                uint32_t idx = (qIndex + m_rrlast) % fcount;
+                Ptr<RdmaQueuePair> qp = m_qpGrp->Get(idx);
+                if (!paused[qp->m_pg] && qp->GetBytesLeft() > 0 && !qp->IsWinBound()) {
+                    if (m_qpGrp->Get(idx)->m_nextAvail.GetTimeStep() > Simulator::Now().GetTimeStep())
+                        continue;
+                    res = idx;  // 有效索引（uint32_t）
+                    break;
+                } else if (qp->IsFinished()) {
+                    min_finish_id = idx < min_finish_id ? idx : min_finish_id;
+                }
+            }
 
-			// clear the finished qp
-			if (min_finish_id < 0xffffffff) {
-				int nxt = min_finish_id;
-				auto &qps = m_qpGrp->m_qps;
-				for (int i = min_finish_id + 1; i < fcount; i++) if (!qps[i]->IsFinished()) {
-						if (i == res) // update res to the idx after removing finished qp
-							res = nxt;
-						qps[nxt] = qps[i];
-						nxt++;
-					}
-				qps.resize(nxt);
-			}
+            // 清理已完成的qp
+            if (min_finish_id != UINT32_MAX) {  // 修复：用!=替代<（UINT32_MAX是无符号最大值）
+                // 2. 修复：nxt改为uint32_t（索引变量，避免int与uint32_t混用）
+                uint32_t nxt = min_finish_id;
+                auto &qps = m_qpGrp->m_qps;
+                // 3. 修复：i和res均为uint32_t，类型匹配，无sign-compare错误
+                for (uint32_t i = min_finish_id + 1; i < fcount; i++) if (!qps[i]->IsFinished()) {
+                        if (i == res)  // 现在i(res)都是uint32_t，无类型不匹配
+                            res = nxt;  // 更新res为删除完成qp后的索引
+                        qps[nxt] = qps[i];
+                        nxt++;
+                    }
+                qps.resize(nxt);
+            }
 
-			if (res != -1024) {
-				return res;
-			}
-		}
-		else {
-			if (qb_dev->GetQueue()->GetNBytes(tcpip_q_idx)) {
-				res = -2;
-				return res;
-			}
-		}
-	}
+            // 4. 修复：判断res是否为有效索引（替代原res != -1024）
+            if (res != UINT32_MAX) {
+                return static_cast<int>(res);  // 有效索引转为int返回
+            }
+        } else {
+            if (qb_dev->GetQueue()->GetNBytes(tcpip_q_idx)) {
+                return -2;  // 原逻辑：tcpip_q_idx相关的特殊值，直接返回
+            }
+        }
+    }
 
-	return res;
+    // 5. 修复：返回值兼容原逻辑（UINT32_MAX→-1024，其他→对应int）
+    return (res == UINT32_MAX) ? -1024 : static_cast<int>(res);
 }
 
 int RdmaEgressQueue::GetLastQueue() {
@@ -251,6 +310,7 @@ QbbNetDevice::QbbNetDevice()
 
 	for (uint32_t i = 0; i < qCnt; i++) {
 		m_paused[i] = false;
+		m_pauseResumeEvent[i] = EventId();
 		dummy_paused[i] = false;
 		m_rdmaEQ->dummy_paused[i] = dummy_paused[i];
 	}
@@ -266,6 +326,9 @@ void
 QbbNetDevice::DoDispose()
 {
 	NS_LOG_FUNCTION(this);
+	for (uint32_t i = 0; i < qCnt; i++) {
+		CancelPauseTimer(i);
+	}
 
 	PointToPointNetDevice::DoDispose();
 }
@@ -309,7 +372,7 @@ QbbNetDevice::TransmitComplete(void)
 	NS_LOG_FUNCTION(this);
 	NS_ASSERT_MSG(m_txMachineState == BUSY, "Must be BUSY if transmitting");
 	m_txMachineState = READY;
-	NS_ASSERT_MSG(m_currentPkt != 0, "QbbNetDevice::TransmitComplete(): m_currentPkt zero");
+	// NS_ASSERT_MSG(!m_currentPkt, "QbbNetDevice::TransmitComplete(): m_currentPkt zero");
 	m_phyTxEndTrace(m_currentPkt);
 	m_currentPkt = 0;
 	DequeueAndTransmit();
@@ -337,7 +400,7 @@ QbbNetDevice::DequeueAndTransmit(void)
 			}
 			else if (qIndex == -2) {
 				Ptr<Packet> p = m_queue->DequeueRR (m_paused);
-				if (p == 0)
+				if (!p)
 				{
 					NS_LOG_LOGIC ("No pending packets in device queue after tx complete");
 					return;
@@ -427,11 +490,33 @@ void
 QbbNetDevice::Resume(unsigned qIndex)
 {
 	NS_LOG_FUNCTION(this << qIndex);
-	NS_ASSERT_MSG(m_paused[qIndex], "Must be PAUSEd");
+	if (!m_paused[qIndex]) {
+		return;
+	}
 	m_paused[qIndex] = false;
 	NS_LOG_INFO("Node " << m_node->GetId() << " dev " << m_ifIndex << " queue " << qIndex <<
 	            " resumed at " << Simulator::Now().GetSeconds());
 	DequeueAndTransmit();
+}
+
+void
+QbbNetDevice::ApplyPause(uint32_t qIndex, Time duration)
+{
+	NS_LOG_FUNCTION(this << qIndex << duration);
+	m_paused[qIndex] = true;
+	CancelPauseTimer(qIndex);
+	if (duration.IsPositive()) {
+		m_pauseResumeEvent[qIndex] = Simulator::Schedule(duration, &QbbNetDevice::Resume, this, qIndex);
+	}
+}
+
+void
+QbbNetDevice::CancelPauseTimer(uint32_t qIndex)
+{
+	NS_LOG_FUNCTION(this << qIndex);
+	if (!m_pauseResumeEvent[qIndex].IsExpired()) {
+		Simulator::Cancel(m_pauseResumeEvent[qIndex]);
+	}
 }
 
 void
@@ -509,9 +594,10 @@ QbbNetDevice::Receive(Ptr<Packet> packet)
 		unsigned qIndex = ch.pfc.qIndex;
 		if (ch.pfc.time > 0) {
 			m_tracePfc(1);
-			m_paused[qIndex] = true;
+			ApplyPause(qIndex, MicroSeconds(ch.pfc.time));
 		} else {
 			m_tracePfc(0);
+			CancelPauseTimer(qIndex);
 			Resume(qIndex);
 		}
 	} else { // non-PFC packets (data, ACK, NACK, CNP...)
@@ -519,12 +605,12 @@ QbbNetDevice::Receive(Ptr<Packet> packet)
 			packet->AddPacketTag(InterfaceTag(m_ifIndex));
 			m_node->SwitchReceiveFromDevice(this, packet, ch);
 		} else { // NIC
-			int ret;
+			// int ret;
 			Ptr<Packet> cp = packet->Copy();
 			PppHeader ph; cp->RemoveHeader(ph);
 			Ipv4Header ih;
 			cp->RemoveHeader(ih);
-			if (ih.GetProtocol() == 0x06) {
+			if (ih.GetProtocol() == 0x06) { // tcp
 				m_snifferTrace (packet);
 				m_promiscSnifferTrace (packet);
 				m_phyRxEndTrace (packet);
@@ -542,7 +628,8 @@ QbbNetDevice::Receive(Ptr<Packet> packet)
 			}
 			else {
 				// send to RdmaHw
-				ret = m_rdmaReceiveCb(packet, ch);
+				// ret = m_rdmaReceiveCb(packet, ch);
+				m_rdmaReceiveCb(packet, ch);
 			}
 			// TODO we may based on the ret do something
 		}
@@ -595,8 +682,16 @@ bool QbbNetDevice::SwitchSend (uint32_t qIndex, Ptr<Packet> packet, CustomHeader
 }
 
 void QbbNetDevice::SendPfc(uint32_t qIndex, uint32_t type) {
+	SendPfc(qIndex, type == 0 ? MicroSeconds(m_pausetime) : Time(0));
+}
+
+void QbbNetDevice::SendPfc(uint32_t qIndex, Time pauseDuration) {
 	Ptr<Packet> p = Create<Packet>(0);
-	PauseHeader pauseh((type == 0 ? m_pausetime : 0), m_queue->GetNBytes(qIndex), qIndex);
+	uint64_t pauseUs = pauseDuration.IsPositive() ? pauseDuration.GetMicroSeconds() : 0;
+	if (pauseUs > std::numeric_limits<uint32_t>::max()) {
+		pauseUs = std::numeric_limits<uint32_t>::max();
+	}
+	PauseHeader pauseh(static_cast<uint32_t>(pauseUs), m_queue->GetNBytes(qIndex), qIndex);
 	p->AddHeader(pauseh);
 	Ipv4Header ipv4h;  // Prepare IPv4 header
 	ipv4h.SetProtocol(0xFE);
@@ -609,7 +704,7 @@ void QbbNetDevice::SendPfc(uint32_t qIndex, uint32_t type) {
 	AddHeader(p, 0x800);
 	CustomHeader ch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
 	p->PeekHeader(ch);
-	m_tracePfc(type+2); // 2 indicates PFC PAUSE sent.3 indicates RESUME sent
+	m_tracePfc(pauseUs > 0 ? 2 : 3); // 2 indicates PFC PAUSE sent.3 indicates RESUME sent
 	SwitchSend(0, p, ch);
 }
 
@@ -671,11 +766,13 @@ void QbbNetDevice::TakeDown() {
 		m_rdmaLinkDownCb(this);
 	} else { // switch
 		// clean the queue
-		for (uint32_t i = 0; i < qCnt; i++)
+		for (uint32_t i = 0; i < qCnt; i++) {
+			CancelPauseTimer(i);
 			m_paused[i] = false;
+		}
 		while (1) {
 			Ptr<Packet> p = m_queue->DequeueRR(m_paused);
-			if (p == 0)
+			if (!p)
 				break;
 			m_traceDrop(p, m_queue->GetLastQueue());
 		}

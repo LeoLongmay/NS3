@@ -114,6 +114,7 @@ SwitchMmu::SwitchMmu(void) {
 			congestedIngress[port][q] = 0; // This keeps track of the number of congested queues at the ingress
 			congestedEgress[port][q] = 0; // This keeps track of the number of congested queues at the egress
 			txBytesIngress[port][q] = 0; // used for calculating dequeue rates. counter for tx bytes of ingress queues
+			rxBytesIngress[port][q] = 0; // cumulative admitted ingress bytes
 			txBytesEgress[port][q] = 0; // used for calculating dequeue rates. counter for tx bytes of egress queues
 			dequeueRateIngress[port][q] = 1; // normalized dequeue rate of an ingress queue
 			dequeueRateEgress[port][q]  = 1; // normalized dequeue rate of an egress queue
@@ -126,6 +127,10 @@ SwitchMmu::SwitchMmu(void) {
 	}
 	for (uint32_t portId = 0; portId < pCnt; portId++) {
 		bandwidth[portId] = 25 * 1e9;
+		ecnEnabled[portId] = true;
+		ecnUseFixed[portId] = false;
+		ecnFixedKBytes[portId] = 0;
+		bifrostEnabled[portId] = false;
 	}
 	congestionIndicator = 20 * 1024;
 
@@ -339,7 +344,7 @@ uint64_t SwitchMmu::GetIngressSharedUsed() {
 // A sky high threshold for a queue can be emulated by setting the corresponding alpha to a large value. eg., UINT32_MAX
 uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type) {
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		if (ingressSharedPool > ingressPoolSharedUsed) {
@@ -353,7 +358,7 @@ uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		if (egressPool[type] > egressPoolUsed[type]) {
 			uint64_t remaining = egressPool[type] - egressPoolUsed[type];
 			// UINT64_MAX - 1024*1024 is just a randomly chosen big value.
@@ -365,6 +370,7 @@ uint64_t SwitchMmu::DynamicThreshold(uint32_t port, uint32_t qIndex, std::string
 			return 0;
 		}
 	}
+	return 0;
 }
 void SwitchMmu::setCongested(uint32_t portId, uint32_t qIndex, std::string inout, double satLevel) {
 	if (inout == "ingress") {
@@ -453,7 +459,7 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 		updateDequeueRates();
 	}
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		double satLevel = double(ingress_bytes[port][qIndex]) / congestionIndicator;
@@ -482,7 +488,7 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		double satLevel = double(egress_bytes[port][qIndex]) / congestionIndicator;
 		if (satLevel > 1) {
 			satLevel = 1;
@@ -506,11 +512,12 @@ uint64_t SwitchMmu::ActiveBufferManagement(uint32_t port, uint32_t qIndex, std::
 			return 0;
 		}
 	}
+	return 0;
 }
 
 uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type, uint32_t unsched) {
 	if (inout == "ingress") {
-		double remaining = 0;
+		// double remaining = 0;
 		uint64_t ingressPoolSharedUsed = GetIngressSharedUsed(); // Total bytes used from the ingress "shared" pool specifically.
 		uint64_t ingressSharedPool = ingressPool - totalIngressReserved;
 		if (ingressSharedPool > ingressPoolSharedUsed) {
@@ -532,7 +539,7 @@ uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string 
 		}
 	}
 	else if (inout == "egress") {
-		double remaining = 0;
+		// double remaining = 0;
 		if (egressPool[type] > egressPoolUsed[type]) {
 			uint64_t remaining = egressPool[type] - egressPoolUsed[type];
 			// UINT64_MAX - 1024*1024 is just a randomly chosen big value.
@@ -551,6 +558,7 @@ uint64_t SwitchMmu::FlowAwareBuffer(uint32_t port, uint32_t qIndex, std::string 
 			return 0;
 		}
 	}
+	return 0;
 }
 
 
@@ -614,6 +622,7 @@ uint64_t SwitchMmu::ReverieThreshold(uint32_t port, uint32_t qIndex, uint32_t ty
 			return 0;
 		}
 	}
+	return 0;
 }
 
 uint64_t SwitchMmu::Threshold(uint32_t port, uint32_t qIndex, std::string inout, uint32_t type, uint32_t unsched) {
@@ -676,7 +685,6 @@ bool SwitchMmu::CheckIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t p
 			        // if the switch buffer is full
 			        || (psize + totalUsed > bufferPool)  ) {
 
-				std::cout << "reverie: dropping lossless packet at ingress admission headroom " << GetHdrmBytes(port, qIndex) << " xoff " << xoff[port][qIndex] << " pktSize " << psize << " xoffTotalUsed " << xoffTotalUsed  << " totalUsed " <<  totalUsed << " ingresspool " << ingressPool << " threshold " << ReverieThreshold(port, qIndex, LOSSLESS, unsched) << " ingress_bytes " << ingressLpf_bytes[port][qIndex] << std::endl;
 				return false;
 			}
 			else {
@@ -720,7 +728,6 @@ bool SwitchMmu::CheckIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t p
 			        // if the switch buffer is full
 			        || (psize + totalUsed > bufferPool)  )
 			{
-				std::cout << "dropping lossless packet at ingress admission headroom " << GetHdrmBytes(port, qIndex) << " xoff " << xoff[port][qIndex] << " pktSize " << psize << " xoffTotalUsed " << xoffTotalUsed << " totalUsed " <<  totalUsed << std::endl;
 				return false;
 			}
 			else {
@@ -799,8 +806,6 @@ bool SwitchMmu::CheckEgressAdmission(uint32_t port, uint32_t qIndex, uint32_t ps
 			        // or if the switch buffer is full
 			        || (psize + totalUsed > bufferPool) )
 			{
-				std::cout << "dropping lossless packet at egress admission port " << port << " qIndex " << qIndex << " egress_bytes " << egress_bytes[port][qIndex] << " threshold " << Threshold(port, qIndex, "egress", type, unsched)
-				          << std::endl;
 				return false;
 			}
 			else {
@@ -836,6 +841,7 @@ void SwitchMmu::UpdateIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t 
 	// This includes bytes from ingresspool as well as from headroom and also reserved. ingress_bytes[port][qIndex] - xoffUsed[port][qIndex] gives us the occupancy in ingressPool.
 	// ingress_bytes[port][qIndex] - xoffUsed[port][qIndex] - GetIngressReservedUsed(port,qIndex) gives us the occupancy in ingress shared pool.
 	ingress_bytes[port][qIndex] += psize;
+	rxBytesIngress[port][qIndex] += psize;
 	totalUsed += psize; // IMPORTANT: totalUsed is only updated in the ingress. No need to update in egress. Avoid double counting.
 
 	totalIngressReservedUsed += GetIngressReservedUsed(port, qIndex); // updating with the new reserved used.
@@ -1008,11 +1014,15 @@ uint64_t SwitchMmu::GetHdrmBytes(uint32_t port, uint32_t qIndex) {
 }
 
 bool SwitchMmu::CheckShouldPause(uint32_t port, uint32_t qIndex) {
+	if (bifrostEnabled[port])
+		return false;
 	return !paused[port][qIndex] && (GetHdrmBytes(port, qIndex) > 0);
 }
 
 bool SwitchMmu::CheckShouldResume(uint32_t port, uint32_t qIndex) {
 	std::string model = bufferModel;
+	if (bifrostEnabled[port])
+		return false;
 	if (!paused[port][qIndex])
 		return false;
 	if (model == "sonic") {
@@ -1023,6 +1033,7 @@ bool SwitchMmu::CheckShouldResume(uint32_t port, uint32_t qIndex) {
 	}
 	// Minor detail: Threshold(port, qIndex, "ingress", LOSSLESS, 0) is used above where type=LOSSLESS and unsched=0; It is obvious that resume is triggered only for LOSSLESS queues.
 	// Abound unsched=0: sending resume must be independent of arriving traffic and hence the threshold used is the default value and a prioritized value cannot be used here as is done for admission of priority packets in ABM.
+	return false;
 }
 
 void SwitchMmu::SetPause(uint32_t port, uint32_t qIndex) {
@@ -1035,9 +1046,15 @@ void SwitchMmu::SetResume(uint32_t port, uint32_t qIndex) {
 bool SwitchMmu::ShouldSendCN(uint32_t ifindex, uint32_t qIndex) {
 	if (qIndex == 0)
 		return false;
+	if (!ecnEnabled[ifindex])
+		return false;
+	if (ecnUseFixed[ifindex])
+		return egress_bytes[ifindex][qIndex] > ecnFixedKBytes[ifindex];
 	if (egress_bytes[ifindex][qIndex] > kmax[ifindex])
 		return true;
 	if (egress_bytes[ifindex][qIndex] > kmin[ifindex]) {
+		if (kmax[ifindex] <= kmin[ifindex])
+			return true;
 		double p = pmax[ifindex] * double(egress_bytes[ifindex][qIndex] - kmin[ifindex]) / (kmax[ifindex] - kmin[ifindex]);
 		if (UniformVariable(0, 1).GetValue() < p)
 			return true;
@@ -1048,6 +1065,36 @@ void SwitchMmu::ConfigEcn(uint32_t port, uint32_t _kmin, uint32_t _kmax, double 
 	kmin[port] = _kmin * 1000;
 	kmax[port] = _kmax * 1000;
 	pmax[port] = _pmax;
+	ecnUseFixed[port] = false;
+}
+void SwitchMmu::ConfigEcnFixed(uint32_t port, uint32_t kBytes) {
+	ecnFixedKBytes[port] = kBytes * 1000;
+	ecnUseFixed[port] = true;
+}
+void SwitchMmu::SetEcnEnabled(uint32_t port, bool enabled) {
+	ecnEnabled[port] = enabled;
+}
+
+void SwitchMmu::SetBifrostEnabled(uint32_t port, bool enabled) {
+	bifrostEnabled[port] = enabled;
+}
+
+uint64_t SwitchMmu::GetIngressBytes(uint32_t port, uint32_t qIndex) const {
+	return ingress_bytes[port][qIndex];
+}
+
+uint64_t SwitchMmu::GetIngressRxBytes(uint32_t port, uint32_t qIndex) const {
+	return rxBytesIngress[port][qIndex];
+}
+
+uint64_t SwitchMmu::GetTotalUsedBuffer() {
+	uint64_t totalUsedBuffer = 0;
+	for (uint32_t i = 0; i < pCnt; i++) {
+		for (uint32_t j = 0; j < qCnt; j++) {
+			totalUsedBuffer += egress_bytes[i][j];
+		}
+	}
+	return totalUsedBuffer;
 }
 
 }
