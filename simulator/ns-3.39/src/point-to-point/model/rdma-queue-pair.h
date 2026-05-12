@@ -131,7 +131,17 @@ public:
 		uint64_t m_lastCongRateBps;
 		uint64_t m_lastRtt;
         uint64_t m_minRtt;
+		uint64_t m_lastFcnpTs;
     }lpcc;
+	struct {
+		DataRate nsRate;
+		DataRate eteRate;
+		DataRate blendedRate;
+		uint64_t lastBlendTsNs;
+		uint64_t lastNsAiTsNs;
+		uint64_t lastEteAiTsNs;
+		bool initialized;
+	} bicc;
 
 	/***********
 	 * methods

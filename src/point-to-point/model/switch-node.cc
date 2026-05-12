@@ -94,6 +94,56 @@ TypeId SwitchNode::GetTypeId (void)
 	                                  UintegerValue(3000),
 	                                  MakeUintegerAccessor(&SwitchNode::m_epsilon),
 	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("FcnpMinIntervalUs",
+			                                  "Minimum FCNP send interval per egress queue (us).",
+			                                  UintegerValue(50),
+			                                  MakeUintegerAccessor(&SwitchNode::m_fcnpMinIntervalUs),
+			                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccPerFlowFcnpCooldownUs",
+			                                  "LPCC per-flow fCNP cooldown in microseconds. A flow will not be FCNP-hit again within this window.",
+			                                  UintegerValue(800),
+			                                  MakeUintegerAccessor(&SwitchNode::m_lpccPerFlowFcnpCooldownUs),
+			                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccFcnpTopK",
+			                                  "LPCC FCNP fanout count at low queue: send FCNP to top-K highest-rate flows in a congested queue.",
+			                                  UintegerValue(3),
+			                                  MakeUintegerAccessor(&SwitchNode::m_lpccFcnpTopK),
+			                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccFcnpTopKHigh",
+			                                  "LPCC FCNP fanout count at high queue.",
+			                                  UintegerValue(6),
+			                                  MakeUintegerAccessor(&SwitchNode::m_lpccFcnpTopKHigh),
+			                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccFcnpKHighThreshBytes",
+			                                  "LPCC dynamic-K queue threshold in bytes. Queue >= threshold uses high-K fanout.",
+			                                  UintegerValue(524288),
+			                                  MakeUintegerAccessor(&SwitchNode::m_lpccFcnpKHighThreshBytes),
+			                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BiccEnableEcnClear",
+	                                  "Whether BiCC clears ECN marks on longhaul ingress at receiver-side DCI.",
+	                                  BooleanValue(true),
+	                                  MakeBooleanAccessor(&SwitchNode::m_biccEnableEcnClear),
+	                                  MakeBooleanChecker())
+						.AddAttribute("BiccLonghaulDelayCutoffUs",
+	                                  "Ports with delay above this cutoff are considered longhaul ports for BiCC.",
+	                                  UintegerValue(100),
+	                                  MakeUintegerAccessor(&SwitchNode::m_biccLonghaulDelayCutoffUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BiccNsFeedbackMinIntervalUs",
+	                                  "Minimum near-source BiCC feedback interval per egress queue (us).",
+	                                  UintegerValue(75),
+	                                  MakeUintegerAccessor(&SwitchNode::m_biccNsFeedbackMinIntervalUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("BiccDstBdpFactor",
+	                                  "BDP factor for BiCC destination aggregate gating.",
+	                                  DoubleValue(1.0),
+	                                  MakeDoubleAccessor(&SwitchNode::m_biccDstBdpFactor),
+	                                  MakeDoubleChecker<double>())
+						.AddAttribute("BiccSoftVoqMaxPkts",
+	                                  "Maximum packets queued per destination in BiCC soft VOQ.",
+	                                  UintegerValue(1024),
+	                                  MakeUintegerAccessor(&SwitchNode::m_biccSoftVoqMaxPkts),
+	                                  MakeUintegerChecker<uint32_t>())
 
 	                    ;
 	return tid;
@@ -113,7 +163,17 @@ SwitchNode::SwitchNode() {
 		m_lastPktSize[i] = m_lastPktTs[i] = 0;
 	for (uint32_t i = 0; i < pCnt; i++)
 		m_u[i] = 0;
-    uint64_t inactiveThreshold = m_epsilon * 5;
+	for (uint32_t i = 0; i < pCnt; i++)
+		for (uint32_t q = 0; q < qCnt; q++)
+			m_lastFcnpSentTs[i][q] = 0;
+	for (uint32_t i = 0; i < pCnt; i++)
+		for (uint32_t q = 0; q < qCnt; q++)
+			m_lastBiccNsSentTs[i][q] = 0;
+	m_biccNsFeedbackCount = 0;
+	m_biccEcnClearCount = 0;
+	m_biccSoftVoqEnqueueCount = 0;
+	m_biccSoftVoqDequeueCount = 0;
+	    uint64_t inactiveThreshold = 50000; // 50us in ns time steps
 	m_flowTable = CreateObject<RDMAFlowTable>();
 	m_flowTable->SetInactiveThreshold(inactiveThreshold);
 
@@ -122,8 +182,17 @@ SwitchNode::SwitchNode() {
 
 void SwitchNode::ScheduleCleanFlowTable() {
     m_flowTable->CleanInactiveFlows();
+	const uint64_t nowTs = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
+	const uint64_t keepTs = std::max<uint64_t>(1000000ULL, static_cast<uint64_t>(m_lpccPerFlowFcnpCooldownUs) * 1000ULL * 8ULL);
+	for (auto it = m_lpccFlowLastFcnpTs.begin(); it != m_lpccFlowLastFcnpTs.end();) {
+		if (nowTs > it->second && nowTs - it->second > keepTs) {
+			it = m_lpccFlowLastFcnpTs.erase(it);
+		} else {
+			++it;
+		}
+	}
 
-    m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(100),
+    m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(50),
                                            &SwitchNode::ScheduleCleanFlowTable, this);
 }
 
@@ -322,8 +391,13 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 		}
 		// std::cout << "inDev: " << inDev << " outDev: " << idx << " qIndex: " << qIndex << std::endl;
 		// qIndex %= 8;
-		m_bytes[inDev][idx][qIndex] += p->GetSize();
-		m_devices[idx]->SwitchSend(qIndex, p, ch);
+			m_bytes[inDev][idx][qIndex] += p->GetSize();
+			if (ch.l3Prot == 0x11 && qIndex != 0) {
+				m_flowTable->InsertOrUpdateFlowOnEgress(Ipv4Address(ch.sip), Ipv4Address(ch.dip),
+				                                        ch.udp.sport, ch.udp.dport, idx, qIndex, ch.udp.pg,
+				                                        p->GetSize());
+			}
+			m_devices[idx]->SwitchSend(qIndex, p, ch);
 		DynamicCast<QbbNetDevice>(m_devices[idx])->totalBytesRcvd += p->GetSize(); // Attention: this is the egress port's total received packets. Not the ingress port.
 	} else
 		std::cout << "outdev not found! Dropped. This should not happen. Debugging required!" << std::endl;
@@ -383,14 +457,32 @@ void SwitchNode::ClearTable() {
 
 // This function can only be called in switch mode
 bool SwitchNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch) {
-	PppHeader ppp;
-	Ipv4Header h;
-	UdpHeader udph;
-	Ptr<Packet> p = packet->Copy();
-	p->RemoveHeader(ppp);
-	p->RemoveHeader(h);
-	p->PeekHeader(udph);	
-	m_flowTable->InsertOrUpdateFlow(h.GetSource(), h.GetDestination(), udph.GetSourcePort(), udph.GetDestinationPort()); // update flow table
+	InterfaceTag t;
+	packet->PeekPacketTag(t);
+	uint32_t inDev = t.GetPortId();
+	int outDevSigned = GetOutDev(packet, ch);
+	uint32_t outDev = outDevSigned >= 0 ? static_cast<uint32_t>(outDevSigned) : 0;
+
+	if (ch.l3Prot == 0x11) {
+		PppHeader ppp;
+		Ipv4Header h;
+		UdpHeader udph;
+		Ptr<Packet> p = packet->Copy();
+		p->RemoveHeader(ppp);
+		p->RemoveHeader(h);
+		p->PeekHeader(udph);
+		m_flowTable->InsertOrUpdateFlow(h.GetSource(), h.GetDestination(), udph.GetSourcePort(), udph.GetDestinationPort());
+	}
+
+	if (m_ccMode == 12 && outDevSigned >= 0) {
+		MaybeApplyBiccEcnClear(inDev, outDev, packet);
+		if (ch.l3Prot == 0xFC || ch.l3Prot == 0xFD) {
+			MaybeHandleBiccAckRelease(inDev, outDev, ch);
+		}
+		if (MaybeHandleBiccNearDestinationIngress(inDev, outDev, packet, ch)) {
+			return true;
+		}
+	}
 
 	SendToDev(packet, ch);
 	return true;
@@ -405,65 +497,145 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 
 	if (qIndex != 0) {
 		uint32_t inDev = t.GetPortId();
+		bool lpccFcnpSent = false;
 		m_mmu->RemoveFromIngressAdmission(inDev, qIndex, p->GetSize(), found);
 		m_mmu->RemoveFromEgressAdmission(ifIndex, qIndex, p->GetSize(), found);
 		m_bytes[inDev][ifIndex][qIndex] -= p->GetSize();
-		if (m_ccMode == 9) { // lpcc
-			if (m_mmu->totalUsed > m_epsilon) { // send FCNP
-				// std::cout << "egress_bytes: " << m_mmu->egress_bytes[ifIndex][qIndex] << std::endl;egress_bytes[ifIndex][qIndex]
-				// if (Simulator::Now().GetTimeStep() >= 165210000) {
-				// 	int debug = 1;
-				// 	std::cout << debug << std::endl;
-				// }
-				PppHeader ppp;
-				Ipv4Header h;
-				UdpHeader ch;
-				Ptr<Packet> packet = p->Copy();
-				packet->RemoveHeader(ppp);
-				packet->RemoveHeader(h);
-				packet->PeekHeader(ch);
+				if (m_ccMode == 9) { // LPCC: all switches can send FCNP on congestion
+					if (m_mmu->egress_bytes[ifIndex][qIndex] > m_epsilon) { // send FCNP
+					const uint64_t nowTs = Simulator::Now().GetTimeStep();
+					const uint64_t minIntervalTs = static_cast<uint64_t>(m_fcnpMinIntervalUs) * 1000ULL;
+					if (minIntervalTs == 0 || nowTs - m_lastFcnpSentTs[ifIndex][qIndex] >= minIntervalTs) {
+						// Queue-scoped FCNP fanout:
+						// notify only flows traversing this congested egress queue.
+						PppHeader ppp;
+						Ipv4Header h;
+						Ptr<Packet> packet = p->Copy();
+						packet->RemoveHeader(ppp);
+						packet->RemoveHeader(h);
+						PppHeader nppp = ppp;
+						Ipv4Header nh = h;
+						nh.SetProtocol(0xF9); // fcnp
 
-				Ipv4Address srcip = h.GetDestination(); // origin pkt's dst ip is fcnp's src ip
-				Ipv4Address dstip = h.GetSource(); // origin pkt's src ip is fcnp's dst ip;
-				PppHeader nppp = ppp;
-				Ipv4Header nh = h;
-				nh.SetSource(srcip);
-				nh.SetDestination(dstip);
-				nh.SetProtocol(0xF9); // fcnp
-					
-				CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
-				nch.sip = srcip.Get();
-				nch.dip = dstip.Get();
-				nch.l3Prot = 0xF9; // fcnp
-				nch.fcnp.timestamp = Simulator::Now().GetTimeStep();
-				nch.fcnp.qIndex = 0;
-				nch.fcnp.pg = 3;
-				nch.fcnp.dport = ch.GetSourcePort();
-				Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
-				// nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
-				nch.fcnp.qlen = m_mmu->totalUsed;
-				nch.fcnp.m_flowCount = m_flowTable->GetFlowCountByDip(srcip);
+						Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
+						const uint16_t queueFlowCount = std::max<uint16_t>(1, m_flowTable->GetFlowCountByEgress(ifIndex, qIndex));
+						// Dynamic-K FCNP fanout:
+						// use low-K at low queue to preserve throughput; switch to high-K when queue is above threshold.
+						const uint32_t qlenBytes = m_mmu->egress_bytes[ifIndex][qIndex];
+						const bool highQueue = (m_lpccFcnpKHighThreshBytes > 0) && (qlenBytes >= m_lpccFcnpKHighThreshBytes);
+						const uint32_t kLow = std::max<uint32_t>(1, m_lpccFcnpTopK);
+						const uint32_t kHigh = std::max<uint32_t>(kLow, m_lpccFcnpTopKHigh);
+						const uint32_t topK = highQueue ? kHigh : kLow;
+						const uint64_t perFlowCooldownTs = static_cast<uint64_t>(m_lpccPerFlowFcnpCooldownUs) * 1000ULL;
+						const auto selectedFlows = m_flowTable->GetTopRateFlowsByEgressQueue(ifIndex, qIndex, topK);
+						for (const auto& selectedFlow : selectedFlows) {
+							LpccFeedbackFlowKey flowKey{
+								selectedFlow.flow.sip.Get(),
+								selectedFlow.flow.dip.Get(),
+								selectedFlow.flow.sport,
+								selectedFlow.flow.dport,
+								selectedFlow.pg
+							};
+							auto coolIt = m_lpccFlowLastFcnpTs.find(flowKey);
+							if (coolIt != m_lpccFlowLastFcnpTs.end() &&
+							    nowTs > coolIt->second &&
+							    nowTs - coolIt->second < perFlowCooldownTs) {
+								continue;
+							}
+							Ipv4Address srcip = selectedFlow.flow.dip; // origin dst
+							Ipv4Address dstip = selectedFlow.flow.sip; // origin src
+							nh.SetSource(srcip);
+							nh.SetDestination(dstip);
 
-				Ptr<Packet> fcnp_pkt = Create<Packet>();
-				fcnp_pkt->AddHeader(nch);
-				fcnp_pkt->AddHeader(nh);
-				fcnp_pkt->AddHeader(nppp);
-				fcnp_pkt->AddPacketTag(t);
-				SendToDev(fcnp_pkt, nch);
-				// fcnp_count++;
+							CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+							nch.sip = srcip.Get();
+							nch.dip = dstip.Get();
+							nch.l3Prot = 0xF9; // fcnp
+							nch.fcnp.timestamp = nowTs;
+							nch.fcnp.qIndex = 0;
+							nch.fcnp.pg = selectedFlow.pg;
+							nch.fcnp.dport = selectedFlow.flow.sport;
+							nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+							nch.fcnp.m_flowCount = queueFlowCount;
+							nch.fcnp.linkRateBps = dev->GetDataRate().GetBitRate();
+
+							Ptr<Packet> fcnp_pkt = Create<Packet>();
+							fcnp_pkt->AddHeader(nch);
+							fcnp_pkt->AddHeader(nh);
+							fcnp_pkt->AddHeader(nppp);
+							fcnp_pkt->AddPacketTag(t);
+							SendToDev(fcnp_pkt, nch);
+							m_lpccFlowLastFcnpTs[flowKey] = nowTs;
+							lpccFcnpSent = true;
+						}
+
+						// Fallback: if no active-flow snapshot is available yet, at least
+						// notify the current packet's flow.
+						if (!lpccFcnpSent) {
+							UdpHeader udp;
+							Ptr<Packet> cur = p->Copy();
+							cur->RemoveHeader(ppp);
+							cur->RemoveHeader(h);
+							cur->PeekHeader(udp);
+
+							Ipv4Address srcip = h.GetDestination();
+							Ipv4Address dstip = h.GetSource();
+							nh.SetSource(srcip);
+							nh.SetDestination(dstip);
+
+							CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+							nch.sip = srcip.Get();
+							nch.dip = dstip.Get();
+							nch.l3Prot = 0xF9;
+							nch.fcnp.timestamp = nowTs;
+							nch.fcnp.qIndex = 0;
+							nch.fcnp.pg = 3;
+							nch.fcnp.dport = udp.GetSourcePort();
+							nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+							nch.fcnp.m_flowCount = queueFlowCount;
+							nch.fcnp.linkRateBps = dev->GetDataRate().GetBitRate();
+
+							Ptr<Packet> fcnp_pkt = Create<Packet>();
+							fcnp_pkt->AddHeader(nch);
+								fcnp_pkt->AddHeader(nh);
+								fcnp_pkt->AddHeader(nppp);
+								fcnp_pkt->AddPacketTag(t);
+								SendToDev(fcnp_pkt, nch);
+								LpccFeedbackFlowKey fallbackKey{
+									h.GetSource().Get(),
+									h.GetDestination().Get(),
+									udp.GetSourcePort(),
+									udp.GetDestinationPort(),
+									3
+								};
+								m_lpccFlowLastFcnpTs[fallbackKey] = nowTs;
+								lpccFcnpSent = true;
+							}
+
+						if (lpccFcnpSent) {
+							m_lastFcnpSentTs[ifIndex][qIndex] = nowTs;
+						}
+					}
+				}
 			}
-		}
-		if (m_ecnEnabled) {
-			bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
+				if (m_ccMode == 12) {
+					MaybeGenerateBiccNearSourceFeedback(ifIndex, qIndex, inDev, p);
+				}
+			if (m_ecnEnabled) {
+				bool egressCongested = m_mmu->ShouldSendCN(ifIndex, qIndex);
 			if (egressCongested) {
-				PppHeader ppp;
-				Ipv4Header h;
-				p->RemoveHeader(ppp);
-				p->RemoveHeader(h);
-				h.SetEcn((Ipv4Header::EcnType)0x03);
-				p->AddHeader(h);
-				p->AddHeader(ppp);
-				// cnp_count++;
+				// LPCC fallback: keep ECN marking when FCNP was not emitted in this cycle.
+				bool markEcn = (m_ccMode != 9) || !lpccFcnpSent;
+				if (markEcn) {
+					PppHeader ppp;
+					Ipv4Header h;
+					p->RemoveHeader(ppp);
+					p->RemoveHeader(h);
+					h.SetEcn((Ipv4Header::EcnType)0x03);
+					p->AddHeader(h);
+					p->AddHeader(ppp);
+					// cnp_count++;
+				}
 			}
 		}
 		//CheckAndSendPfc(inDev, qIndex);
@@ -598,6 +770,216 @@ int SwitchNode::log2apprx(int x, int b, int m, int l) {
 	return int(log2(x) * (1 << logres_shift(b, l)));
 }
 
+bool SwitchNode::IsLpccWanNode() const {
+	uint32_t id = GetId();
+	return id >= 21 && id <= 25;
+}
+
+bool SwitchNode::IsLonghaulPort(uint32_t portId) const {
+	if (portId == 0 || portId >= GetNDevices()) {
+		return false;
+	}
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[portId]);
+	if (dev == nullptr || dev->GetChannel() == nullptr) {
+		return false;
+	}
+	uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
+	return delay >= static_cast<uint64_t>(m_biccLonghaulDelayCutoffUs) * 1000ULL;
+}
+
+bool SwitchNode::IsSenderSideDciPath(uint32_t inDev, uint32_t outDev) const {
+	return !IsLonghaulPort(inDev) && IsLonghaulPort(outDev);
+}
+
+bool SwitchNode::IsReceiverSideDciPath(uint32_t inDev, uint32_t outDev) const {
+	return IsLonghaulPort(inDev) && !IsLonghaulPort(outDev);
+}
+
+uint64_t SwitchNode::EstimateBiccDstBudgetBytes(uint32_t outDev) const {
+	if (outDev == 0 || outDev >= GetNDevices()) {
+		return 1;
+	}
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[outDev]);
+	if (dev == nullptr || dev->GetChannel() == nullptr) {
+		return 1;
+	}
+	uint64_t rate = dev->GetDataRate().GetBitRate();
+	uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
+	double bdp = (double(rate) * double(delay * 2)) / 8e9;
+	double factor = std::max(0.1, m_biccDstBdpFactor);
+	uint64_t budget = static_cast<uint64_t>(std::max(1.0, bdp * factor));
+	return budget;
+}
+
+void SwitchNode::MaybeGenerateBiccNearSourceFeedback(uint32_t ifIndex, uint32_t qIndex, uint32_t inDev, Ptr<Packet> p) {
+	if (!IsSenderSideDciPath(inDev, ifIndex)) {
+		return;
+	}
+	if (!m_mmu->ShouldSendCN(ifIndex, qIndex)) {
+		return;
+	}
+	const uint64_t nowTs = Simulator::Now().GetTimeStep();
+	const uint64_t minIntervalTs = static_cast<uint64_t>(m_biccNsFeedbackMinIntervalUs) * 1000ULL;
+	if (minIntervalTs > 0 && nowTs - m_lastBiccNsSentTs[ifIndex][qIndex] < minIntervalTs) {
+		return;
+	}
+
+	CustomHeader orig(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+	orig.getInt = 0;
+	Ptr<Packet> parsePkt = p->Copy();
+	parsePkt->PeekHeader(orig);
+	if (orig.l3Prot != 0x11) {
+		return;
+	}
+
+	PppHeader ppp;
+	Ipv4Header h;
+	UdpHeader udp;
+	Ptr<Packet> packet = p->Copy();
+	packet->RemoveHeader(ppp);
+	packet->RemoveHeader(h);
+	packet->PeekHeader(udp);
+
+	Ipv4Address srcip = h.GetDestination();
+	Ipv4Address dstip = h.GetSource();
+	PppHeader nppp = ppp;
+	Ipv4Header nh = h;
+	nh.SetSource(srcip);
+	nh.SetDestination(dstip);
+	nh.SetProtocol(0xF9); // reuse FCNP channel for BiCC near-source feedback
+
+	CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+	nch.sip = srcip.Get();
+	nch.dip = dstip.Get();
+	nch.l3Prot = 0xF9;
+	nch.fcnp.timestamp = nowTs;
+	nch.fcnp.qIndex = 1; // marker: BiCC near-source feedback
+	nch.fcnp.pg = orig.udp.pg;
+	nch.fcnp.dport = orig.udp.sport;
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
+	nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+	nch.fcnp.m_flowCount = m_flowTable->GetFlowCountByEgress(ifIndex, qIndex);
+	nch.fcnp.linkRateBps = dev->GetDataRate().GetBitRate();
+
+	Ptr<Packet> fbPkt = Create<Packet>();
+	fbPkt->AddHeader(nch);
+	fbPkt->AddHeader(nh);
+	fbPkt->AddHeader(nppp);
+	InterfaceTag inTag(inDev);
+	fbPkt->AddPacketTag(inTag);
+	SendToDev(fbPkt, nch);
+	m_lastBiccNsSentTs[ifIndex][qIndex] = nowTs;
+	m_biccNsFeedbackCount++;
+}
+
+void SwitchNode::MaybeApplyBiccEcnClear(uint32_t inDev, uint32_t outDev, Ptr<Packet> p) {
+	if (!m_biccEnableEcnClear) {
+		return;
+	}
+	if (!IsReceiverSideDciPath(inDev, outDev)) {
+		return;
+	}
+	Ptr<Packet> packet = p;
+	PppHeader ppp;
+	Ipv4Header h;
+	packet->RemoveHeader(ppp);
+	packet->RemoveHeader(h);
+	if (h.GetProtocol() == 0x11 || h.GetProtocol() == 0xFC || h.GetProtocol() == 0xFD) {
+		if (h.GetEcn() != Ipv4Header::ECN_NotECT) {
+			h.SetEcn(Ipv4Header::ECN_NotECT);
+			m_biccEcnClearCount++;
+		}
+	}
+	packet->AddHeader(h);
+	packet->AddHeader(ppp);
+}
+
+bool SwitchNode::MaybeHandleBiccNearDestinationIngress(uint32_t inDev, uint32_t outDev, Ptr<Packet> packet, CustomHeader& ch) {
+	if (ch.l3Prot != 0x11) {
+		return false;
+	}
+	if (!IsReceiverSideDciPath(inDev, outDev)) {
+		return false;
+	}
+
+	uint32_t dstIp = ch.dip;
+	auto& st = m_biccDstState[dstIp];
+	// Use longhaul ingress port as budget reference for receiver-side DCI gating.
+	st.outDev = inDev;
+	uint64_t budget = EstimateBiccDstBudgetBytes(st.outDev);
+	// Keep inflight accounting in the same unit as ACK seq delta (payload bytes).
+	uint32_t pktSize = std::max<uint32_t>(1, ch.udp.payload_size);
+	bool needQueue = !st.queue.empty() || st.inflightBytes + pktSize > budget;
+	if (!needQueue) {
+		st.inflightBytes += pktSize;
+		return false;
+	}
+	if (st.queue.size() >= m_biccSoftVoqMaxPkts) {
+		// Do not drop: bypass gating for this packet to avoid transport stall.
+		st.inflightBytes += pktSize;
+		return false;
+	}
+	BiccBufferedPkt item{packet->Copy(), ch, pktSize};
+	st.queue.push_back(item);
+	st.queuedBytes += pktSize;
+	m_biccSoftVoqEnqueueCount++;
+	return true;
+}
+
+SwitchNode::BiccAckFlowKey SwitchNode::GetBiccAckFlowKey(const CustomHeader& ch) const {
+	return BiccAckFlowKey{ch.sip, ch.dip, ch.ack.sport, ch.ack.dport, ch.ack.pg};
+}
+
+void SwitchNode::MaybeHandleBiccAckRelease(uint32_t inDev, uint32_t outDev, const CustomHeader& ch) {
+	if (!IsSenderSideDciPath(inDev, outDev)) {
+		return;
+	}
+	BiccAckFlowKey flowKey = GetBiccAckFlowKey(ch);
+	auto& ackState = m_biccAckState[flowKey];
+	uint32_t prevSeq = ackState.initialized ? ackState.lastSeq : 0;
+	ackState.initialized = true;
+	if (ch.ack.seq <= prevSeq) {
+		return;
+	}
+	uint32_t delta = ch.ack.seq - prevSeq;
+	ackState.lastSeq = ch.ack.seq;
+
+	uint32_t dstIp = ch.sip; // ACK source is destination host for longhaul->intra data
+	auto it = m_biccDstState.find(dstIp);
+	if (it == m_biccDstState.end()) {
+		return;
+	}
+	BiccDstState& st = it->second;
+	st.inflightBytes = st.inflightBytes > delta ? st.inflightBytes - delta : 0;
+	DrainBiccDstQueue(dstIp);
+}
+
+void SwitchNode::DrainBiccDstQueue(uint32_t dstIp) {
+	auto it = m_biccDstState.find(dstIp);
+	if (it == m_biccDstState.end()) {
+		return;
+	}
+	BiccDstState& st = it->second;
+	uint64_t budget = EstimateBiccDstBudgetBytes(st.outDev);
+	uint32_t sent = 0;
+	const uint32_t maxBurst = 128;
+	while (!st.queue.empty() && sent < maxBurst) {
+		BiccBufferedPkt item = st.queue.front();
+		if (st.inflightBytes + item.size > budget) {
+			break;
+		}
+		st.queue.pop_front();
+		st.queuedBytes = st.queuedBytes > item.size ? st.queuedBytes - item.size : 0;
+		st.inflightBytes += item.size;
+		SendToDev(item.packet, item.header);
+		m_biccSoftVoqDequeueCount++;
+		sent++;
+	}
+	if (st.queue.empty() && st.inflightBytes == 0) {
+		m_biccDstState.erase(it);
+	}
+}
+
 SwitchNode::~SwitchNode() {
     Simulator::Cancel(m_cleanFlowEvent);
 	for (uint32_t i = 0; i < pCnt; i++) {
@@ -606,6 +988,14 @@ SwitchNode::~SwitchNode() {
 				Simulator::Cancel(m_bifrost[i][q].tickEvent);
 			}
 		}
+	}
+	if (m_ccMode == 12) {
+		std::cout << "BiCCStats node=" << GetId()
+		          << " ns_fb=" << m_biccNsFeedbackCount
+		          << " ecn_clear=" << m_biccEcnClearCount
+		          << " softvoq_enq=" << m_biccSoftVoqEnqueueCount
+		          << " softvoq_deq=" << m_biccSoftVoqDequeueCount
+		          << std::endl;
 	}
 }
 

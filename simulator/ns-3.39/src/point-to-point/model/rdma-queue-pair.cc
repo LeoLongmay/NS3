@@ -73,8 +73,18 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
     lpcc.m_decrease_cnp_arrived = false;
     lpcc.m_lastUpdateSeq = 0;
 	lpcc.m_flowCount = 0;
-	lpcc.m_lastCongRateBps = 0;
-	lpcc.m_lastDecreaseRate = 0;
+		lpcc.m_lastCongRateBps = 0;
+		lpcc.m_lastDecreaseRate = 0;
+		lpcc.m_lastRtt = 0;
+		lpcc.m_minRtt = 0;
+		lpcc.m_lastFcnpTs = 0;
+		bicc.nsRate = 0;
+		bicc.eteRate = 0;
+		bicc.blendedRate = 0;
+		bicc.lastBlendTsNs = 0;
+		bicc.lastNsAiTsNs = 0;
+		bicc.lastEteAiTsNs = 0;
+		bicc.initialized = false;
 
 		hpccPint.m_lastUpdateSeq = 0;
 		hpccPint.m_incStage = 0;

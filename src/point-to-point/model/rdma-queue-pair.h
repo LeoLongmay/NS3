@@ -128,9 +128,22 @@ public:
         uint32_t m_lastUpdateSeq;
 		uint64_t m_lastDecreaseRate; // time of last rate decrease
 		uint16_t m_flowCount;
-		uint64_t m_lastRtt;
-        uint64_t m_minRtt;
-    }lpcc;
+		uint64_t m_lastCongRateBps;
+		uint32_t m_lastFcnpQlen;
+			uint64_t m_lastRtt;
+	        uint64_t m_minRtt;
+			uint64_t m_lastFcnpTs;
+			uint64_t m_lastProcessedFcnpTs;
+	    }lpcc;
+	struct {
+		DataRate nsRate;
+		DataRate eteRate;
+		DataRate blendedRate;
+		uint64_t lastBlendTsNs;
+		uint64_t lastNsAiTsNs;
+		uint64_t lastEteAiTsNs;
+		bool initialized;
+	} bicc;
 
 	/***********
 	 * methods

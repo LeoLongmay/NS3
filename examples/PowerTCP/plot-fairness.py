@@ -40,13 +40,23 @@ plt.rcParams.update({'font.size': 18})
 # algnames={}
 # algnames["timely"]="TIMELY"
 
-algs=list(["dcqcn", "bifrost", "bbr"])
+# algs=list(["dcqcn", "timely", "dctcp", "hpcc", "powertcp", "lpcc", "gemini", "bbr", "bicc"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+# algnames["timely"]="TIMELY"
+# algnames["dctcp"]="DCTCP"
+# algnames["hpcc"]="HPCC"
+# algnames["powertcp"]="PowerTCP"
+# algnames["lpcc"]="LPCC"
+# algnames["gemini"]="GEMINI"
+# algnames["bbr"]="BBR"
+# algnames["bicc"]="BICC"
+
+algs=list(["gemini", "bbr", "bicc"])
 algnames={}
-algnames["dcqcn"]="DCQCN"
-algnames["bifrost"]="Bifrost"
-algnames["bbr"]="BBR"
-algnames["lpcc"]="LPCC"
 algnames["gemini"]="GEMINI"
+algnames["bbr"]="BBR"
+algnames["bicc"]="BICC"
 
 
 ######## FAIRNESS #############
@@ -129,9 +139,9 @@ for alg in algs:
     # fig.tight_layout(rect=[0, 0, 1.1, 0.92])  
 
     fig.tight_layout()    
-    fig.savefig(plots_dir+alg+ '-fairness' + '.pdf', bbox_inches='tight', pad_inches=0)
-    fig.savefig(plots_dir+alg+'.png', bbox_inches='tight', pad_inches=0, dpi=300)
+    fig.savefig(plots_dir+alg+ '-fairness-new' + '.pdf', bbox_inches='tight', pad_inches=0)
+    fig.savefig(plots_dir+alg+'-new.png', bbox_inches='tight', pad_inches=0, dpi=300)
 
 figlegend.tight_layout()
 figlegend.legend(handles=lenged_elements,loc=9,ncol=5, framealpha=0,fontsize=48)
-figlegend.savefig(plots_dir+'/fair-legend.pdf')
+figlegend.savefig(plots_dir+'/fair-legend-new.pdf')

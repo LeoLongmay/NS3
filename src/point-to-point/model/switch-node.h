@@ -2,6 +2,7 @@
 #define SWITCH_NODE_H
 
 #include <unordered_map>
+#include <deque>
 #include <ns3/node.h>
 #include "qbb-net-device.h"
 #include "switch-mmu.h"
@@ -64,12 +65,26 @@ protected:
 	// vamsi
 	bool PowerEnabled;
 	uint32_t m_epsilon; // lpcc epsilon
+	uint32_t m_fcnpMinIntervalUs; // lpcc FCNP min send interval per egress queue
+	uint32_t m_lpccPerFlowFcnpCooldownUs; // lpcc per-flow fCNP cooldown window
+	uint32_t m_lpccFcnpTopK; // lpcc FCNP low-queue fanout top-k flows per congested egress queue
+	uint32_t m_lpccFcnpTopKHigh; // lpcc FCNP high-queue fanout top-k flows per congested egress queue
+	uint32_t m_lpccFcnpKHighThreshBytes; // switch to high-K when queue exceeds this threshold
 	uint32_t m_flowControlMode;
 	uint32_t m_transportMode;
 	uint32_t m_bifrostTimeSlotUs;
 	uint32_t m_bifrostK;
 	uint32_t m_bifrostLonghaulDelayCutoffUs;
 	uint32_t m_bifrostHMarginSlots;
+	bool m_biccEnableEcnClear;
+	uint32_t m_biccLonghaulDelayCutoffUs;
+	uint32_t m_biccNsFeedbackMinIntervalUs;
+	double m_biccDstBdpFactor;
+	uint32_t m_biccSoftVoqMaxPkts;
+	uint64_t m_biccNsFeedbackCount;
+	uint64_t m_biccEcnClearCount;
+	uint64_t m_biccSoftVoqEnqueueCount;
+	uint64_t m_biccSoftVoqDequeueCount;
 
 private:
 	int GetOutDev(Ptr<const Packet>, CustomHeader &ch);
@@ -79,13 +94,89 @@ private:
 	void CheckAndSendResume(uint32_t inDev, uint32_t qIndex);
 	void ScheduleBifrostTick(uint32_t inDev, uint32_t qIndex);
 	void RunBifrostTick(uint32_t inDev, uint32_t qIndex);
+	bool IsLpccWanNode() const;
 
-    Ptr<RDMAFlowTable> m_flowTable; // flow table
-    EventId m_cleanFlowEvent;
-	BifrostState m_bifrost[pCnt][qCnt];
+	    Ptr<RDMAFlowTable> m_flowTable; // flow table
+	    EventId m_cleanFlowEvent;
+		uint64_t m_lastFcnpSentTs[pCnt][qCnt];
+		uint64_t m_lastBiccNsSentTs[pCnt][qCnt];
+		BifrostState m_bifrost[pCnt][qCnt];
+		struct BiccBufferedPkt {
+			Ptr<Packet> packet;
+			CustomHeader header;
+			uint32_t size;
+		};
+		struct BiccDstState {
+			uint64_t inflightBytes;
+			uint64_t queuedBytes;
+			uint32_t outDev;
+			std::deque<BiccBufferedPkt> queue;
+			BiccDstState() : inflightBytes(0), queuedBytes(0), outDev(0), queue() {}
+		};
+		struct BiccAckState {
+			uint32_t lastSeq;
+			bool initialized;
+			BiccAckState() : lastSeq(0), initialized(false) {}
+		};
+		struct BiccAckFlowKey {
+			uint32_t sip;
+			uint32_t dip;
+			uint16_t sport;
+			uint16_t dport;
+			uint16_t pg;
+			bool operator==(const BiccAckFlowKey& other) const {
+				return sip == other.sip && dip == other.dip && sport == other.sport &&
+				       dport == other.dport && pg == other.pg;
+			}
+		};
+		struct BiccAckFlowKeyHasher {
+			size_t operator()(const BiccAckFlowKey& key) const {
+				size_t h = std::hash<uint32_t>{}(key.sip);
+				h = h * 1315423911u + std::hash<uint32_t>{}(key.dip);
+				h = h * 1315423911u + std::hash<uint16_t>{}(key.sport);
+				h = h * 1315423911u + std::hash<uint16_t>{}(key.dport);
+				h = h * 1315423911u + std::hash<uint16_t>{}(key.pg);
+				return h;
+			}
+		};
+			std::unordered_map<uint32_t, BiccDstState> m_biccDstState;
+			std::unordered_map<BiccAckFlowKey, BiccAckState, BiccAckFlowKeyHasher> m_biccAckState;
+			struct LpccFeedbackFlowKey {
+				uint32_t sip;
+				uint32_t dip;
+				uint16_t sport;
+				uint16_t dport;
+				uint16_t pg;
+				bool operator==(const LpccFeedbackFlowKey& other) const {
+					return sip == other.sip && dip == other.dip &&
+					       sport == other.sport && dport == other.dport &&
+					       pg == other.pg;
+				}
+			};
+			struct LpccFeedbackFlowKeyHasher {
+				size_t operator()(const LpccFeedbackFlowKey& key) const {
+					size_t h = std::hash<uint32_t>{}(key.sip);
+					h = h * 1315423911u + std::hash<uint32_t>{}(key.dip);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.sport);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.dport);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.pg);
+					return h;
+				}
+			};
+			std::unordered_map<LpccFeedbackFlowKey, uint64_t, LpccFeedbackFlowKeyHasher> m_lpccFlowLastFcnpTs;
 
     // callback for scheduled flow table cleanup
     void ScheduleCleanFlowTable();
+	bool IsLonghaulPort(uint32_t portId) const;
+	bool IsSenderSideDciPath(uint32_t inDev, uint32_t outDev) const;
+	bool IsReceiverSideDciPath(uint32_t inDev, uint32_t outDev) const;
+	uint64_t EstimateBiccDstBudgetBytes(uint32_t outDev) const;
+	void MaybeGenerateBiccNearSourceFeedback(uint32_t ifIndex, uint32_t qIndex, uint32_t inDev, Ptr<Packet> p);
+	void MaybeApplyBiccEcnClear(uint32_t inDev, uint32_t outDev, Ptr<Packet> p);
+	bool MaybeHandleBiccNearDestinationIngress(uint32_t inDev, uint32_t outDev, Ptr<Packet> packet, CustomHeader& ch);
+	void MaybeHandleBiccAckRelease(uint32_t inDev, uint32_t outDev, const CustomHeader& ch);
+	void DrainBiccDstQueue(uint32_t dstIp);
+	BiccAckFlowKey GetBiccAckFlowKey(const CustomHeader& ch) const;
 public:
 	Ptr<SwitchMmu> m_mmu;
 

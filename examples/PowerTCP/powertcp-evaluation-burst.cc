@@ -118,6 +118,7 @@ std::map<uint32_t, uint32_t> switchNumToId;
 std::map<uint32_t, uint32_t> switchIdToNum;
 std::map<uint32_t, NetDeviceContainer> switchUp;
 std::map<uint32_t, NetDeviceContainer> switchDown;
+std::vector<int32_t> hostToSwitch;
 //NetDeviceContainer switchUp[switch_num];
 std::map<uint32_t, NetDeviceContainer> sourceNodes;
 
@@ -159,6 +160,14 @@ FlowInput flow_input = {0};
 uint32_t flow_num;
 uint64_t tcp_flow_id = 0;
 FILE *g_fct_output = nullptr;
+int32_t g_monitorSwitchIdx = -1;
+int32_t g_monitorPortIdx = -1;
+int32_t g_monitorReceiverHost = -1;
+int32_t g_monitorSwitchId = -1;
+bool g_monitorWholeSwitchBuffer = false;
+std::string g_monitorContainerName = "unknown";
+int32_t g_monitorThroughputPortIdx = -1;
+uint64_t g_monitorThroughputTargetBps = 400000000000ULL;
 
 Ipv4Address node_id_to_ip(uint32_t id);
 
@@ -412,11 +421,25 @@ uint64_t get_nic_rate(NodeContainer &n) {
 	return 0;
 }
 
-void PrintResults(std::map<uint32_t, NetDeviceContainer> ToR, uint32_t numToRs, double delay) {
-	for (uint32_t i = 0; i < numToRs; i++) {
+void PrintResults(std::map<uint32_t, NetDeviceContainer> ToR, uint32_t numToRs, double delay, int32_t monitorSwitchIdx = -1, int32_t monitorPortIdx = -1) {
+	std::vector<uint32_t> switchIndices;
+	if (monitorSwitchIdx >= 0) {
+		switchIndices.push_back(static_cast<uint32_t>(monitorSwitchIdx));
+	} else {
+		switchIndices.reserve(numToRs);
+		for (uint32_t i = 0; i < numToRs; i++) {
+			switchIndices.push_back(i);
+		}
+	}
+	for (uint32_t i : switchIndices) {
+		if (ToR.find(i) == ToR.end()) {
+			continue;
+		}
 		double throughputTotal = 0;
 		uint64_t torBuffer = 0;
-		double power;
+		double monitoredThroughput = 0;
+		uint64_t monitoredQlen = 0;
+		double monitoredPower = 0;
 		for (uint32_t j = 0; j < ToR[i].GetN(); j++) {
 			Ptr<QbbNetDevice> nd = DynamicCast<QbbNetDevice>(ToR[i].Get(j));
 //			uint64_t txBytes = nd->getTxBytes();
@@ -428,16 +451,49 @@ void PrintResults(std::map<uint32_t, NetDeviceContainer> ToR, uint32_t numToRs, 
 
 			torBuffer += qlen;
 			double throughput = double(txBytes * 8) / delay;
-			if (j == 16) { //  ToDo. very ugly hardcode here specific to the burst evaluation scenario where 16 is the receiver in flow-burstExp.txt.
-				throughputTotal += throughput;
-				power = (rxBytes * 8.0 / delay) * (qlen + bw * maxRtt * 1e-9) / (bw * (bw * maxRtt * 1e-9));
-
+			double power = (rxBytes * 8.0 / delay) * (qlen + bw * maxRtt * 1e-9) / (bw * (bw * maxRtt * 1e-9));
+			throughputTotal += throughput;
+			// Throughput monitor:
+			// - monitorPortIdx >= 0: monitor exactly that port
+			// - monitorPortIdx < 0 and g_monitorThroughputPortIdx >= 0: monitor only selected throughput port
+			// - otherwise: aggregate over all ports
+			if (monitorPortIdx >= 0) {
+				if (static_cast<int32_t>(j) == monitorPortIdx) {
+					monitoredThroughput += throughput;
+					monitoredQlen += qlen;
+					monitoredPower += power;
+				}
+			} else if (g_monitorThroughputPortIdx >= 0) {
+				if (static_cast<int32_t>(j) == g_monitorThroughputPortIdx) {
+					monitoredThroughput += throughput;
+					monitoredPower += power;
+				}
+			} else {
+				monitoredThroughput += throughput;
+				monitoredQlen += qlen;
+				monitoredPower += power;
 			}
 			std::cout << "ToR " << i << " Port " << j << " throughput " << throughput << " txBytes " << txBytes << " qlen " << qlen << " time " << Simulator::Now().GetSeconds() << " normpower " << power << std::endl;
 		}
+		// Queue monitor for whole-switch mode should stay on aggregate buffer.
+		if (g_monitorWholeSwitchBuffer) {
+			monitoredQlen = torBuffer;
+		}
+		// When monitorPortIdx < 0, emit an aggregate line with a stable token layout
+		// so result parsing/plotting can still use the same columns (throughput/qlen/time/power).
+		if (monitorPortIdx < 0) {
+			std::cout << "ToR " << i << " PortAgg " << -1 << " throughput " << monitoredThroughput
+			          << " txBytes " << 0 << " qlen " << torBuffer << " time "
+			          << Simulator::Now().GetSeconds() << " normpower " << monitoredPower << std::endl;
+		}
 		std::cout << "ToR " << i << " Total " << 0 << " throughput " << throughputTotal << " buffer " << torBuffer <<  " time " << Simulator::Now().GetSeconds() << std::endl;
+		if (monitorPortIdx >= 0) {
+			std::cout << "ToR " << i << " MonitorPort " << monitorPortIdx << " throughput " << monitoredThroughput
+			          << " qlen " << monitoredQlen << " time " << Simulator::Now().GetSeconds()
+			          << " normpower " << monitoredPower << std::endl;
+		}
 	}
-	Simulator::Schedule(Seconds(delay), PrintResults, ToR, numToRs, delay);
+	Simulator::Schedule(Seconds(delay), PrintResults, ToR, numToRs, delay, monitorSwitchIdx, monitorPortIdx);
 }
 
 
@@ -475,6 +531,17 @@ int main(int argc, char *argv[])
 	uint32_t windowCheck = 1;
 	uint32_t transportModeArg = transport_mode;
 	uint32_t flowControlModeArg = flow_control_mode;
+	int32_t lpccEpsilonArg = -1;
+	int32_t lpccFcnpMinIntervalUsArg = -1;
+	int32_t lpccPerFlowFcnpCooldownUsArg = -1;
+	int32_t lpccFcnpTopKArg = -1;
+	int32_t lpccFcnpTopKHighArg = -1;
+	int32_t lpccFcnpKHighThreshBytesArg = -1;
+	double lpccThetaUsArg = -1.0;
+	int32_t lpccIncreaseIntervalUsArg = -1;
+	double lpccIncreaseFactorArg = -1.0;
+	double lpccWrArg = -1.0;
+	double lpccKrArg = -1.0;
 	std::string confFile = "/home/master01/CC_Exp/examples/PowerTCP/config-burst.txt";
 	std::cout << confFile;
 	CommandLine cmd;
@@ -485,7 +552,18 @@ int main(int argc, char *argv[])
 	cmd.AddValue ("algorithm", "specify CC mode. This is added for my convinience. I prefer cmd rather than parsing files.", algorithm);
 	cmd.AddValue("windowCheck", "windowCheck", windowCheck);
 	cmd.AddValue("transportMode", "specify transport mode. 0=RDMA, 1=TCP_BBR", transportModeArg);
-	cmd.AddValue("flowControlMode", "specify flow control mode. 0=PFC, 1=Bifrost", flowControlModeArg);
+	cmd.AddValue("flowControlMode", "specify flow control mode. 0=PFC (default, including BICC), 1=Bifrost (legacy baseline)", flowControlModeArg);
+	cmd.AddValue("lpccEpsilon", "LPCC queue threshold in bytes (<=0 means keep built-in default)", lpccEpsilonArg);
+	cmd.AddValue("lpccFcnpMinIntervalUs", "LPCC switch FCNP min interval in microseconds (<=0 means keep built-in default)", lpccFcnpMinIntervalUsArg);
+	cmd.AddValue("lpccPerFlowFcnpCooldownUs", "LPCC per-flow fCNP cooldown in microseconds (<=0 means keep built-in default)", lpccPerFlowFcnpCooldownUsArg);
+	cmd.AddValue("lpccFcnpTopK", "LPCC switch FCNP fanout top-K flows per congested queue (<=0 means keep built-in default)", lpccFcnpTopKArg);
+	cmd.AddValue("lpccFcnpTopKHigh", "LPCC switch FCNP dynamic high-queue fanout top-K (<=0 means keep built-in default)", lpccFcnpTopKHighArg);
+	cmd.AddValue("lpccFcnpKHighThreshBytes", "LPCC switch FCNP dynamic-K queue threshold in bytes (<=0 means keep built-in default)", lpccFcnpKHighThreshBytesArg);
+	cmd.AddValue("lpccThetaUs", "LPCC decrease-cycle interval in microseconds (<=0 means keep built-in default)", lpccThetaUsArg);
+	cmd.AddValue("lpccIncreaseIntervalUs", "LPCC AI timer interval in microseconds (<=0 means keep built-in default)", lpccIncreaseIntervalUsArg);
+	cmd.AddValue("lpccIncreaseFactor", "LPCC AI factor beta (<=0 means keep built-in default)", lpccIncreaseFactorArg);
+	cmd.AddValue("lpccWr", "LPCC FCNP decrease cap wr (<=0 means keep built-in default)", lpccWrArg);
+	cmd.AddValue("lpccKr", "LPCC RTT-inflation decrease cap kr (<=0 means keep built-in default)", lpccKrArg);
 
 	cmd.Parse (argc, argv);
 	conf.open(confFile.c_str());
@@ -869,11 +947,77 @@ int main(int argc, char *argv[])
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
 
-	// lpcc: epsilon
+	// LPCC tuning for burst:
+	// - larger queue threshold than 15KB to avoid over-triggering
+	// - shorter control loop and gentler AI to reduce persistent full-buffer state
 	uint32_t epsilon = 0;
+	uint32_t lpccFcnpMinIntervalUs = 50;
+	uint32_t lpccPerFlowFcnpCooldownUs = 800;
+	uint32_t lpccFcnpTopK = 3;
+	uint32_t lpccFcnpTopKHigh = 6;
+	uint32_t lpccFcnpKHighThreshBytes = 524288;
+	double lpccThetaUs = 5000.0;
+	uint32_t lpccIncreaseIntervalUs = 250;
+	double lpccIncreaseFactor = 0.10;
+	double lpccWr = 2.0;
+	double lpccKr = 0.20;
 	if (cc_mode == 9) {
-		// epsilon = 20000;
-		epsilon = 15000;
+		epsilon = 110000;                  // 96KB (stability-oriented default)
+		lpccFcnpMinIntervalUs = 42;       // denser FCNP feedback
+		lpccPerFlowFcnpCooldownUs = 800;  // avoid repeatedly hitting same top flows
+		lpccFcnpTopK = 3;                 // send FCNP to top-K highest-rate queue flows
+		lpccFcnpTopKHigh = 6;             // dynamic-K high queue fanout
+		lpccFcnpKHighThreshBytes = 524288;// 0.5MB
+		lpccThetaUs = 2500.0;             // moderate decrease-cycle refresh
+		lpccIncreaseIntervalUs = 250;     // default cadence
+		lpccIncreaseFactor = 0.10;        // default AI strength
+		lpccWr = 2.0;                     // default FCNP-triggered decrease cap
+		lpccKr = 0.20;                    // default RTT-inflation decrease cap
+		if (lpccEpsilonArg > 0) {
+			epsilon = static_cast<uint32_t>(lpccEpsilonArg);
+		}
+		if (lpccFcnpMinIntervalUsArg > 0) {
+			lpccFcnpMinIntervalUs = static_cast<uint32_t>(lpccFcnpMinIntervalUsArg);
+		}
+		if (lpccPerFlowFcnpCooldownUsArg > 0) {
+			lpccPerFlowFcnpCooldownUs = static_cast<uint32_t>(lpccPerFlowFcnpCooldownUsArg);
+		}
+		if (lpccFcnpTopKArg > 0) {
+			lpccFcnpTopK = static_cast<uint32_t>(lpccFcnpTopKArg);
+		}
+		if (lpccFcnpTopKHighArg > 0) {
+			lpccFcnpTopKHigh = static_cast<uint32_t>(lpccFcnpTopKHighArg);
+		}
+		if (lpccFcnpKHighThreshBytesArg > 0) {
+			lpccFcnpKHighThreshBytes = static_cast<uint32_t>(lpccFcnpKHighThreshBytesArg);
+		}
+		if (lpccThetaUsArg > 0) {
+			lpccThetaUs = lpccThetaUsArg;
+		}
+		if (lpccIncreaseIntervalUsArg > 0) {
+			lpccIncreaseIntervalUs = static_cast<uint32_t>(lpccIncreaseIntervalUsArg);
+		}
+		if (lpccIncreaseFactorArg > 0) {
+			lpccIncreaseFactor = lpccIncreaseFactorArg;
+		}
+		if (lpccWrArg > 0) {
+			lpccWr = lpccWrArg;
+		}
+		if (lpccKrArg > 0) {
+			lpccKr = lpccKrArg;
+		}
+		std::cout << "LPCC_TUNING\t\t\t"
+		          << "eps=" << epsilon
+		          << " fcnpIntUs=" << lpccFcnpMinIntervalUs
+		          << " fcnpFlowCooldownUs=" << lpccPerFlowFcnpCooldownUs
+		          << " fcnpTopK=" << lpccFcnpTopK
+		          << " fcnpTopKHigh=" << lpccFcnpTopKHigh
+		          << " fcnpKThreshB=" << lpccFcnpKHighThreshBytes
+		          << " thetaUs=" << lpccThetaUs
+		          << " incIntUs=" << lpccIncreaseIntervalUs
+		          << " beta=" << lpccIncreaseFactor
+		          << " wr=" << lpccWr
+		          << " kr=" << lpccKr << "\n";
 	}
 
 	// Set Pint
@@ -889,6 +1033,38 @@ int main(int argc, char *argv[])
 	tors = switch_num;
 	std::cout << node_num << " " << switch_num << " " << tors <<  " " << link_num << std::endl;
 	flowf >> flow_num;
+	hostToSwitch.assign(node_num, -1);
+
+	// Auto-detect the primary receiver host from flow file (the most frequent destination).
+	// This keeps burst scripts compatible when topology/flow IDs change.
+	uint32_t primaryReceiverHost = 0;
+	bool hasPrimaryReceiver = false;
+	{
+		std::unordered_map<uint32_t, uint32_t> dstCount;
+		std::streampos flowStartPos = flowf.tellg();
+		for (uint32_t idx = 0; idx < flow_num; ++idx) {
+			uint64_t src = 0, dst = 0, pg = 0, dport = 0, maxPacketCount = 0;
+			double startTime = 0;
+			flowf >> src >> dst >> pg >> dport >> maxPacketCount >> startTime;
+			if (!flowf.good()) {
+				break;
+			}
+			dstCount[static_cast<uint32_t>(dst)]++;
+		}
+		flowf.clear();
+		flowf.seekg(flowStartPos);
+		uint32_t bestCount = 0;
+		for (const auto &it : dstCount) {
+			if (!hasPrimaryReceiver || it.second > bestCount) {
+				hasPrimaryReceiver = true;
+				bestCount = it.second;
+				primaryReceiverHost = it.first;
+			}
+		}
+		if (hasPrimaryReceiver) {
+			std::cout << "PRIMARY_RECEIVER_HOST\t\t" << primaryReceiverHost << "\n";
+		}
+	}
 
 	NodeContainer serverNodes;
 	NodeContainer torNodes;
@@ -1023,7 +1199,11 @@ int main(int argc, char *argv[])
 		}
 
 		if (!snode->GetNodeType() && dnode->GetNodeType()) {
+			hostToSwitch[src] = static_cast<int32_t>(dst);
 			switchDown[switchIdToNum[dst]].Add(DynamicCast<QbbNetDevice>(d.Get(1)));
+		}
+		if (snode->GetNodeType() && !dnode->GetNodeType()) {
+			hostToSwitch[dst] = static_cast<int32_t>(src);
 		}
 
 
@@ -1121,6 +1301,77 @@ int main(int argc, char *argv[])
 		}
 	}
 
+		// Monitor target selection:
+		// - Prefer a fixed switch-id 72 if present (requested for current burst experiments).
+		// - Monitor the whole switch buffer (sum over downlink ports), not a single port queue.
+			g_monitorReceiverHost = -1;
+			g_monitorSwitchId = -1;
+			g_monitorSwitchIdx = -1;
+			g_monitorPortIdx = -1;
+			g_monitorWholeSwitchBuffer = false;
+			g_monitorContainerName = "unknown";
+			g_monitorThroughputPortIdx = -1;
+			const int32_t requestedSwitchId = 72;
+			auto fixedIt = switchIdToNum.find(static_cast<uint32_t>(requestedSwitchId));
+			if (fixedIt != switchIdToNum.end()) {
+				g_monitorSwitchId = requestedSwitchId;
+				g_monitorSwitchIdx = static_cast<int32_t>(fixedIt->second);
+			g_monitorPortIdx = -1; // aggregate over whole switch buffer
+			g_monitorWholeSwitchBuffer = true;
+		} else if (hasPrimaryReceiver && primaryReceiverHost < hostToSwitch.size()) {
+			// Fallback: if switch-id 72 does not exist, keep receiver-ToR behavior.
+			int32_t recvSwId = hostToSwitch[primaryReceiverHost];
+			if (recvSwId >= 0 && switchIdToNum.find(static_cast<uint32_t>(recvSwId)) != switchIdToNum.end()) {
+				g_monitorReceiverHost = static_cast<int32_t>(primaryReceiverHost);
+				g_monitorSwitchId = recvSwId;
+				g_monitorSwitchIdx = static_cast<int32_t>(switchIdToNum[static_cast<uint32_t>(recvSwId)]);
+				g_monitorPortIdx = -1;
+				g_monitorWholeSwitchBuffer = true;
+			}
+		}
+			if (g_monitorSwitchIdx >= 0) {
+				const uint32_t idx = static_cast<uint32_t>(g_monitorSwitchIdx);
+				const NetDeviceContainer *monitorPorts = nullptr;
+				if (switchDown.find(idx) != switchDown.end()) {
+					g_monitorContainerName = "switchDown";
+					monitorPorts = &switchDown[idx];
+				} else if (switchUp.find(idx) != switchUp.end()) {
+					g_monitorContainerName = "switchUp";
+					monitorPorts = &switchUp[idx];
+				}
+
+				// Choose one 400Gbps link for throughput monitoring.
+				// Prefer uplink-side 400G ports (port index >= 4 in this topology), then fallback.
+				if (monitorPorts != nullptr) {
+					for (uint32_t portPos = 0; portPos < monitorPorts->GetN(); ++portPos) {
+						Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(monitorPorts->Get(portPos));
+						if (dev && dev->GetDataRate().GetBitRate() == g_monitorThroughputTargetBps) {
+							if (portPos >= 4) {
+								g_monitorThroughputPortIdx = static_cast<int32_t>(portPos);
+								break;
+							}
+							if (g_monitorThroughputPortIdx < 0) {
+								g_monitorThroughputPortIdx = static_cast<int32_t>(portPos);
+							}
+						}
+					}
+					// Fallback if no 400Gbps port exists in this container.
+					if (g_monitorThroughputPortIdx < 0 && monitorPorts->GetN() > 0) {
+						g_monitorThroughputPortIdx = 0;
+					}
+				}
+			}
+			std::cout << "MONITOR_TARGET "
+			          << "Receiver " << g_monitorReceiverHost
+			          << " SwitchId " << g_monitorSwitchId
+			          << " ToRIdx " << g_monitorSwitchIdx
+			          << " MonitorPort " << g_monitorPortIdx
+			          << " ThroughputPort " << g_monitorThroughputPortIdx
+			          << " ThroughputTargetBps " << g_monitorThroughputTargetBps
+			          << " Scope " << (g_monitorWholeSwitchBuffer ? "switch_buffer" : "single_port")
+			          << " Container " << g_monitorContainerName
+			          << std::endl;
+
 #if ENABLE_QP
 	g_fct_output = fopen(fct_output_file.c_str(), "w");
 	//
@@ -1155,6 +1406,11 @@ int main(int argc, char *argv[])
 				rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 				rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
 				rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
+				rdmaHw->SetAttribute("LpccTheta", DoubleValue(lpccThetaUs));
+				rdmaHw->SetAttribute("LpccIncreaseInterval", UintegerValue(lpccIncreaseIntervalUs));
+				rdmaHw->SetAttribute("LpccIncreaseFactor", DoubleValue(lpccIncreaseFactor));
+				rdmaHw->SetAttribute("Lpcc_m_wr", DoubleValue(lpccWr));
+				rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKr));
 				rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
 				rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
 				rdmaHw->SetAttribute("GeminiH", DoubleValue(gemini_h));
@@ -1230,7 +1486,12 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("BifrostK", UintegerValue(bifrost_k));
 			sw->SetAttribute("BifrostLonghaulDelayCutoffUs", UintegerValue(bifrost_longhaul_delay_cutoff_us));
 			sw->SetAttribute("BifrostHMarginSlots", UintegerValue(bifrost_h_margin_slots));
-			sw->SetAttribute("Epsilon", UintegerValue(epsilon));
+				sw->SetAttribute("Epsilon", UintegerValue(epsilon));
+				sw->SetAttribute("FcnpMinIntervalUs", UintegerValue(lpccFcnpMinIntervalUs));
+				sw->SetAttribute("LpccPerFlowFcnpCooldownUs", UintegerValue(lpccPerFlowFcnpCooldownUs));
+				sw->SetAttribute("LpccFcnpTopK", UintegerValue(lpccFcnpTopK));
+				sw->SetAttribute("LpccFcnpTopKHigh", UintegerValue(lpccFcnpTopKHigh));
+				sw->SetAttribute("LpccFcnpKHighThreshBytes", UintegerValue(lpccFcnpKHighThreshBytes));
 			if (flow_control_mode == 1) {
 				for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
@@ -1319,7 +1580,19 @@ int main(int argc, char *argv[])
 	tracef.close();
 	double delay = 1.5 * minRtt * 1e-9; // 10 micro seconds
 	// Simulator::Schedule(Seconds(delay), PrintResults, switchDown, 1, delay);
-	Simulator::Schedule(Seconds(delay), PrintResults, switchUp, 1, delay);
+	if (g_monitorSwitchIdx >= 0) {
+		const uint32_t idx = static_cast<uint32_t>(g_monitorSwitchIdx);
+		if (switchDown.find(idx) != switchDown.end()) {
+			Simulator::Schedule(Seconds(delay), PrintResults, switchDown, switch_num, delay, g_monitorSwitchIdx, g_monitorPortIdx);
+		} else if (switchUp.find(idx) != switchUp.end()) {
+			Simulator::Schedule(Seconds(delay), PrintResults, switchUp, switch_num, delay, g_monitorSwitchIdx, g_monitorPortIdx);
+		} else {
+			Simulator::Schedule(Seconds(delay), PrintResults, switchUp, 1, delay, -1, -1);
+		}
+	} else {
+		// Fallback for unexpected topologies: preserve legacy monitor target.
+		Simulator::Schedule(Seconds(delay), PrintResults, switchUp, 1, delay, -1, -1);
+	}
 
 	// AsciiTraceHelper ascii;
 	//     qbb.EnableAsciiAll (ascii.CreateFileStream ("eval.tr"));

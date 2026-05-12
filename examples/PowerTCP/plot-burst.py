@@ -51,12 +51,44 @@ plt.rcParams.update({'font.size': 18})
 # algnames={}
 # algnames["timely"]="TIMELY"
 
-algs=list(["dcqcn", "gemini", "bifrost", "bbr"])
+# algs=list(["dcqcn", "timely", "dctcp", "hpcc", "powertcp", "lpcc", "gemini", "bbr", "bicc"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+# algnames["timely"]="TIMELY"
+# algnames["dctcp"]="DCTCP"
+# algnames["hpcc"]="HPCC"
+# algnames["powertcp"]="PowerTCP"
+# algnames["lpcc"]="LPCC"
+# algnames["bbr"]="BBR"
+# algnames["gemini"]="GEMINI"
+# algnames["bicc"]="BICC"
+
+# algs=list(["gemini"])
+# algnames={}
+# algnames["gemini"]="GEMINI"
+
+# algs=list(["bbr"])
+# algnames={}
+# algnames["bbr"]="BBR"
+
+# algs=list(["bicc"])
+# algnames={}
+# algnames["bicc"]="BICC"
+
+# algs=list(["dcqcn", "gemini", "bbr", "bicc"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
+# algnames["bicc"]="BICC"
+# algnames["bbr"]="BBR"
+# algnames["gemini"]="GEMINI"
+
+algs=list(["lpcc"])
 algnames={}
-algnames["dcqcn"]="DCQCN"
-algnames["bifrost"]="Bifrost"
-algnames["bbr"]="BBR"
-algnames["gemini"]="GEMINI"
+algnames["lpcc"]="LPCC"
+
+# algs=list(["dcqcn"])
+# algnames={}
+# algnames["dcqcn"]="DCQCN"
 
 #%%
 
@@ -86,18 +118,19 @@ for alg in algs:
     ax1=ax.twinx()
     # ax.set_yticks([10e9,25e9,40e9,55e9,70e9,85e9,100e9])
     # ax.set_yticklabels(["10","25","40","55","70","85","100"])
-    ax.set_yticks([0, 50e9,100e9,150e9,200e9])
-    ax.set_yticklabels(["0","50","100","150","200"])
+    ax.set_ylim(0, 420e9)
+    ax.set_yticks([0, 100e9, 200e9, 300e9, 400e9])
+    ax.set_yticklabels(["0","100","200","300","400"])
     ax.set_ylabel("Throughput (Gbps)")
 
     start=0.14
-    xtics=[i*0.01+start for i in range(0,11)]
+    xtics=[i*0.02+start for i in range(0,8)]
     ax.set_xticks(xtics)
-    xticklabels=[str(i * 10) for i in range(0,11)]
+    xticklabels=[str(i * 20) for i in range(0,8)]
     ax.set_xticklabels(xticklabels)
 
     ax.set_xlabel("Time (ms)")
-    ax.set_xlim(0.1395,0.2)
+    ax.set_xlim(0.1395,0.25)
     # ax.plot(df["time"],df["th"],label="Throughput",c='#1979a9',lw=2)
     ax.plot(
         df["time"].dropna().to_numpy(),
@@ -106,7 +139,7 @@ for alg in algs:
         c='#1979a9',
         lw=2
     )
-    ax1.set_ylim(0,5)
+    ax1.set_ylim(0,150)
     ax1.set_ylabel("Queue length (MB)")
     # ax1.plot(df["time"],df["qlen"]/(1000),c='r',label="Qlen",lw=2)
     ax1.plot(
@@ -193,8 +226,8 @@ for alg in algs:
     # ax1.legend(loc=3)
     # fig.legend(loc=2,ncol=2,framealpha=0,borderpad=-0.1)
     fig.tight_layout()
-    fig.savefig(plots_dir+alg+'-burst.pdf', bbox_inches='tight', pad_inches=0)
-    fig.savefig(plots_dir+alg+'.png', bbox_inches='tight', pad_inches=0, dpi=300)
+    fig.savefig(plots_dir+alg+'-burst-new.pdf', bbox_inches='tight', pad_inches=0)
+    fig.savefig(plots_dir+alg+'-new.png', bbox_inches='tight', pad_inches=0, dpi=300)
 
     fig1,ax2 = plt.subplots(1,1)
     # fig.suptitle(alg)
@@ -231,8 +264,8 @@ for alg in algs:
         lw=2
     )
     fig1.tight_layout()
-    fig1.savefig(plots_dir+alg+'-power.pdf')
-    fig1.savefig(plots_dir+alg+'-power.png')
+    fig1.savefig(plots_dir+alg+'-power-new.pdf')
+    fig1.savefig(plots_dir+alg+'-power-new.png')
 
 
 figlegend.tight_layout()

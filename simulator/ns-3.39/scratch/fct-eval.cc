@@ -93,6 +93,12 @@ uint32_t bifrost_timeslot_us = 10;
 uint32_t bifrost_k = 1;
 uint32_t bifrost_longhaul_delay_cutoff_us = 100;
 uint32_t bifrost_h_margin_slots = 3;
+uint32_t bicc_longhaul_delay_cutoff_us = 100;
+uint32_t bicc_ns_feedback_min_interval_us = 75;
+uint64_t bicc_blend_base_rtt_ns = 0;
+double bicc_dst_bdp_factor = 1.0;
+uint32_t bicc_soft_voq_max_pkts = 1024;
+uint32_t bicc_enable_ecn_clear = 1;
 
 bool clamp_target_rate = false, l2_back_to_zero = false;
 double error_rate_per_link = 0.0;
@@ -1055,6 +1061,24 @@ int main(int argc, char *argv[])
 		} else if (key.compare("BIFROST_H_MARGIN_SLOTS") == 0) {
 			conf >> bifrost_h_margin_slots;
 			std::cout << "BIFROST_H_MARGIN_SLOTS\t\t\t" << bifrost_h_margin_slots << '\n';
+		} else if (key.compare("BICC_LONGHAUL_DELAY_CUTOFF_US") == 0) {
+			conf >> bicc_longhaul_delay_cutoff_us;
+			std::cout << "BICC_LONGHAUL_DELAY_CUTOFF_US\t\t" << bicc_longhaul_delay_cutoff_us << '\n';
+		} else if (key.compare("BICC_NS_FEEDBACK_MIN_INTERVAL_US") == 0) {
+			conf >> bicc_ns_feedback_min_interval_us;
+			std::cout << "BICC_NS_FEEDBACK_MIN_INTERVAL_US\t" << bicc_ns_feedback_min_interval_us << '\n';
+		} else if (key.compare("BICC_BLEND_BASE_RTT_NS") == 0) {
+			conf >> bicc_blend_base_rtt_ns;
+			std::cout << "BICC_BLEND_BASE_RTT_NS\t\t\t" << bicc_blend_base_rtt_ns << '\n';
+		} else if (key.compare("BICC_DST_BDP_FACTOR") == 0) {
+			conf >> bicc_dst_bdp_factor;
+			std::cout << "BICC_DST_BDP_FACTOR\t\t\t" << bicc_dst_bdp_factor << '\n';
+		} else if (key.compare("BICC_SOFT_VOQ_MAX_PKTS") == 0) {
+			conf >> bicc_soft_voq_max_pkts;
+			std::cout << "BICC_SOFT_VOQ_MAX_PKTS\t\t\t" << bicc_soft_voq_max_pkts << '\n';
+		} else if (key.compare("BICC_ENABLE_ECN_CLEAR") == 0) {
+			conf >> bicc_enable_ecn_clear;
+			std::cout << "BICC_ENABLE_ECN_CLEAR\t\t\t" << bicc_enable_ecn_clear << '\n';
 		} else if (key.compare("TRANSPORT_MODE") == 0) {
 			conf >> transport_mode;
 			std::cout << "TRANSPORT_MODE\t\t\t" << transport_mode << '\n';
@@ -1165,16 +1189,17 @@ int main(int argc, char *argv[])
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
 
-	// lpcc: parameters (Combo A)
+	// lpcc: parameters (balanced small/large-flow profile for ~1ms RTT)
 	uint32_t epsilon = 0;
-	uint64_t lpccThetaUs = 5000;           // 5 ms
-	uint64_t lpccIncreaseIntervalUs = 250; // 250 us
-	double lpccBeta = 0.10;
-	double lpccWr = 2.0;
-	double lpccKr = 0.20;
-	Time lpccFcnpInterval = MicroSeconds(100);
+	uint64_t lpccThetaUs = 400;             // 0.4 ms
+	uint64_t lpccIncreaseIntervalUs = 150;  // 150 us
+	double lpccBeta = 0.03;
+	double lpccWr = 1.20;
+	double lpccKr = 0.08;
+	Time lpccFcnpInterval = MicroSeconds(150);
+	uint32_t lpccSwitchFcnpMinIntervalUs = 150;
 	if (cc_mode == 9) {
-		epsilon = 262144; // 256 KB
+		epsilon = 524288; // 512 KB
 	}
 
 	// Set Pint
@@ -1457,6 +1482,7 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("Lpcc_m_wr", DoubleValue(lpccWr));
 			rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKr));
 			rdmaHw->SetAttribute("LpccFcnpInterval", TimeValue(lpccFcnpInterval));
+			rdmaHw->SetAttribute("BiccBlendBaseRttNs", UintegerValue(bicc_blend_base_rtt_ns));
 			rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
 			rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
 			rdmaHw->SetAttribute("GeminiH", DoubleValue(gemini_h));
@@ -1529,10 +1555,16 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("FlowControlMode", UintegerValue(flow_control_mode));
 			sw->SetAttribute("BifrostTimeSlotUs", UintegerValue(bifrost_timeslot_us));
 			sw->SetAttribute("BifrostK", UintegerValue(bifrost_k));
-			sw->SetAttribute("BifrostLonghaulDelayCutoffUs", UintegerValue(bifrost_longhaul_delay_cutoff_us));
-			sw->SetAttribute("BifrostHMarginSlots", UintegerValue(bifrost_h_margin_slots));
-			sw->SetAttribute("Epsilon", UintegerValue(epsilon));
-			if (flow_control_mode == 1) {
+				sw->SetAttribute("BifrostLonghaulDelayCutoffUs", UintegerValue(bifrost_longhaul_delay_cutoff_us));
+				sw->SetAttribute("BifrostHMarginSlots", UintegerValue(bifrost_h_margin_slots));
+				sw->SetAttribute("BiccEnableEcnClear", BooleanValue(bicc_enable_ecn_clear != 0));
+				sw->SetAttribute("BiccLonghaulDelayCutoffUs", UintegerValue(bicc_longhaul_delay_cutoff_us));
+				sw->SetAttribute("BiccNsFeedbackMinIntervalUs", UintegerValue(bicc_ns_feedback_min_interval_us));
+				sw->SetAttribute("BiccDstBdpFactor", DoubleValue(bicc_dst_bdp_factor));
+				sw->SetAttribute("BiccSoftVoqMaxPkts", UintegerValue(bicc_soft_voq_max_pkts));
+				sw->SetAttribute("Epsilon", UintegerValue(epsilon));
+				sw->SetAttribute("FcnpMinIntervalUs", UintegerValue(lpccSwitchFcnpMinIntervalUs));
+				if (flow_control_mode == 1) {
 				for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
 					uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();

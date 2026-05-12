@@ -3,7 +3,7 @@ USE_DYNAMIC_PFC_THRESHOLD 1
 
 PACKET_PAYLOAD_SIZE 1000
 
-TOPOLOGY_FILE examples/PowerTCP/topology.txt
+TOPOLOGY_FILE examples/PowerTCP/topology_bk.txt
 FLOW_FILE examples/PowerTCP/flow-fairnessExp.txt
 TRACE_FILE examples/PowerTCP/mix/trace.txt
 TRACE_OUTPUT_FILE examples/PowerTCP/mix/mix.tr

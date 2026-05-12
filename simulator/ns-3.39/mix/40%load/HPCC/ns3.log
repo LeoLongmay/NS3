@@ -6,7 +6,7 @@ TRACE_FILE			/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/HPCC/HPCC_in_tr
 TRACE_OUTPUT_FILE		/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/HPCC/HPCC_out_trace.txt
 FCT_OUTPUT_FILE		/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/HPCC/HPCC_out_fct.txt
 PFC_OUTPUT_FILE				/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/HPCC/HPCC_out_pfc.txt
-SIMULATOR_STOP_TIME		3
+SIMULATOR_STOP_TIME		6
 CC_MODE		3
 ALPHA_RESUME_INTERVAL		1
 RATE_DECREASE_INTERVAL		4
@@ -43,9 +43,15 @@ PMAX_MAP				 100000000000 0.2 200000000000 0.2 400000000000 0.2
 BUFFER_SIZE				4
 QLEN_MON_FILE				/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/HPCC/HPCC_out_qlen.txt
 QLEN_MON_START				2000000000
-QLEN_MON_END				2500000000
+QLEN_MON_END				4000000000
 FLOWGEN_START_TIME		2
-FLOWGEN_STOP_TIME		2.5
-RANDOM_SEED			4001
-maxRtt=10200400 maxBdp=127505000 minRtt=20160
-SimulationSeconds 2219.47
+FLOWGEN_STOP_TIME		4
+RANDOM_SEED			4003
+maxRtt=1200400 maxBdp=15005000 minRtt=20160
+ERROR: node:6 NACK NIC cannot find the flow
+ERROR: node:10 NACK NIC cannot find the flow
+ERROR: node:10 NACK NIC cannot find the flow
+ERROR: node:15 NACK NIC cannot find the flow
+ERROR: node:14 NACK NIC cannot find the flow
+ERROR: node:14 NACK NIC cannot find the flow
+SimulationSeconds 3261.25

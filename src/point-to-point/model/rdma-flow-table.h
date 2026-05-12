@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <vector>
 
 namespace std {
 template<>
@@ -36,6 +37,28 @@ struct RDMAFlowKey {
 struct RDMAFlowEntry {
     RDMAFlowKey key;
     uint64_t last_ts; // The timestamp of the last received packet in the flow
+    uint64_t last_pkt_bytes; // Last observed packet size on this flow
+    double ewma_rate_bps; // Smoothed per-flow rate estimate
+};
+
+struct RDMAPortQueueKey {
+    uint32_t port;
+    uint32_t qIndex;
+
+    bool operator==(const RDMAPortQueueKey& other) const {
+        return port == other.port && qIndex == other.qIndex;
+    }
+};
+
+struct RDMAEgressFlowKey {
+    RDMAFlowKey flow;
+    uint32_t port;
+    uint32_t qIndex;
+    uint16_t pg;
+
+    bool operator==(const RDMAEgressFlowKey& other) const {
+        return flow == other.flow && port == other.port && qIndex == other.qIndex && pg == other.pg;
+    }
 };
 
 class RDMAFlowTable : public Object {
@@ -51,10 +74,16 @@ public:
     }
 
     void InsertOrUpdateFlow(Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport);
+    void InsertOrUpdateFlowOnEgress(Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport, uint32_t port, uint32_t qIndex, uint16_t pg, uint32_t pktBytes);
 
     uint16_t GetFlowCountByDip(Ipv4Address dip) const;
 
     uint16_t GetFlowCountBySip(Ipv4Address sip) const;
+    uint16_t GetFlowCountByEgress(uint32_t port, uint32_t qIndex) const;
+    uint16_t GetFlowCountByEgressPort(uint32_t port) const;
+    std::vector<RDMAEgressFlowKey> GetActiveFlowsByEgressPort(uint32_t port) const;
+    bool GetMaxRateFlowByEgressQueue(uint32_t port, uint32_t qIndex, RDMAEgressFlowKey& outFlow) const;
+    std::vector<RDMAEgressFlowKey> GetTopRateFlowsByEgressQueue(uint32_t port, uint32_t qIndex, uint32_t k) const;
 
     void CleanInactiveFlows();
 
@@ -84,9 +113,31 @@ private:
         }
     };
 
+    struct PortQueueKeyHash {
+        size_t operator()(const RDMAPortQueueKey& key) const noexcept {
+            std::hash<uint32_t> h;
+            size_t seed = h(key.port);
+            seed ^= h(key.qIndex) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
+        }
+    };
+
+    struct EgressFlowKeyHash {
+        size_t operator()(const RDMAEgressFlowKey& key) const noexcept {
+            FlowKeyHash flowHash;
+            std::hash<uint32_t> h;
+            size_t seed = flowHash(key.flow);
+            seed ^= h(key.port) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            seed ^= h(key.qIndex) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
+        }
+    };
+
     std::unordered_map<RDMAFlowKey, RDMAFlowEntry, FlowKeyHash> m_flowMap{};
+    std::unordered_map<RDMAEgressFlowKey, RDMAFlowEntry, EgressFlowKeyHash> m_egressFlowMap{};
     std::unordered_map<Ipv4Address, uint32_t> m_dipFlowCount{};
     std::unordered_map<Ipv4Address, uint32_t> m_sipFlowCount{};
+    std::unordered_map<RDMAPortQueueKey, uint32_t, PortQueueKeyHash> m_egressFlowCount{};
     uint64_t m_inactiveThreshold{0};
 };
 

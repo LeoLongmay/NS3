@@ -478,7 +478,7 @@ int main(int argc, char *argv[])
 	cmd.AddValue ("algorithm", "specify CC mode. This is added for my convinience since I prefer cmd rather than parsing files.", algorithm);
 	cmd.AddValue("windowCheck","windowCheck",windowCheck);
 	cmd.AddValue("transportMode","specify transport mode. 0=RDMA, 1=TCP_BBR",transportModeArg);
-	cmd.AddValue("flowControlMode","specify flow control mode. 0=PFC, 1=Bifrost",flowControlModeArg);
+	cmd.AddValue("flowControlMode","specify flow control mode. 0=PFC (default, including BICC), 1=Bifrost (legacy baseline)",flowControlModeArg);
 
 	cmd.Parse (argc,argv);
 	conf.open(confFile.c_str());

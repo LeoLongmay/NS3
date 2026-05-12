@@ -170,8 +170,17 @@ public:
 		 ********************/
 	uint32_t pint_smpl_thresh;
 	void SetPintSmplThresh(double p);
-	void HandleAckHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
-	void UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react);
+		void HandleAckHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
+		void UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch, bool fast_react);
+
+	/**********************
+	 * BiCC
+	 *********************/
+	uint64_t m_biccBlendBaseRttNs;
+	void InitBiCcState(Ptr<RdmaQueuePair> qp);
+	void UpdateBiCcNsLoop(Ptr<RdmaQueuePair> qp, const CustomHeader& ch);
+	void UpdateBiCcEteLoop(Ptr<RdmaQueuePair> qp, bool cnp);
+	void BlendBiCcRate(Ptr<RdmaQueuePair> qp);
 
 	/**********************
     * LPCC

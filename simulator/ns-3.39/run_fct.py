@@ -12,6 +12,7 @@ ALGO_MATRIX = {
     "Timely": {"algorithm": 7, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "PowerTCP": {"algorithm": 3, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "true", "delayWien": "false"},
     "LPCC": {"algorithm": 9, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
+    "BICC": {"algorithm": 12, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "GEMINI": {"algorithm": 11, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "Bifrost": {"algorithm": 1, "transportMode": 0, "flowControlMode": 1, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "BBR": {"algorithm": 0, "transportMode": 1, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
@@ -29,7 +30,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="algorithm names to run (case-insensitive), e.g., DCQCN HPCC BBR",
     )
-    parser.add_argument("--sim-time", type=float, default=1.0, help="traffic generation time window in seconds")
+    parser.add_argument("--sim-time", type=float, default=2.0, help="traffic generation time window in seconds")
     parser.add_argument("--seed-base", type=int, default=1)
     parser.add_argument("--traffic-script", default="traffic_gen/traffic_gen.py")
     parser.add_argument("--base-conf", default="examples/PowerTCP/config-workload.txt")
@@ -229,6 +230,37 @@ def run_cmd(cmd: List[str], cwd: Path, log_path: Path = None) -> None:
         subprocess.run(cmd, cwd=cwd, check=True, stdout=logf, stderr=subprocess.STDOUT)
 
 
+def stretch_flow_start_times(
+    flow_file: Path,
+    old_start_sec: float,
+    old_stop_sec: float,
+    new_stop_sec: float,
+) -> None:
+    if old_stop_sec <= old_start_sec:
+        raise ValueError("old flow generation window is invalid")
+    if new_stop_sec <= old_start_sec:
+        raise ValueError("new flow generation window is invalid")
+
+    scale = (new_stop_sec - old_start_sec) / (old_stop_sec - old_start_sec)
+    lines = flow_file.read_text(encoding="utf-8").splitlines()
+    if not lines:
+        raise ValueError(f"Empty flow file: {flow_file}")
+
+    # Keep header as-is; only stretch per-flow start times.
+    out = [lines[0]]
+    for raw in lines[1:]:
+        if not raw.strip():
+            continue
+        parts = raw.split()
+        if len(parts) not in (5, 6):
+            raise ValueError(f"Unexpected flow row format: {raw}")
+        old_t = float(parts[-1])
+        new_t = old_start_sec + (old_t - old_start_sec) * scale
+        parts[-1] = f"{new_t:.9f}"
+        out.append(" ".join(parts))
+    flow_file.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     args = parse_args()
     ns3_root = Path(__file__).resolve().parent
@@ -262,6 +294,14 @@ def main() -> None:
 
     base_conf_lines = (ns3_root / base_conf_path).read_text(encoding="utf-8").splitlines()
 
+    # Extended injection-window mode (keep total traffic bytes unchanged):
+    # 1) Generate baseline workload in [flowgen_start, baseline_flowgen_stop].
+    # 2) Stretch all flow start times linearly to [flowgen_start, flowgen_stop].
+    flowgen_start = 2.0
+    baseline_flowgen_stop = 3.0
+    flowgen_stop = 4.0
+    simulator_stop = 6.0
+
     for load in args.loads:
         load_tag = f"{load}%load"
         load_dir = ns3_root / output_root / load_tag
@@ -281,15 +321,19 @@ def main() -> None:
             "-b",
             bandwidth,
             "-t",
-            f"{args.sim_time}",
+            f"{baseline_flowgen_stop - flowgen_start}",
+            # Rollback logic (old version, do not delete):
+            # f"{2.0}",
             "-o",
             str(flow_file),
         ]
         run_cmd(traffic_cmd, cwd=ns3_root)
+        stretch_flow_start_times(flow_file, flowgen_start, baseline_flowgen_stop, flowgen_stop)
 
-        flowgen_start = 2.0
-        flowgen_stop = flowgen_start + args.sim_time / 2
-        simulator_stop = flowgen_stop + args.sim_time / 2
+        # Rollback logic (old version, do not delete):
+        # flowgen_start = 2.0
+        # flowgen_stop = flowgen_start + 2.0
+        # simulator_stop = flowgen_stop + args.sim_time
 
         for idx, (alg_name, conf) in enumerate(algo_plan):
             alg_dir = load_dir / alg_name
