@@ -71,6 +71,15 @@ uint32_t bifrost_timeslot_us = 10;
 uint32_t bifrost_k = 1;
 uint32_t bifrost_longhaul_delay_cutoff_us = 100;
 uint32_t bifrost_h_margin_slots = 3;
+uint32_t bbr_rtt_win_ms = 200;
+uint32_t bbr_probe_rtt_ms = 50;
+uint32_t bbr_init_cwnd = 100;
+uint32_t bbr_snd_buf_mb = 64;
+uint32_t bbr_rcv_buf_mb = 64;
+double   bicc_dst_bdp_factor = 0.1;
+uint32_t bicc_longhaul_cutoff_us = 100;
+uint32_t bicc_ns_fb_interval_us = 75;
+uint64_t bicc_blend_t_ns = 2000000;
 
 bool clamp_target_rate = false, l2_back_to_zero = false;
 double error_rate_per_link = 0.0;
@@ -769,6 +778,33 @@ int main(int argc, char *argv[])
 		}else if (key.compare("BIFROST_H_MARGIN_SLOTS") == 0){
 			conf >> bifrost_h_margin_slots;
 			std::cout << "BIFROST_H_MARGIN_SLOTS\t\t\t" << bifrost_h_margin_slots << '\n';
+		}else if (key.compare("BBR_RTT_WIN_MS") == 0){
+			conf >> bbr_rtt_win_ms;
+			std::cout << "BBR_RTT_WIN_MS\t\t\t\t" << bbr_rtt_win_ms << '\n';
+		}else if (key.compare("BBR_PROBE_RTT_MS") == 0){
+			conf >> bbr_probe_rtt_ms;
+			std::cout << "BBR_PROBE_RTT_MS\t\t\t" << bbr_probe_rtt_ms << '\n';
+		}else if (key.compare("BBR_INIT_CWND") == 0){
+			conf >> bbr_init_cwnd;
+			std::cout << "BBR_INIT_CWND\t\t\t\t" << bbr_init_cwnd << '\n';
+		}else if (key.compare("BBR_SND_BUF_MB") == 0){
+			conf >> bbr_snd_buf_mb;
+			std::cout << "BBR_SND_BUF_MB\t\t\t\t" << bbr_snd_buf_mb << '\n';
+		}else if (key.compare("BBR_RCV_BUF_MB") == 0){
+			conf >> bbr_rcv_buf_mb;
+			std::cout << "BBR_RCV_BUF_MB\t\t\t\t" << bbr_rcv_buf_mb << '\n';
+		}else if (key.compare("BICC_DST_BDP_FACTOR") == 0){
+			conf >> bicc_dst_bdp_factor;
+			std::cout << "BICC_DST_BDP_FACTOR\t\t\t" << bicc_dst_bdp_factor << '\n';
+		}else if (key.compare("BICC_LONGHAUL_CUTOFF_US") == 0){
+			conf >> bicc_longhaul_cutoff_us;
+			std::cout << "BICC_LONGHAUL_CUTOFF_US\t\t\t" << bicc_longhaul_cutoff_us << '\n';
+		}else if (key.compare("BICC_NS_FB_INTERVAL_US") == 0){
+			conf >> bicc_ns_fb_interval_us;
+			std::cout << "BICC_NS_FB_INTERVAL_US\t\t\t" << bicc_ns_fb_interval_us << '\n';
+		}else if (key.compare("BICC_BLEND_T_NS") == 0){
+			conf >> bicc_blend_t_ns;
+			std::cout << "BICC_BLEND_T_NS\t\t\t\t" << bicc_blend_t_ns << '\n';
 		}else if (key.compare("TRANSPORT_MODE") == 0){
 			conf >> transport_mode;
 			std::cout << "TRANSPORT_MODE\t\t\t" << transport_mode << '\n';
@@ -838,10 +874,12 @@ int main(int argc, char *argv[])
 	Config::SetDefault("ns3::QbbNetDevice::QcnEnabled", BooleanValue(enable_qcn));
 	if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
 		Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue("ns3::TcpBbr"));
+		Config::SetDefault("ns3::TcpBbr::RttWindowLength", TimeValue(MilliSeconds(bbr_rtt_win_ms)));
+		Config::SetDefault("ns3::TcpBbr::ProbeRttDuration", TimeValue(MilliSeconds(bbr_probe_rtt_ms)));
 		Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(packet_payload_size));
-		Config::SetDefault("ns3::TcpSocket::InitialCwnd", UintegerValue(10));
-		Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(4 * 1024 * 1024));
-		Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(6 * 1024 * 1024));
+		Config::SetDefault("ns3::TcpSocket::InitialCwnd", UintegerValue(bbr_init_cwnd));
+		Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(bbr_snd_buf_mb * 1024 * 1024));
+		Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(bbr_rcv_buf_mb * 1024 * 1024));
 	}
 
 	// set int_multi
@@ -900,6 +938,11 @@ int main(int argc, char *argv[])
 			node_type[sid]=2;
 
 	}
+
+	// BiCC SwitchNode attribute overrides (applied before SwitchNode creation).
+	Config::SetDefault("ns3::SwitchNode::BiccDstBdpFactor",            DoubleValue(bicc_dst_bdp_factor));
+	Config::SetDefault("ns3::SwitchNode::BiccLonghaulDelayCutoffUs",   UintegerValue(bicc_longhaul_cutoff_us));
+	Config::SetDefault("ns3::SwitchNode::BiccNsFeedbackMinIntervalUs", UintegerValue(bicc_ns_fb_interval_us));
 
 	for (uint32_t i = 0; i < node_num; i++){
 		if (node_type[i] == 0){
@@ -1112,6 +1155,9 @@ int main(int argc, char *argv[])
 	//
 	// install RDMA driver
 	//
+	// BiCC RdmaHw attribute override (applied before RdmaHw creation).
+	Config::SetDefault("ns3::RdmaHw::BiccBlendBaseRttNs", UintegerValue(bicc_blend_t_ns));
+
 	for (uint32_t i = 0; i < node_num; i++){
 		if (n.Get(i)->GetNodeType() == 0){ // is server
 			// create RdmaHw

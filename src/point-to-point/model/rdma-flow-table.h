@@ -88,8 +88,14 @@ public:
     void CleanInactiveFlows();
 
     size_t GetTotalFlowCount() const { return m_flowMap.size(); }
+    size_t GetTotalEgressFlowCount() const { return m_egressFlowMap.size(); }
 
     uint64_t GetTotalMemoryUsage() const;
+
+    uint64_t GetInsertFlowCounter() const { return m_insertFlowCalls; }
+    uint64_t GetInsertEgressFlowCounter() const { return m_insertEgressFlowCalls; }
+    uint64_t GetCleanInactiveCounter() const { return m_cleanInactiveCalls; }
+    uint64_t GetTopRateSelectCounter() const { return m_topRateSelectCalls; }
 
 private:
     RDMAFlowTable(const RDMAFlowTable&) = delete;
@@ -139,6 +145,11 @@ private:
     std::unordered_map<Ipv4Address, uint32_t> m_sipFlowCount{};
     std::unordered_map<RDMAPortQueueKey, uint32_t, PortQueueKeyHash> m_egressFlowCount{};
     uint64_t m_inactiveThreshold{0};
+
+    uint64_t m_insertFlowCalls{0};
+    uint64_t m_insertEgressFlowCalls{0};
+    uint64_t m_cleanInactiveCalls{0};
+    uint64_t m_topRateSelectCalls{0};
 };
 
 } // namespace ns3

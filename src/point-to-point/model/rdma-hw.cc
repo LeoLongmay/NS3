@@ -204,23 +204,53 @@ TypeId RdmaHw::GetTypeId (void)
 	                                  MakeUintegerChecker<uint32_t>())
 	                    .AddAttribute("PowerTCPEnabled", "to enable PowerTCP", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPEnabled), MakeBooleanChecker())
 	                    .AddAttribute("PowerTCPdelay", "to enable PowerTCP in delaymode", BooleanValue(false), MakeBooleanAccessor(&RdmaHw::PowerTCPdelay), MakeBooleanChecker())
-						.AddAttribute("LpccEpsilon", "Buffer queue length threshold", UintegerValue(262144), MakeUintegerAccessor(&RdmaHw::m_epsilon), MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccEpsilon", "Buffer queue length threshold", UintegerValue(1000000), MakeUintegerAccessor(&RdmaHw::m_epsilon), MakeUintegerChecker<uint32_t>())
             			.AddAttribute("LpccTheta", "Fcnp aggregate time window", DoubleValue(5000),
                         			MakeDoubleAccessor(&RdmaHw::m_theta), MakeDoubleChecker<double>())
-						.AddAttribute("LpccIncreaseInterval", "Rate increase interval", UintegerValue(250), 
+						.AddAttribute("LpccIncreaseInterval", "Rate increase interval", UintegerValue(67),
 									MakeUintegerAccessor(&RdmaHw::m_increaseInterval), MakeUintegerChecker<uint64_t>())
-						.AddAttribute("LpccIncreaseFactor", "Rate increase factor", DoubleValue(0.10),
+						.AddAttribute("LpccIncreaseFactor", "Rate increase factor", DoubleValue(0.19),
 									MakeDoubleAccessor(&RdmaHw::m_beta), MakeDoubleChecker<double>())
             			.AddAttribute("LpccTau", "RTT detection time window", UintegerValue(20000),
                           			MakeUintegerAccessor(&RdmaHw::m_tau), MakeUintegerChecker<uint32_t>())
 						.AddAttribute("LpccFcnpInterval", "Minimum interval between two consecutive FCNPs", TimeValue(MicroSeconds(100)),
 						  			MakeTimeAccessor(&RdmaHw::m_fcnpInvokeInterval), MakeTimeChecker(Time(0), Time::Max()))
-            			.AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", DoubleValue(2.0),
-                          			MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>()) // 9.3
-            			.AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.20),
-                          			MakeDoubleAccessor(&RdmaHw::m_kr), MakeDoubleChecker<double>()) // 0.875
-	            			.AddAttribute("Lpcc_ClampTargetRate", "lpcc clamp target rate.", BooleanValue(false), 
+            			.AddAttribute("Lpcc_m_wr", "lpcc min rate adjustment fraction", DoubleValue(3.0),
+                          			MakeDoubleAccessor(&RdmaHw::m_wr), MakeDoubleChecker<double>())
+            			.AddAttribute("Lpcc_m_kr", "lpcc min rate regulation faction", DoubleValue(0.12),
+                          			MakeDoubleAccessor(&RdmaHw::m_kr), MakeDoubleChecker<double>())
+	            			.AddAttribute("Lpcc_ClampTargetRate", "lpcc clamp target rate.", BooleanValue(false),
 	                          			MakeBooleanAccessor(&RdmaHw::m_EcnClampTgtRateLpcc), MakeBooleanChecker())
+						.AddAttribute("LpccQueueTargetBytes",
+						              "LPCC steady-state queue target in bytes. 0 = derive at runtime from epsilon * LpccQueueTargetRatio.",
+						              UintegerValue(0),
+						              MakeUintegerAccessor(&RdmaHw::m_lpccQueueTargetBytesCfg),
+						              MakeUintegerChecker<uint32_t>())
+						.AddAttribute("LpccQueueTargetRatio",
+						              "Queue target relative to epsilon, used when LpccQueueTargetBytes == 0.",
+						              DoubleValue(0.375),
+						              MakeDoubleAccessor(&RdmaHw::m_lpccQueueTargetRatio),
+						              MakeDoubleChecker<double>(0.0))
+						.AddAttribute("LpccDropCapLow",
+						              "Single-step rate-drop cap when qlen <= queue target.",
+						              DoubleValue(0.2),
+						              MakeDoubleAccessor(&RdmaHw::m_lpccDropCapLow),
+						              MakeDoubleChecker<double>(0.0, 1.0))
+						.AddAttribute("LpccDropCapHigh",
+						              "Single-step rate-drop cap when qlen / queue target >= LpccDropCapHighRatio.",
+						              DoubleValue(0.5),
+						              MakeDoubleAccessor(&RdmaHw::m_lpccDropCapHigh),
+						              MakeDoubleChecker<double>(0.0, 1.0))
+						.AddAttribute("LpccDropCapHighRatio",
+						              "qlen / queue target threshold above which the high drop cap takes effect.",
+						              DoubleValue(2.0),
+						              MakeDoubleAccessor(&RdmaHw::m_lpccDropCapHighRatio),
+						              MakeDoubleChecker<double>(1.0))
+						.AddAttribute("LpccAiSuppressMultiplier",
+						              "AI suppression window in units of increaseInterval (after a processed FCNP).",
+						              UintegerValue(15),
+						              MakeUintegerAccessor(&RdmaHw::m_lpccAiSuppressMultiplier),
+						              MakeUintegerChecker<uint32_t>(1))
 							.AddAttribute("BiccBlendBaseRttNs",
 							              "BiCC blend time constant in ns. 0 means per-flow base RTT.",
 							              UintegerValue(0),
@@ -586,7 +616,11 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
 			const uint64_t nowTs = Simulator::Now().GetTimeStep();
 			qp->lpcc.m_lastCongRateBps = nch.fcnp.linkRateBps;
 			qp->lpcc.m_lastFcnpQlen = nch.fcnp.qlen;
-			qp->lpcc.m_lastFcnpTs = nowTs;
+
+			// Note: m_lastFcnpTs / m_lastProcessedFcnpTs are only updated when a FCNP
+			// actually triggers a rate decrease (below). A debounce-dropped FCNP must NOT
+			// refresh either timestamp, otherwise the AI suppression gate keyed on these
+			// timestamps would freeze rate growth permanently during sustained congestion.
 
 			// FCNP debounce/cooldown:
 			// ignore repeated FCNP bursts within a short window to avoid excessive
@@ -604,6 +638,7 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
 			if (qp->lpcc.m_first_cnp) {
 				qp->lpcc.m_lastDecreaseRate = nowTs;
 				qp->lpcc.m_lastProcessedFcnpTs = nowTs;
+				qp->lpcc.m_lastFcnpTs = nowTs;
 				qp->lpcc.m_first_cnp = false;
 				UpdateRateLpcc(qp, nch);
 
@@ -616,11 +651,9 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
 		}
 
 			if (nowTs - qp->lpcc.m_lastDecreaseRate >= m_theta * 1000) {
-				if (Simulator::Now().GetTimeStep() == 159919000) {
-					std::cout << "debug\n";
-				}
 				qp->lpcc.m_lastDecreaseRate = nowTs;
 				qp->lpcc.m_lastProcessedFcnpTs = nowTs;
+				qp->lpcc.m_lastFcnpTs = nowTs;
 				UpdateRateLpcc(qp, nch);
 
 			qp->lpcc.m_rpTimeStage = 0;
@@ -630,7 +663,6 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
                                                &RdmaHw::RateIncEventTimerLpcc, this, qp);
 			return 0;
 		}
-		// fcnp_received_lpcc(qp, nch);
 	}
 	return 0;
 }
@@ -1638,77 +1670,22 @@ void RdmaHw::UpdateRateHpPint(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader
 /**********************
  * LPCC
  *********************/
-void RdmaHw::fcnp_received_lpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
-    qp->lpcc.m_decrease_cnp_arrived = true;
-    if (qp->lpcc.m_first_cnp) {
-        ScheduleDecreaseRateLpcc(qp, ch, 0);
-
-        qp->lpcc.m_targetRate = qp->m_rate = m_rateOnFirstCNP * qp->m_rate;
-        qp->lpcc.m_first_cnp = false;
-    }
-}
-
-void RdmaHw::CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch) {
-    ScheduleDecreaseRateLpcc(q, ch, 0);
-    if (q->lpcc.m_decrease_cnp_arrived) {
-#if PRINT_LOG
-        printf("%lu rate dec: %08x %08x %u %u (%0.3lf %.3lf)->", Simulator::Now().GetTimeStep(),
-               q->sip.Get(), q->dip.Get(), q->sport, q->dport,
-               q->mlx.m_targetRate.GetBitRate() * 1e-9, q->m_rate.GetBitRate() * 1e-9);
-#endif
-        bool clamp = true;
-        if (!m_EcnClampTgtRate) {
-            if (q->lpcc.m_rpTimeStage == 0) clamp = false;
-        }
-        if (clamp) {
-            q->lpcc.m_targetRate = q->m_rate;
-        }
-        UpdateRateLpcc(q, ch);
-        q->lpcc.m_rpTimeStage = 0;
-        q->lpcc.m_decrease_cnp_arrived = false;
-        Simulator::Cancel(q->lpcc.m_rpTimer);
-        q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_increaseInterval),
-                                               &RdmaHw::RateIncEventTimerLpcc, this, q);
-		// q->lpcc.m_rpTimer = Simulator::Schedule(NanoSeconds(m_increaseInterval),
-        //                                        &RdmaHw::RateIncEventTimerLpcc, this, q);
-#if PRINT_LOG
-        printf("(%.3lf %.3lf)\n", q->mlx.m_targetRate.GetBitRate() * 1e-9,
-               q->m_rate.GetBitRate() * 1e-9);
-#endif
-    }
-}
 
 void RdmaHw::RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q) {
     q->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_increaseInterval), &RdmaHw::RateIncEventTimerLpcc, this, q);
-	// q->lpcc.m_rpTimer = Simulator::Schedule(NanoSeconds(m_increaseInterval), &RdmaHw::RateIncEventTimerLpcc, this, q);
     RateIncEventLpcc(q);
     q->lpcc.m_rpTimeStage++;
 }
 
 void RdmaHw::RateIncEventLpcc(Ptr<RdmaQueuePair> q) {
-    uint32_t nic_idx = GetNicIdxOfQp(q);
-    Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
-    // q->lpcc.m_targetRate += m_rhai; // m_rhai is a parameter of DCQCN
-	q->lpcc.m_targetRate += DataRate("500Mb/s");
-    if (q->lpcc.m_targetRate > dev->GetDataRate()) q->lpcc.m_targetRate = dev->GetDataRate();
-    // q->lpcc.m_curRate = std::min((q->lpcc.m_curRate / 2) + (q->lpcc.m_targetRate / 2), dev->GetDataRate());
-    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-	// std::cout << "dev rate: " << dev->GetDataRate().GetBitRate() << std::endl;
-	// std::cout << "target rate: " << q->lpcc.m_targetRate.GetBitRate() << std::endl;
-    // std::cout << "Inc\t" << "before: " << q->lpcc.m_curRate.GetBitRate() << std::endl;   
-    // std::cout << "Inc\t" << "after: " << q->lpcc.m_curRate.GetBitRate() << std::endl;
-    // std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl; 
-    // ChangeRate(q, q->lpcc.m_curRate);
-    // q->m_rate = (q->m_rate / 2) + (q->lpcc.m_targetRate / 2);
-	// std::cout << "now_time\t" << Simulator::Now().GetTimeStep() << std::endl;
-	// std::cout << "Inc\t" << "before: " << q->m_rate.GetBitRate() << std::endl;
-	// Old fixed-AI logic (rollback reference):
-	// q->m_rate *= (1.0 + std::min(1.0 * (dev->GetDataRate().GetBitRate() - q->m_rate.GetBitRate()) * 1.0 / dev->GetDataRate().GetBitRate(), m_beta));
+	uint32_t nic_idx = GetNicIdxOfQp(q);
+	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
 
-	    // New logic 1+2:
-	// (1) gate AI by a recent-FCNP quiet window
-	// (2) gate AI by queue-target ratio (instead of epsilon ratio)
-	const double kLpccQueueTargetBytes = 0.75 * 1024.0 * 1024.0; // 0.75MB target
+	// AI gating logic:
+	//   (1) suppress AI for a configurable number of increaseIntervals after a
+	//       *processed* FCNP — debounce-dropped FCNPs no longer hold AI down.
+	//   (2) shape AI strength by qRatio = effectiveQlen / queueTarget.
+	const double kLpccQueueTargetBytes = GetLpccQueueTargetBytes();
 	const double lineRate = std::max<double>(1.0, dev->GetDataRate().GetBitRate());
 	const double rateNow = std::max<double>(1.0, q->m_rate.GetBitRate());
 	const double gapRatio = std::max(0.0, (lineRate - rateNow) / lineRate);
@@ -1717,96 +1694,93 @@ void RdmaHw::RateIncEventLpcc(Ptr<RdmaQueuePair> q) {
 	const uint64_t nowTs = Simulator::Now().GetTimeStep();
 	const uint64_t thetaTs = std::max<uint64_t>(1ULL, m_theta) * 1000ULL;
 	const uint64_t incTs = std::max<uint64_t>(1ULL, m_increaseInterval) * 1000ULL;
-	const uint64_t fastRecoverQuietTs = 2ULL * incTs;
-	const uint64_t ageSinceFcnpTs =
-	    (q->lpcc.m_lastFcnpTs != 0 && nowTs > q->lpcc.m_lastFcnpTs) ? (nowTs - q->lpcc.m_lastFcnpTs) : 0;
+	const uint64_t fastRecoverQuietTs =
+	    static_cast<uint64_t>(std::max<uint32_t>(1u, m_lpccAiSuppressMultiplier)) * incTs;
+	const uint64_t ageSinceProcessedTs =
+	    (q->lpcc.m_lastProcessedFcnpTs != 0 && nowTs > q->lpcc.m_lastProcessedFcnpTs)
+	        ? (nowTs - q->lpcc.m_lastProcessedFcnpTs)
+	        : 0;
 
-	// Remove linear decay: keep the last FCNP queue signal until theta timeout,
-	// then clear it to 0 directly.
-	if (q->lpcc.m_lastFcnpTs == 0 || q->lpcc.m_lastFcnpQlen == 0) {
+	// Keep the last FCNP queue signal until theta timeout, then clear it.
+	if (q->lpcc.m_lastProcessedFcnpTs == 0 || q->lpcc.m_lastFcnpQlen == 0) {
 		effectiveQlen = 0;
-	} else if (ageSinceFcnpTs >= thetaTs) {
+	} else if (ageSinceProcessedTs >= thetaTs) {
 		effectiveQlen = 0;
 		q->lpcc.m_lastFcnpQlen = 0;
 	}
 
-	// If FCNP was seen recently (even if it was debounce-ignored), hold AI.
-	// FCNP receive path always refreshes m_lastFcnpTs first.
-	if (q->lpcc.m_lastFcnpTs != 0 && ageSinceFcnpTs < fastRecoverQuietTs) {
+	// Suppress AI only while a recently *processed* FCNP is still within the
+	// quiet window. Debounce-dropped FCNPs do not refresh m_lastProcessedFcnpTs
+	// any more, so they no longer freeze AI growth.
+	if (q->lpcc.m_lastProcessedFcnpTs != 0 && ageSinceProcessedTs < fastRecoverQuietTs) {
 		return;
 	}
 
 	const double qRatio = std::max(0.0, double(effectiveQlen) / std::max(1.0, kLpccQueueTargetBytes));
-		double adaptiveBeta = m_beta;
-		if (qRatio >= 1.5) {
-			adaptiveBeta = m_beta * 0.20;
-		} else if (qRatio >= 1.0) {
-			adaptiveBeta = m_beta * 0.50;
-		} else if (qRatio >= 0.5) {
-			adaptiveBeta = m_beta * 0.90;
-		} else {
-			adaptiveBeta = std::min(0.25, m_beta * 1.40);
-		}
+	double adaptiveBeta = m_beta;
+	if (qRatio >= 5.0) {
+		// v9: severely saturated queue (queue >> queueTarget, e.g. PFC-locked at cap)
+		//   → freeze AI almost completely. Lets aggregate decay under repeated FCNP
+		//   cuts so PFC eventually drains and the queue escapes the cap.
+		adaptiveBeta = m_beta * 0.02;
+	} else if (qRatio >= 1.5) {
+		adaptiveBeta = m_beta * 0.20;
+	} else if (qRatio >= 1.0) {
+		adaptiveBeta = m_beta * 0.50;
+	} else if (qRatio >= 0.5) {
+		adaptiveBeta = m_beta * 0.90;
+	} else {
+		adaptiveBeta = std::min(0.25, m_beta * 1.40);
+	}
 
-		// Queue-target guard: above target -> throttle AI but avoid hard freeze.
-		if (effectiveQlen > kLpccQueueTargetBytes) {
-			double over = std::min(2.0, (double(effectiveQlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
-			adaptiveBeta *= std::max(0.20, 1.0 - 0.60 * over);
-		}
+	// Queue-target guard: above target -> throttle AI but avoid hard freeze.
+	if (effectiveQlen > kLpccQueueTargetBytes) {
+		double over = std::min(2.0, (double(effectiveQlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
+		adaptiveBeta *= std::max(0.20, 1.0 - 0.60 * over);
+	}
 
-		const double baseIncRatio = std::max(0.0, std::min(gapRatio, adaptiveBeta));
-		double aiFloor = 0.0;
-		// Two-speed AI:
-		//   - low queue: fast recovery
-		//   - medium queue: steady recovery
-		if (qRatio < 0.5) {
-			aiFloor = std::min(gapRatio, std::max(0.012, gapRatio * 0.30));
-		} else if (qRatio < 1.0) {
-			aiFloor = std::min(gapRatio, std::max(0.004, gapRatio * 0.12));
-		} else if (qRatio < 1.2) {
-			aiFloor = std::min(gapRatio, 0.001);
-		}
-		// Fast recovery branch:
-		// if queue signal has been quiet for >= 2 increase intervals, accelerate ramp-up.
-		const bool queueQuietLongEnough = (effectiveQlen == 0) &&
-		                                  (q->lpcc.m_lastFcnpTs == 0 ||
-		                                   (nowTs > q->lpcc.m_lastFcnpTs &&
-		                                    nowTs - q->lpcc.m_lastFcnpTs >= fastRecoverQuietTs));
-		if (queueQuietLongEnough) {
-			const double fastFloor = std::min(gapRatio, std::max(0.02, gapRatio * 0.40));
-			aiFloor = std::max(aiFloor, fastFloor);
-		}
+	const double baseIncRatio = std::max(0.0, std::min(gapRatio, adaptiveBeta));
+	double aiFloor = 0.0;
+	if (qRatio < 0.5) {
+		// v7: lowered from 0.30 to 0.05 to eliminate AI explosion when queue empties.
+		// Prevents the sawtooth bistability where queue under-shoot kicks AI into
+		// 28%/tick recovery mode (which then overshoots line rate).
+		aiFloor = std::min(gapRatio, std::max(0.005, gapRatio * 0.05));
+	} else if (qRatio < 1.0) {
+		aiFloor = std::min(gapRatio, std::max(0.003, gapRatio * 0.03));
+	} else if (qRatio < 1.2) {
+		aiFloor = std::min(gapRatio, 0.001);
+	}
+	// Fast recovery branch keyed on processed FCNP quiet time.
+	const bool queueQuietLongEnough = (effectiveQlen == 0) &&
+	                                  (q->lpcc.m_lastProcessedFcnpTs == 0 ||
+	                                   (nowTs > q->lpcc.m_lastProcessedFcnpTs &&
+	                                    nowTs - q->lpcc.m_lastProcessedFcnpTs >= fastRecoverQuietTs));
+	if (queueQuietLongEnough) {
+		const double fastFloor = std::min(gapRatio, std::max(0.02, gapRatio * 0.40));
+		aiFloor = std::max(aiFloor, fastFloor);
+	}
 
-		const double incRatio = std::max(baseIncRatio, aiFloor);
-		q->m_rate *= (1.0 + incRatio);
-	// std::cout << "Inc\t" << "after: " << q->m_rate.GetBitRate() << std::endl;
-	// std::cout << std::endl;
-}
-
-void RdmaHw::ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta) {
-    q->lpcc.m_eventDecreaseRate =
-        Simulator::Schedule(MicroSeconds(m_theta) + NanoSeconds(delta),
-                            &RdmaHw::CheckRateDecreaseLpcc, this, q, ch);
+	const double incRatio = std::max(baseIncRatio, aiFloor);
+	q->m_rate *= (1.0 + incRatio);
 }
 
 void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
-    uint64_t m_rttl = qp->lpcc.m_lastRtt;
-	// uint64_t m_rttl = 10008480;
-    uint64_t m_rtts = Simulator::Now().GetTimeStep() - ch.fcnp.timestamp;
 	uint32_t m_qlen = ch.fcnp.qlen;
-    if (m_rtts == 0 || m_epsilon == 0) {
-        return;
-    }
-    // Allow immediate first-FCNP decrease before ACK path learns lastRtt.
-    // If lastRtt is not available yet, fall back to current FCNP flight time.
-    uint64_t rttlEff = (m_rttl == 0) ? m_rtts : m_rttl;
-    double m_k = (1.0 * m_qlen / m_epsilon - 1.0) * (1.0 * rttlEff / m_rtts);
-    m_k = std::max(0.0, std::min(m_k, 1.2));
-    
-    uint64_t congRateBps = ch.fcnp.linkRateBps;
-    if (congRateBps == 0) {
-        return;
-    }
+	if (m_epsilon == 0) {
+		return;
+	}
+	// m_k now directly reflects queue overshoot vs epsilon. The previous
+	// rttlEff/m_rtts factor used FCNP's reverse one-way travel time, which
+	// has the wrong direction and made the first decrease accidentally
+	// weaker than steady-state. Drop it.
+	double m_k = (1.0 * m_qlen / m_epsilon - 1.0);
+	m_k = std::max(0.0, std::min(m_k, 1.2));
+
+	uint64_t congRateBps = ch.fcnp.linkRateBps;
+	if (congRateBps == 0) {
+		return;
+	}
 	const double rateRatio = 1.0 * qp->m_rate.GetBitRate() / congRateBps;
 	double flowFactor = std::sqrt(std::max(1.0, static_cast<double>(ch.fcnp.m_flowCount)));
 	flowFactor = std::min(flowFactor, 3.0);
@@ -1814,53 +1788,40 @@ void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
 	m_p = std::max(0.0, std::min(m_p, 4.0));
 	qp->lpcc.m_flowCount = ch.fcnp.m_flowCount;
 
-    // Old LPCC decrease core (rollback reference):
-    // DataRate new_rate = qp->m_rate * (1.0 / (1 + std::max(std::min(m_k * m_p, m_wr), 0.0)));
+	// Queue-target-aware decrease intensity.
+	const double kLpccQueueTargetBytes = GetLpccQueueTargetBytes();
+	double qPenalty = 1.0;
+	if (m_qlen > kLpccQueueTargetBytes) {
+		double over = std::min(1.0, (double(m_qlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
+		qPenalty += 0.5 * over;
+	}
+	const double decreaseSignal = std::max(std::min(m_k * m_p * qPenalty, m_wr), 0.0);
+	DataRate new_rate = qp->m_rate * (1.0 / (1 + decreaseSignal));
 
-	    // New queue-target-aware LPCC decrease:
-	    // when queue exceeds target, increase decrease intensity.
-	    const double kLpccQueueTargetBytes = 0.75 * 1024.0 * 1024.0; // 0.75MB target
-    double qPenalty = 1.0;
-    if (m_qlen > kLpccQueueTargetBytes) {
-        double over = std::min(1.0, (double(m_qlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
-        qPenalty += 0.5 * over;
-    }
-	    const double decreaseSignal = std::max(std::min(m_k * m_p * qPenalty, m_wr), 0.0);
-	    DataRate new_rate = qp->m_rate * (1.0 / (1 + decreaseSignal));
-	    // Piecewise cap for single-step FCNP decrease:
-	    // mild queue overshoot should not immediately collapse throughput.
-	    const double rateBps = std::max(1.0, static_cast<double>(qp->m_rate.GetBitRate()));
-	    double dropFrac = 1.0 - (static_cast<double>(new_rate.GetBitRate()) / rateBps);
-	    double dropCap = 0.2;
-	    if (m_qlen <= kLpccQueueTargetBytes) {
-	        dropCap = 0.2;
-	    } else if (m_qlen <= 1.5 * kLpccQueueTargetBytes) {
-	        const double x = (double(m_qlen) - kLpccQueueTargetBytes) / (0.5 * kLpccQueueTargetBytes);
-	        dropCap = 0.4 + 0.1 * std::max(0.0, std::min(1.0, x));
-	    } else {
-	        dropCap = 0.75;
-	    }
-	    if (dropFrac > dropCap) {
-	        new_rate = qp->m_rate * (1.0 - dropCap);
-	    }
-	// if (ch.dip == 184551425) {
-	// 	std::cout << "now_time\t" << Simulator::Now().GetTimeStep() << std::endl;
-	// }
-	// DataRate new_rate = qp->lpcc.m_curRate * m_k;
-    new_rate = std::max(new_rate, m_minRate * 10.0); // min rate is 1Gbps
-    // std::cout << "**************************************" << std::endl;
-	// std::cout << "m_rttl: " << m_rttl << std::endl;
-	// std::cout << "m_rtts: " << m_rtts << std::endl;
-	// std::cout << "m_qlen: " << m_qlen << std::endl;
-    // std::cout << "m_k: " << m_k << std::endl;
-    // std::cout << "m_p: " << m_p << std::endl;
-	// std::cout << "now_time\t" << Simulator::Now().GetTimeStep() << std::endl;
-    // std::cout << "Down\t" << "before: " << qp->m_rate.GetBitRate() << std::endl;
-    // std::cout << "Down\t" << "after: " << new_rate.GetBitRate() << std::endl;
-    // std::cout << "**************************************" << std::endl;
-    // ChangeRate(qp, new_rate);
-	
-    qp->m_rate = new_rate;
+	// Piecewise single-step drop cap (parameterised):
+	//   qlen <= queueTarget       -> dropCapLow
+	//   queueTarget < qlen < hi   -> linear lerp from low to high
+	//   qlen >= queueTarget * R   -> dropCapHigh
+	const double rateBps = std::max(1.0, static_cast<double>(qp->m_rate.GetBitRate()));
+	double dropFrac = 1.0 - (static_cast<double>(new_rate.GetBitRate()) / rateBps);
+	const double hiRatio = std::max(1.0 + 1e-6, m_lpccDropCapHighRatio);
+	const double qOverTarget = (kLpccQueueTargetBytes > 0.0)
+	                               ? (static_cast<double>(m_qlen) / kLpccQueueTargetBytes)
+	                               : 0.0;
+	double dropCap;
+	if (qOverTarget <= 1.0) {
+		dropCap = m_lpccDropCapLow;
+	} else if (qOverTarget < hiRatio) {
+		const double t = (qOverTarget - 1.0) / (hiRatio - 1.0);
+		dropCap = m_lpccDropCapLow + (m_lpccDropCapHigh - m_lpccDropCapLow) * t;
+	} else {
+		dropCap = m_lpccDropCapHigh;
+	}
+	if (dropFrac > dropCap) {
+		new_rate = qp->m_rate * (1.0 - dropCap);
+	}
+	new_rate = std::max(new_rate, m_minRate * 10.0); // 1Gbps floor
+	qp->m_rate = new_rate;
 }
 
 void RdmaHw::HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {

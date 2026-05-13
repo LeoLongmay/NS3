@@ -200,11 +200,23 @@ public:
 	Time m_lastfcnpInvokeTime = ns3::Time::Min();
 	Time m_fcnpInvokeInterval;
 
+    // LPCC queue-target + dropCap piecewise (parameterised)
+    uint32_t m_lpccQueueTargetBytesCfg; // 0 means derive from epsilon at use time
+    double m_lpccQueueTargetRatio;      // queueTarget = epsilon * ratio when cfg == 0
+    double m_lpccDropCapLow;            // dropCap at qlen <= queueTarget
+    double m_lpccDropCapHigh;           // dropCap at qlen >= queueTarget * highRatio
+    double m_lpccDropCapHighRatio;      // qlen / queueTarget threshold for DropCapHigh
+    uint32_t m_lpccAiSuppressMultiplier;// AI suppress window = N * increaseInterval
+
+    double GetLpccQueueTargetBytes() const {
+        if (m_lpccQueueTargetBytesCfg > 0) {
+            return static_cast<double>(m_lpccQueueTargetBytesCfg);
+        }
+        return static_cast<double>(m_epsilon) * m_lpccQueueTargetRatio;
+    }
+
     void UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch);
-    void fcnp_received_lpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
     void HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);
-    void ScheduleDecreaseRateLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch, uint32_t delta);
-    void CheckRateDecreaseLpcc(Ptr<RdmaQueuePair> q, CustomHeader &ch);
     void RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q);
     void RateIncEventLpcc(Ptr<RdmaQueuePair> q);
     void UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch);

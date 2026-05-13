@@ -188,6 +188,7 @@ public:
 	void ClearTable();
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
+	Ptr<RDMAFlowTable> GetFlowTable() const { return m_flowTable; }
 	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
 	void ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k);
 	void SetBifrostPortEnabled(uint32_t inPort, bool enabled);

@@ -35,6 +35,7 @@ RDMAFlowTable::RDMAFlowTable(uint64_t inactiveThreshold)
 // RDMAFlowTable::~RDMAFlowTable() = default;
 
 void RDMAFlowTable::InsertOrUpdateFlow(Ipv4Address sip, Ipv4Address dip, uint16_t sport, uint16_t dport) {
+    ++m_insertFlowCalls;
     RDMAFlowKey key{ sip, dip, sport, dport };
     auto it = m_flowMap.find(key);
     uint64_t now = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
@@ -58,6 +59,7 @@ void RDMAFlowTable::InsertOrUpdateFlowOnEgress(Ipv4Address sip,
                                                uint32_t qIndex,
                                                uint16_t pg,
                                                uint32_t pktBytes) {
+    ++m_insertEgressFlowCalls;
     RDMAEgressFlowKey key{{sip, dip, sport, dport}, port, qIndex, pg};
     auto it = m_egressFlowMap.find(key);
     uint64_t now = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
@@ -145,6 +147,7 @@ bool RDMAFlowTable::GetMaxRateFlowByEgressQueue(uint32_t port,
 std::vector<RDMAEgressFlowKey> RDMAFlowTable::GetTopRateFlowsByEgressQueue(uint32_t port,
                                                                             uint32_t qIndex,
                                                                             uint32_t k) const {
+    const_cast<RDMAFlowTable*>(this)->m_topRateSelectCalls++;
     std::vector<std::pair<RDMAEgressFlowKey, double>> candidates;
     if (k == 0) {
         return {};
@@ -177,6 +180,7 @@ std::vector<RDMAEgressFlowKey> RDMAFlowTable::GetTopRateFlowsByEgressQueue(uint3
 }
 
 void RDMAFlowTable::CleanInactiveFlows() {
+    ++m_cleanInactiveCalls;
     uint64_t now = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
     std::vector<RDMAFlowKey> toDelete;
     std::vector<RDMAEgressFlowKey> toDeleteEgress;
@@ -239,6 +243,12 @@ uint64_t RDMAFlowTable::GetTotalMemoryUsage() const {
     totalMem += m_flowMap.size() * sizeof(FlowMapPair);
     using EgressFlowMapPair = typename decltype(m_egressFlowMap)::value_type;
     totalMem += m_egressFlowMap.size() * sizeof(EgressFlowMapPair);
+    using DipPair = typename decltype(m_dipFlowCount)::value_type;
+    totalMem += m_dipFlowCount.size() * sizeof(DipPair);
+    using SipPair = typename decltype(m_sipFlowCount)::value_type;
+    totalMem += m_sipFlowCount.size() * sizeof(SipPair);
+    using EgressCountPair = typename decltype(m_egressFlowCount)::value_type;
+    totalMem += m_egressFlowCount.size() * sizeof(EgressCountPair);
 
     return totalMem;
 }

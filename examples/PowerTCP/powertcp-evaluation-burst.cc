@@ -100,6 +100,10 @@ uint32_t qlen_dump_interval = 100000000, qlen_mon_interval = 100;
 uint64_t qlen_mon_start = 2000000000, qlen_mon_end = 2100000000;
 string qlen_mon_file;
 
+string flow_table_mon_file;
+uint64_t flow_table_mon_interval_ns = 100000;
+FILE* g_flow_table_output = nullptr;
+
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
 unordered_map<uint64_t, double> rate2pmax;
 unordered_map<uint64_t, uint32_t> rate2geminiK;
@@ -305,6 +309,43 @@ void monitor_buffer(FILE* qlen_output, NodeContainer *n) {
 	}
 	if (Simulator::Now().GetTimeStep() < (int64_t)qlen_mon_end)
 		Simulator::Schedule(NanoSeconds(qlen_mon_interval), &monitor_buffer, qlen_output, n);
+}
+
+void monitor_flow_table(FILE* out, NodeContainer* n) {
+	if (out == nullptr) return;
+	uint64_t now = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
+	for (uint32_t i = 0; i < n->GetN(); i++) {
+		if (n->Get(i)->GetNodeType() != 1) continue;
+		Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n->Get(i));
+		if (!sw) continue;
+		Ptr<RDMAFlowTable> ft = sw->GetFlowTable();
+		uint64_t bufBytes = sw->m_mmu ? sw->m_mmu->GetTotalUsedBuffer() : 0;
+		uint64_t ftBytes = ft ? ft->GetTotalMemoryUsage() : 0;
+		size_t flowCount = ft ? ft->GetTotalFlowCount() : 0;
+		size_t egressFlowCount = ft ? ft->GetTotalEgressFlowCount() : 0;
+		fprintf(out, "rdma: %lu %u %lu %lu %zu %zu\n",
+		        now, sw->GetId(), bufBytes, ftBytes, flowCount, egressFlowCount);
+	}
+	fflush(out);
+	Simulator::Schedule(NanoSeconds(flow_table_mon_interval_ns), &monitor_flow_table, out, n);
+}
+
+void dump_flow_table_counters(FILE* out, NodeContainer* n) {
+	if (out == nullptr) return;
+	for (uint32_t i = 0; i < n->GetN(); i++) {
+		if (n->Get(i)->GetNodeType() != 1) continue;
+		Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n->Get(i));
+		if (!sw) continue;
+		Ptr<RDMAFlowTable> ft = sw->GetFlowTable();
+		if (!ft) continue;
+		fprintf(out, "rdma_counter: %u insert=%lu insert_egress=%lu clean=%lu topk=%lu\n",
+		        sw->GetId(),
+		        ft->GetInsertFlowCounter(),
+		        ft->GetInsertEgressFlowCounter(),
+		        ft->GetCleanInactiveCounter(),
+		        ft->GetTopRateSelectCounter());
+	}
+	fflush(out);
 }
 
 void CalculateRoute(Ptr<Node> host) {
@@ -880,6 +921,12 @@ int main(int argc, char *argv[])
 		} else if (key.compare("QLEN_MON_END") == 0) {
 			conf >> qlen_mon_end;
 			std::cout << "QLEN_MON_END\t\t\t\t" << qlen_mon_end << '\n';
+		} else if (key.compare("FLOW_TABLE_MON_FILE") == 0) {
+			conf >> flow_table_mon_file;
+			std::cout << "FLOW_TABLE_MON_FILE\t\t\t\t" << flow_table_mon_file << '\n';
+		} else if (key.compare("FLOW_TABLE_MON_INTERVAL_NS") == 0) {
+			conf >> flow_table_mon_interval_ns;
+			std::cout << "FLOW_TABLE_MON_INTERVAL_NS\t\t\t\t" << flow_table_mon_interval_ns << '\n';
 		} else if (key.compare("MULTI_RATE") == 0) {
 			int v;
 			conf >> v;
@@ -947,77 +994,22 @@ int main(int argc, char *argv[])
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
 
-	// LPCC tuning for burst:
-	// - larger queue threshold than 15KB to avoid over-triggering
-	// - shorter control loop and gentler AI to reduce persistent full-buffer state
-	uint32_t epsilon = 0;
-	uint32_t lpccFcnpMinIntervalUs = 50;
-	uint32_t lpccPerFlowFcnpCooldownUs = 800;
-	uint32_t lpccFcnpTopK = 3;
-	uint32_t lpccFcnpTopKHigh = 6;
-	uint32_t lpccFcnpKHighThreshBytes = 524288;
-	double lpccThetaUs = 5000.0;
-	uint32_t lpccIncreaseIntervalUs = 250;
-	double lpccIncreaseFactor = 0.10;
-	double lpccWr = 2.0;
-	double lpccKr = 0.20;
+	// LPCC tuning is driven entirely by Attribute defaults (rdma-hw.cc / switch-node.cc).
+	// Command-line --lpcc* args override per-attribute only when supplied (>0). No
+	// `if (cc_mode == 9)` preset block is needed here.
 	if (cc_mode == 9) {
-		epsilon = 110000;                  // 96KB (stability-oriented default)
-		lpccFcnpMinIntervalUs = 42;       // denser FCNP feedback
-		lpccPerFlowFcnpCooldownUs = 800;  // avoid repeatedly hitting same top flows
-		lpccFcnpTopK = 3;                 // send FCNP to top-K highest-rate queue flows
-		lpccFcnpTopKHigh = 6;             // dynamic-K high queue fanout
-		lpccFcnpKHighThreshBytes = 524288;// 0.5MB
-		lpccThetaUs = 2500.0;             // moderate decrease-cycle refresh
-		lpccIncreaseIntervalUs = 250;     // default cadence
-		lpccIncreaseFactor = 0.10;        // default AI strength
-		lpccWr = 2.0;                     // default FCNP-triggered decrease cap
-		lpccKr = 0.20;                    // default RTT-inflation decrease cap
-		if (lpccEpsilonArg > 0) {
-			epsilon = static_cast<uint32_t>(lpccEpsilonArg);
-		}
-		if (lpccFcnpMinIntervalUsArg > 0) {
-			lpccFcnpMinIntervalUs = static_cast<uint32_t>(lpccFcnpMinIntervalUsArg);
-		}
-		if (lpccPerFlowFcnpCooldownUsArg > 0) {
-			lpccPerFlowFcnpCooldownUs = static_cast<uint32_t>(lpccPerFlowFcnpCooldownUsArg);
-		}
-		if (lpccFcnpTopKArg > 0) {
-			lpccFcnpTopK = static_cast<uint32_t>(lpccFcnpTopKArg);
-		}
-		if (lpccFcnpTopKHighArg > 0) {
-			lpccFcnpTopKHigh = static_cast<uint32_t>(lpccFcnpTopKHighArg);
-		}
-		if (lpccFcnpKHighThreshBytesArg > 0) {
-			lpccFcnpKHighThreshBytes = static_cast<uint32_t>(lpccFcnpKHighThreshBytesArg);
-		}
-		if (lpccThetaUsArg > 0) {
-			lpccThetaUs = lpccThetaUsArg;
-		}
-		if (lpccIncreaseIntervalUsArg > 0) {
-			lpccIncreaseIntervalUs = static_cast<uint32_t>(lpccIncreaseIntervalUsArg);
-		}
-		if (lpccIncreaseFactorArg > 0) {
-			lpccIncreaseFactor = lpccIncreaseFactorArg;
-		}
-		if (lpccWrArg > 0) {
-			lpccWr = lpccWrArg;
-		}
-		if (lpccKrArg > 0) {
-			lpccKr = lpccKrArg;
-		}
 		std::cout << "LPCC_TUNING\t\t\t"
-		          << "eps=" << epsilon
-		          << " fcnpIntUs=" << lpccFcnpMinIntervalUs
-		          << " fcnpFlowCooldownUs=" << lpccPerFlowFcnpCooldownUs
-		          << " fcnpTopK=" << lpccFcnpTopK
-		          << " fcnpTopKHigh=" << lpccFcnpTopKHigh
-		          << " fcnpKThreshB=" << lpccFcnpKHighThreshBytes
-		          << " thetaUs=" << lpccThetaUs
-		          << " incIntUs=" << lpccIncreaseIntervalUs
-		          << " beta=" << lpccIncreaseFactor
-		          << " wr=" << lpccWr
-		          << " kr=" << lpccKr << "\n";
+		          << "eps=" << (lpccEpsilonArg > 0 ? std::to_string(lpccEpsilonArg) : std::string("attr-default"))
+		          << " fcnpIntUs=" << (lpccFcnpMinIntervalUsArg > 0 ? std::to_string(lpccFcnpMinIntervalUsArg) : std::string("attr-default"))
+		          << " fcnpFlowCooldownUs=" << (lpccPerFlowFcnpCooldownUsArg > 0 ? std::to_string(lpccPerFlowFcnpCooldownUsArg) : std::string("attr-default"))
+		          << " fcnpTopK=" << (lpccFcnpTopKArg > 0 ? std::to_string(lpccFcnpTopKArg) : std::string("attr-default"))
+		          << " fcnpTopKHigh=" << (lpccFcnpTopKHighArg > 0 ? std::to_string(lpccFcnpTopKHighArg) : std::string("attr-default"))
+		          << " fcnpKThreshB=" << (lpccFcnpKHighThreshBytesArg > 0 ? std::to_string(lpccFcnpKHighThreshBytesArg) : std::string("attr-default"))
+		          << " thetaUs=" << (lpccThetaUsArg > 0 ? std::to_string(lpccThetaUsArg) : std::string("attr-default"))
+		          << " incIntUs=" << (lpccIncreaseIntervalUsArg > 0 ? std::to_string(lpccIncreaseIntervalUsArg) : std::string("attr-default"))
+		          << " beta=" << (lpccIncreaseFactorArg > 0 ? std::to_string(lpccIncreaseFactorArg) : std::string("attr-default"))
+		          << " wr=" << (lpccWrArg > 0 ? std::to_string(lpccWrArg) : std::string("attr-default"))
+		          << " kr=" << (lpccKrArg > 0 ? std::to_string(lpccKrArg) : std::string("attr-default")) << "\n";
 	}
 
 	// Set Pint
@@ -1405,12 +1397,24 @@ int main(int argc, char *argv[])
 				rdmaHw->SetAttribute("DctcpRateAI", DataRateValue(DataRate(dctcp_rate_ai)));
 				rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 				rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
-				rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
-				rdmaHw->SetAttribute("LpccTheta", DoubleValue(lpccThetaUs));
-				rdmaHw->SetAttribute("LpccIncreaseInterval", UintegerValue(lpccIncreaseIntervalUs));
-				rdmaHw->SetAttribute("LpccIncreaseFactor", DoubleValue(lpccIncreaseFactor));
-				rdmaHw->SetAttribute("Lpcc_m_wr", DoubleValue(lpccWr));
-				rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKr));
+				if (lpccEpsilonArg > 0) {
+					rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(static_cast<uint32_t>(lpccEpsilonArg)));
+				}
+				if (lpccThetaUsArg > 0) {
+					rdmaHw->SetAttribute("LpccTheta", DoubleValue(lpccThetaUsArg));
+				}
+				if (lpccIncreaseIntervalUsArg > 0) {
+					rdmaHw->SetAttribute("LpccIncreaseInterval", UintegerValue(static_cast<uint32_t>(lpccIncreaseIntervalUsArg)));
+				}
+				if (lpccIncreaseFactorArg > 0) {
+					rdmaHw->SetAttribute("LpccIncreaseFactor", DoubleValue(lpccIncreaseFactorArg));
+				}
+				if (lpccWrArg > 0) {
+					rdmaHw->SetAttribute("Lpcc_m_wr", DoubleValue(lpccWrArg));
+				}
+				if (lpccKrArg > 0) {
+					rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKrArg));
+				}
 				rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
 				rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
 				rdmaHw->SetAttribute("GeminiH", DoubleValue(gemini_h));
@@ -1486,12 +1490,24 @@ int main(int argc, char *argv[])
 			sw->SetAttribute("BifrostK", UintegerValue(bifrost_k));
 			sw->SetAttribute("BifrostLonghaulDelayCutoffUs", UintegerValue(bifrost_longhaul_delay_cutoff_us));
 			sw->SetAttribute("BifrostHMarginSlots", UintegerValue(bifrost_h_margin_slots));
-				sw->SetAttribute("Epsilon", UintegerValue(epsilon));
-				sw->SetAttribute("FcnpMinIntervalUs", UintegerValue(lpccFcnpMinIntervalUs));
-				sw->SetAttribute("LpccPerFlowFcnpCooldownUs", UintegerValue(lpccPerFlowFcnpCooldownUs));
-				sw->SetAttribute("LpccFcnpTopK", UintegerValue(lpccFcnpTopK));
-				sw->SetAttribute("LpccFcnpTopKHigh", UintegerValue(lpccFcnpTopKHigh));
-				sw->SetAttribute("LpccFcnpKHighThreshBytes", UintegerValue(lpccFcnpKHighThreshBytes));
+				if (lpccEpsilonArg > 0) {
+					sw->SetAttribute("Epsilon", UintegerValue(static_cast<uint32_t>(lpccEpsilonArg)));
+				}
+				if (lpccFcnpMinIntervalUsArg > 0) {
+					sw->SetAttribute("FcnpMinIntervalUs", UintegerValue(static_cast<uint32_t>(lpccFcnpMinIntervalUsArg)));
+				}
+				if (lpccPerFlowFcnpCooldownUsArg > 0) {
+					sw->SetAttribute("LpccPerFlowFcnpCooldownUs", UintegerValue(static_cast<uint32_t>(lpccPerFlowFcnpCooldownUsArg)));
+				}
+				if (lpccFcnpTopKArg > 0) {
+					sw->SetAttribute("LpccFcnpTopK", UintegerValue(static_cast<uint32_t>(lpccFcnpTopKArg)));
+				}
+				if (lpccFcnpTopKHighArg > 0) {
+					sw->SetAttribute("LpccFcnpTopKHigh", UintegerValue(static_cast<uint32_t>(lpccFcnpTopKHighArg)));
+				}
+				if (lpccFcnpKHighThreshBytesArg > 0) {
+					sw->SetAttribute("LpccFcnpKHighThreshBytes", UintegerValue(static_cast<uint32_t>(lpccFcnpKHighThreshBytesArg)));
+				}
 			if (flow_control_mode == 1) {
 				for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
 					Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(sw->GetDevice(j));
@@ -1598,8 +1614,22 @@ int main(int argc, char *argv[])
 	//     qbb.EnableAsciiAll (ascii.CreateFileStream ("eval.tr"));
 	std::cout << "Running Simulation.\n";
 	NS_LOG_INFO("Run Simulation.");
+	if (!flow_table_mon_file.empty()) {
+		g_flow_table_output = fopen(flow_table_mon_file.c_str(), "w");
+		if (g_flow_table_output) {
+			Simulator::Schedule(NanoSeconds(flow_table_mon_interval_ns),
+			                    &monitor_flow_table, g_flow_table_output, &n);
+		} else {
+			std::cerr << "WARN: failed to open FLOW_TABLE_MON_FILE " << flow_table_mon_file << '\n';
+		}
+	}
 	Simulator::Stop(Seconds(simulator_stop_time));
 	Simulator::Run();
+	if (g_flow_table_output) {
+		dump_flow_table_counters(g_flow_table_output, &n);
+		fclose(g_flow_table_output);
+		g_flow_table_output = nullptr;
+	}
 	Simulator::Destroy();
 	NS_LOG_INFO("Done.");
 	endt = clock();

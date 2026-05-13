@@ -111,7 +111,7 @@ if fcnp_send_latency:
     #     lw=2
     # )
     ax.plot(
-        x_in,
+        x_in / 1000,
         f_in,
         c='#1979a9',  # 参考代码的蓝色，对应生成时延
         lw=2

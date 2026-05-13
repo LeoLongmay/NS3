@@ -91,17 +91,17 @@ TypeId SwitchNode::GetTypeId (void)
 	                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("Epsilon",
 	                                  "lpcc epsilon",
-	                                  UintegerValue(3000),
+	                                  UintegerValue(1000000),
 	                                  MakeUintegerAccessor(&SwitchNode::m_epsilon),
 	                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("FcnpMinIntervalUs",
 			                                  "Minimum FCNP send interval per egress queue (us).",
-			                                  UintegerValue(50),
+			                                  UintegerValue(2000),
 			                                  MakeUintegerAccessor(&SwitchNode::m_fcnpMinIntervalUs),
 			                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("LpccPerFlowFcnpCooldownUs",
 			                                  "LPCC per-flow fCNP cooldown in microseconds. A flow will not be FCNP-hit again within this window.",
-			                                  UintegerValue(800),
+			                                  UintegerValue(2000),
 			                                  MakeUintegerAccessor(&SwitchNode::m_lpccPerFlowFcnpCooldownUs),
 			                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("LpccFcnpTopK",
@@ -116,7 +116,7 @@ TypeId SwitchNode::GetTypeId (void)
 			                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("LpccFcnpKHighThreshBytes",
 			                                  "LPCC dynamic-K queue threshold in bytes. Queue >= threshold uses high-K fanout.",
-			                                  UintegerValue(524288),
+			                                  UintegerValue(4000000),
 			                                  MakeUintegerAccessor(&SwitchNode::m_lpccFcnpKHighThreshBytes),
 			                                  MakeUintegerChecker<uint32_t>())
 						.AddAttribute("BiccEnableEcnClear",
@@ -527,8 +527,15 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 						const uint32_t kHigh = std::max<uint32_t>(kLow, m_lpccFcnpTopKHigh);
 						const uint32_t topK = highQueue ? kHigh : kLow;
 						const uint64_t perFlowCooldownTs = static_cast<uint64_t>(m_lpccPerFlowFcnpCooldownUs) * 1000ULL;
-						const auto selectedFlows = m_flowTable->GetTopRateFlowsByEgressQueue(ifIndex, qIndex, topK);
+						// Request 2*topK candidates so that flows currently in per-flow cooldown
+						// don't waste a fanout slot — we backfill from the next-highest flows.
+						const uint32_t candidatePoolSize = std::max<uint32_t>(topK, 2u * topK);
+						const auto selectedFlows = m_flowTable->GetTopRateFlowsByEgressQueue(ifIndex, qIndex, candidatePoolSize);
+						uint32_t fcnpSentForQueue = 0;
 						for (const auto& selectedFlow : selectedFlows) {
+							if (fcnpSentForQueue >= topK) {
+								break;
+							}
 							LpccFeedbackFlowKey flowKey{
 								selectedFlow.flow.sip.Get(),
 								selectedFlow.flow.dip.Get(),
@@ -567,6 +574,7 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 							SendToDev(fcnp_pkt, nch);
 							m_lpccFlowLastFcnpTs[flowKey] = nowTs;
 							lpccFcnpSent = true;
+							++fcnpSentForQueue;
 						}
 
 						// Fallback: if no active-flow snapshot is available yet, at least

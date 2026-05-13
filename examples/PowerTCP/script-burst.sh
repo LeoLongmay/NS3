@@ -110,44 +110,88 @@ for algorithm in "${algs[@]}"; do
 	)
 
 	# Pin LPCC to tuned parameters; keep other algorithms unchanged.
+	# Each --lpcc* knob, when supplied, overrides the matching Attribute default
+	# (see src/point-to-point/model/rdma-hw.cc Attribute table). The C++ Attribute
+	# defaults are aligned to these values, so this block is an explicit contract
+	# rather than a true override.
 		if [[ ${algNames[$algorithm]} == "lpcc" ]]; then
 			CMD+=(
-				# 1ms the best
-				# --lpccEpsilon=4000000
-				# --lpccThetaUs=800
-				# --lpccFcnpMinIntervalUs=250
-				# --lpccPerFlowFcnpCooldownUs=150
+				# --lpccEpsilon=1000000
+				# --lpccThetaUs=3500
+				# --lpccFcnpMinIntervalUs=2000
+				# --lpccPerFlowFcnpCooldownUs=2000
 				# --lpccFcnpTopK=3
-				# --lpccFcnpTopKHigh=5
-				# --lpccFcnpKHighThreshBytes=3500000
-				# --lpccIncreaseIntervalUs=55
-				# --lpccIncreaseFactor=0.38
-				# --lpccWr=2.2
-				# --lpccKr=0.22
+				# --lpccFcnpTopKHigh=6
+				# --lpccFcnpKHighThreshBytes=4000000
+				# --lpccIncreaseIntervalUs=66
+				# --lpccIncreaseFactor=0.2
+				# --lpccWr=4.0
+				# --lpccKr=0.12
 
-				# 10ms the best
-				# --lpccEpsilon=2500000
-				# --lpccThetaUs=500
-				# --lpccFcnpMinIntervalUs=150
-				# --lpccPerFlowFcnpCooldownUs=80
-				# --lpccFcnpTopK=5
-				# --lpccFcnpTopKHigh=12
-				# --lpccFcnpKHighThreshBytes=8000000
+				# --lpccEpsilon=1000000
+				# --lpccThetaUs=2700
+				# --lpccFcnpMinIntervalUs=1000
+				# --lpccPerFlowFcnpCooldownUs=1000
+				# --lpccFcnpTopK=6
+				# --lpccFcnpTopKHigh=10
+				# --lpccFcnpKHighThreshBytes=2000000
 				# --lpccIncreaseIntervalUs=70
-				# --lpccIncreaseFactor=0.24
+				# --lpccIncreaseFactor=0.18
+				# --lpccWr=4.0
+				# --lpccKr=0.12
+
+				# v6 (saved):
+				# --lpccEpsilon=1500000
+				# --lpccThetaUs=1500
+				# --lpccFcnpMinIntervalUs=500
+				# --lpccPerFlowFcnpCooldownUs=800
+				# --lpccFcnpTopK=3
+				# --lpccFcnpTopKHigh=10
+				# --lpccFcnpKHighThreshBytes=4000000
+				# --lpccIncreaseIntervalUs=65
+				# --lpccIncreaseFactor=0.10
+				# --lpccWr=1.0
+				# --lpccKr=0.12
+
+				# v7 (saved):
+				# --lpccEpsilon=2000000
+				# --lpccThetaUs=3000
+				# --lpccFcnpMinIntervalUs=600
+				# --lpccPerFlowFcnpCooldownUs=1500
+				# --lpccFcnpTopK=3
+				# --lpccFcnpTopKHigh=10
+				# --lpccFcnpKHighThreshBytes=10000000
+				# --lpccIncreaseIntervalUs=65
+				# --lpccIncreaseFactor=0.10
 				# --lpccWr=2.0
-				# --lpccKr=0.16
+				# --lpccKr=0.12
+
+				# v8 (saved):
+				# --lpccEpsilon=2000000
+				# --lpccThetaUs=2000
+				# --lpccFcnpMinIntervalUs=400
+				# --lpccPerFlowFcnpCooldownUs=1200
+				# --lpccFcnpTopK=4
+				# --lpccFcnpTopKHigh=13
+				# --lpccFcnpKHighThreshBytes=5000000
+				# --lpccIncreaseIntervalUs=65
+				# --lpccIncreaseFactor=0.10
+				# --lpccWr=2.0
+				# --lpccKr=0.12
+
+				# v9: AI freeze at qRatio>=5 (code-level) + v7 steady params + v8 emergency
 				--lpccEpsilon=2000000
-				--lpccThetaUs=5000
-				--lpccFcnpMinIntervalUs=2000
-				--lpccPerFlowFcnpCooldownUs=2000
-				--lpccFcnpTopK=5
-				--lpccFcnpTopKHigh=10
-				--lpccFcnpKHighThreshBytes=4000000
-				--lpccIncreaseIntervalUs=66
-				--lpccIncreaseFactor=0.19
-				--lpccWr=3.0
-				--lpccKr=0.12						
+				--lpccThetaUs=3000                # back to v7's 3ms (smooth steady state)
+				--lpccFcnpMinIntervalUs=500
+				--lpccPerFlowFcnpCooldownUs=1500
+				--lpccFcnpTopK=3                  # gentle steady-state touch
+				--lpccFcnpTopKHigh=13             # keep v8: emergency hits all flows
+				--lpccFcnpKHighThreshBytes=5000000  # keep v8: emergency engages early
+				--lpccIncreaseIntervalUs=65
+				--lpccIncreaseFactor=0.10
+				--lpccWr=2.0
+				--lpccKr=0.12
+
 			)
 		fi
 

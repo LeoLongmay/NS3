@@ -123,7 +123,6 @@ public:
         EventId m_rpTimer;
         bool m_decrease_cnp_arrived; // indicate if CNP arrived in the last slot
         bool m_first_cnp;          // indicate if the current CNP is the first CNP
-        EventId m_eventDecreaseRate;
         uint32_t m_rpTimeStage;
         uint32_t m_lastUpdateSeq;
 		uint64_t m_lastDecreaseRate; // time of last rate decrease
