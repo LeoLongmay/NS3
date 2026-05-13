@@ -12,7 +12,7 @@ from scipy.stats import lognorm
 from statsmodels.distributions.empirical_distribution import ECDF
 
 # 配置路径（可根据你的实际数据文件路径修改）
-data_file_path = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/dump_workload/evaluation-lpcc-fcnp-delay.out"  # 替换为你的实际数据文件路径
+data_file_path = "/home/master01/CC_Exp/examples/PowerTCP/dump_workload/evaluation-lpcc-fcnp-delay.out"  # 替换为你的实际数据文件路径
 plots_dir = "./plot_workload/"
 os.makedirs(plots_dir, exist_ok=True)
 

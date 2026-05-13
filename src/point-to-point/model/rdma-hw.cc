@@ -18,6 +18,8 @@
 
 namespace ns3 {
 
+NS_OBJECT_ENSURE_REGISTERED(RdmaHw);
+
 TypeId RdmaHw::GetTypeId (void)
 {
 	static TypeId tid = TypeId ("ns3::RdmaHw")

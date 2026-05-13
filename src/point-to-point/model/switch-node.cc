@@ -29,6 +29,8 @@ constexpr uint32_t TRANSPORT_MODE_TCP_BBR = 1;
 // uint32_t SwitchNode::cnp_count = 0;
 // uint32_t SwitchNode::fcnp_count = 0;
 
+NS_OBJECT_ENSURE_REGISTERED(SwitchNode);
+
 TypeId SwitchNode::GetTypeId (void)
 {
 	static TypeId tid = TypeId ("ns3::SwitchNode")
