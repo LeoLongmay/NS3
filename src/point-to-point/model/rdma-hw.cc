@@ -335,11 +335,11 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		std::cout << "sip " << sip << " dip " << dip << " sport " << sport  << " dport " << dport << std::endl;
 	}
 	DataRate m_bps = m_nic[nic_idx].dev->GetDataRate();
-	uint64_t effectivePathBw = pathBwBps > 0 ? pathBwBps : m_bps.GetBitRate();
 	uint32_t initWin = win;
-	if (m_cc_mode == 11 && initWin == 0) {
-		uint64_t bdpWin = effectivePathBw * baseRtt / 8000000000ULL;
-		initWin = std::max<uint64_t>(2 * m_mtu, bdpWin);
+	if (m_cc_mode == 11) {
+		// Paper IW = 10 MSS regardless of what caller passed; AIMD ramps up from there
+		// to preserve fairness (caller passes maxBdp ≈ 122 MB, which causes monopoly).
+		initWin = 10 * m_mtu;
 	}
 	qp->SetWin(initWin);
 	if (win && m_cc_mode != 11)
@@ -1544,10 +1544,21 @@ bool RdmaHw::UpdateStateGeminiOnAck(Ptr<RdmaQueuePair> qp, CustomHeader &ch, boo
 	uint8_t cnp = (ch.ack.flags >> qbbHeader::FLAG_CNP) & 1;
 	uint64_t rttSample = Simulator::Now().GetTimeStep() - ch.ack.ih.ts;
 
+	// Windowed min RTT (10 RTT window) to allow rttBase to recover
 	if (qp->gemini.rttBaseNs == 0) {
 		qp->gemini.rttBaseNs = qp->m_baseRtt > 0 ? qp->m_baseRtt : rttSample;
+		qp->gemini.rttBaseCandidateNs = rttSample;
+		qp->gemini.rttBaseWindowStartNs = Simulator::Now().GetTimeStep();
 	}
 	qp->gemini.rttBaseNs = std::min(qp->gemini.rttBaseNs, rttSample);
+	qp->gemini.rttBaseCandidateNs = std::min(qp->gemini.rttBaseCandidateNs, rttSample);
+	uint64_t rttWindowNs = std::max<uint64_t>(qp->gemini.rttBaseNs * 10, 10000000ULL); // 10x base RTT, min 10ms
+	uint64_t nowNs = Simulator::Now().GetTimeStep();
+	if (nowNs - qp->gemini.rttBaseWindowStartNs >= rttWindowNs) {
+		qp->gemini.rttBaseNs = qp->gemini.rttBaseCandidateNs;
+		qp->gemini.rttBaseCandidateNs = rttSample;
+		qp->gemini.rttBaseWindowStartNs = nowNs;
+	}
 	if (qp->gemini.rttMinWindowNs == 0) {
 		qp->gemini.rttMinWindowNs = rttSample;
 	} else {
@@ -1580,7 +1591,10 @@ bool RdmaHw::UpdateStateGeminiOnAck(Ptr<RdmaQueuePair> qp, CustomHeader &ch, boo
 
 void RdmaHw::ApplyGeminiWindowReduction(Ptr<RdmaQueuePair> qp, bool congestedDcn, bool congestedWan) {
 	uint64_t nowNs = Simulator::Now().GetTimeStep();
-	if (qp->gemini.lastReductionTsNs != 0 && nowNs - qp->gemini.lastReductionTsNs <= qp->gemini.rttBaseNs) {
+	// Paper: "window reduction is performed no more than once per RTT" — use baseRTT,
+	// not queueing-inflated min RTT, so dominant and starved flows MD at same cadence.
+	uint64_t guardNs = qp->gemini.rttBaseNs > 0 ? qp->gemini.rttBaseNs : 1000000ULL;
+	if (qp->gemini.lastReductionTsNs != 0 && nowNs - qp->gemini.lastReductionTsNs <= guardNs) {
 		return;
 	}
 
@@ -1596,14 +1610,19 @@ void RdmaHw::ApplyGeminiWindowReduction(Ptr<RdmaQueuePair> qp, bool congestedDcn
 }
 
 void RdmaHw::ApplyGeminiAi(Ptr<RdmaQueuePair> qp) {
+	// Paper §III-B: h = H * C * RTT (MSS per RTT). Per-RTT cwnd growth = h * MTU.
+	// Called per batch (~1 RTT) from UpdateStateGeminiOnAck, so apply h * MTU directly.
+	uint64_t rttNs = qp->gemini.rttBaseNs > 0 ? qp->gemini.rttBaseNs : 1;
 	uint64_t pathBwBps = qp->pathBwBps > 0 ? qp->pathBwBps : qp->m_max_rate.GetBitRate();
-	uint64_t bdpBytes = std::max<uint64_t>(2 * m_mtu, pathBwBps * qp->gemini.rttBaseNs / 8000000000ULL);
-	double h = m_geminiH * double(bdpBytes);
-	double minH = 0.1 * m_mtu;
-	double maxH = 5.0 * m_mtu;
-	h = std::max(minH, std::min(maxH, h));
-	double cwnd = std::max<double>(qp->gemini.cwndBytes, 2 * m_mtu);
-	qp->gemini.cwndBytes = std::max<uint64_t>(2 * m_mtu, uint64_t(cwnd + h / cwnd));
+	double h = m_geminiH * double(pathBwBps) * (double(rttNs) / 1e9);
+	// Paper bounds h to [0.1, 5] for 1 Gbps testbed; raise upper bound for high-BDP setups.
+	// Higher than ~500 MSS/RTT here causes AI to overshoot fair share past buffer capacity,
+	// triggering PFC NACK death cascades. Slow steady ramp is better than fast oscillation.
+	h = std::max(0.1, std::min(500.0, h));
+	uint64_t aiBytes = uint64_t(h * m_mtu);
+	uint64_t maxCwnd = qp->m_max_rate.GetBitRate() * rttNs / 8000000000ULL;
+	uint64_t newCwnd = std::min(maxCwnd, qp->gemini.cwndBytes + aiBytes);
+	qp->gemini.cwndBytes = std::max<uint64_t>(2 * m_mtu, newCwnd);
 }
 
 void RdmaHw::SyncGeminiRateAndWindow(Ptr<RdmaQueuePair> qp) {

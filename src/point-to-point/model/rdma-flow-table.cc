@@ -42,8 +42,12 @@ void RDMAFlowTable::InsertOrUpdateFlow(Ipv4Address sip, Ipv4Address dip, uint16_
 
     if (it != m_flowMap.end()) {
         it->second.last_ts = now;
+        // Move to back of LRU list (O(1), iterator stays valid).
+        m_flowLru.splice(m_flowLru.end(), m_flowLru, it->second.lru_it);
     } else {
-        RDMAFlowEntry entry{ key, now, 0, 0.0 };
+        m_flowLru.push_back(key);
+        auto lru_it = std::prev(m_flowLru.end());
+        RDMAFlowEntry entry{ key, now, 0, 0.0, lru_it };
         m_flowMap.emplace(key, entry);
 
         m_dipFlowCount[dip]++;
@@ -79,10 +83,13 @@ void RDMAFlowTable::InsertOrUpdateFlowOnEgress(Ipv4Address sip,
         }
         it->second.last_pkt_bytes = pktBytes;
         it->second.last_ts = now;
+        m_egressLru.splice(m_egressLru.end(), m_egressLru, it->second.lru_it);
         return;
     }
 
-    RDMAFlowEntry entry{key.flow, now, pktBytes, 0.0};
+    m_egressLru.push_back(key);
+    auto lru_it = std::prev(m_egressLru.end());
+    RDMAEgressFlowEntry entry{key.flow, now, pktBytes, 0.0, lru_it};
     m_egressFlowMap.emplace(key, entry);
     m_egressFlowCount[RDMAPortQueueKey{port, qIndex}]++;
 }
@@ -134,7 +141,7 @@ bool RDMAFlowTable::GetMaxRateFlowByEgressQueue(uint32_t port,
         if (key.port != port || key.qIndex != qIndex) {
             continue;
         }
-        const RDMAFlowEntry& entry = pair.second;
+        const RDMAEgressFlowEntry& entry = pair.second;
         if (!found || entry.ewma_rate_bps > bestRate) {
             found = true;
             bestRate = entry.ewma_rate_bps;
@@ -182,27 +189,27 @@ std::vector<RDMAEgressFlowKey> RDMAFlowTable::GetTopRateFlowsByEgressQueue(uint3
 void RDMAFlowTable::CleanInactiveFlows() {
     ++m_cleanInactiveCalls;
     uint64_t now = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
-    std::vector<RDMAFlowKey> toDelete;
-    std::vector<RDMAEgressFlowKey> toDeleteEgress;
 
-    for (const auto& pair : m_flowMap) {
-        const RDMAFlowEntry& entry = pair.second;
-        if (now - entry.last_ts > m_inactiveThreshold) {
-            toDelete.push_back(pair.first);
+    // Drain expired ingress flows from the front of the LRU. Each updated flow
+    // is spliced to the back, so the front is always the oldest. We stop at
+    // the first non-expired entry — cost is O(K) where K = #flows expiring now.
+    while (!m_flowLru.empty()) {
+        const RDMAFlowKey& frontKey = m_flowLru.front();
+        auto mapIt = m_flowMap.find(frontKey);
+        if (mapIt == m_flowMap.end()) {
+            // Defensive: dangling LRU node (shouldn't normally happen).
+            m_flowLru.pop_front();
+            continue;
         }
-    }
-
-    for (const auto& pair : m_egressFlowMap) {
-        const RDMAFlowEntry& entry = pair.second;
-        if (now - entry.last_ts > m_inactiveThreshold) {
-            toDeleteEgress.push_back(pair.first);
+        if (now - mapIt->second.last_ts <= m_inactiveThreshold) {
+            break;
         }
-    }
+        Ipv4Address dip = frontKey.dip;
+        Ipv4Address sip = frontKey.sip;
+        m_flowMap.erase(mapIt);
+        m_flowLru.pop_front();
 
-    for (const RDMAFlowKey& key : toDelete) {
-        m_flowMap.erase(key);
-
-        auto dipIt = m_dipFlowCount.find(key.dip);
+        auto dipIt = m_dipFlowCount.find(dip);
         if (dipIt != m_dipFlowCount.end()) {
             if (dipIt->second > 1) {
                 dipIt->second--;
@@ -211,7 +218,7 @@ void RDMAFlowTable::CleanInactiveFlows() {
             }
         }
 
-        auto sipIt = m_sipFlowCount.find(key.sip);
+        auto sipIt = m_sipFlowCount.find(sip);
         if (sipIt != m_sipFlowCount.end()) {
             if (sipIt->second > 1) {
                 sipIt->second--;
@@ -221,10 +228,22 @@ void RDMAFlowTable::CleanInactiveFlows() {
         }
     }
 
-    for (const RDMAEgressFlowKey& key : toDeleteEgress) {
-        m_egressFlowMap.erase(key);
+    while (!m_egressLru.empty()) {
+        const RDMAEgressFlowKey& frontKey = m_egressLru.front();
+        auto mapIt = m_egressFlowMap.find(frontKey);
+        if (mapIt == m_egressFlowMap.end()) {
+            m_egressLru.pop_front();
+            continue;
+        }
+        if (now - mapIt->second.last_ts <= m_inactiveThreshold) {
+            break;
+        }
+        uint32_t port = frontKey.port;
+        uint32_t qIndex = frontKey.qIndex;
+        m_egressFlowMap.erase(mapIt);
+        m_egressLru.pop_front();
 
-        RDMAPortQueueKey portQueue{key.port, key.qIndex};
+        RDMAPortQueueKey portQueue{port, qIndex};
         auto egressIt = m_egressFlowCount.find(portQueue);
         if (egressIt != m_egressFlowCount.end()) {
             if (egressIt->second > 1) {
@@ -249,6 +268,9 @@ uint64_t RDMAFlowTable::GetTotalMemoryUsage() const {
     totalMem += m_sipFlowCount.size() * sizeof(SipPair);
     using EgressCountPair = typename decltype(m_egressFlowCount)::value_type;
     totalMem += m_egressFlowCount.size() * sizeof(EgressCountPair);
+    // LRU list node overhead: key + two pointers (prev/next) per node.
+    totalMem += m_flowLru.size() * (sizeof(RDMAFlowKey) + 2 * sizeof(void*));
+    totalMem += m_egressLru.size() * (sizeof(RDMAEgressFlowKey) + 2 * sizeof(void*));
 
     return totalMem;
 }

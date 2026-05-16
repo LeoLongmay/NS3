@@ -52,11 +52,12 @@ plt.rcParams.update({'font.size': 18})
 # algnames["bbr"]="BBR"
 # algnames["bicc"]="BICC"
 
-algs=list(["gemini", "bbr", "bicc"])
+algs=list(["gemini", "bbr", "bicc", "lpcc"])
 algnames={}
 algnames["gemini"]="GEMINI"
 algnames["bbr"]="BBR"
 algnames["bicc"]="BICC"
+algnames["lpcc"]="LPCC"
 
 
 ######## FAIRNESS #############
@@ -95,14 +96,14 @@ for alg in algs:
     df3 = pd.read_csv(results+'result-'+alg+'.3',delimiter=' ',usecols=[5,7],names=["th","time"])
     df4 = pd.read_csv(results+'result-'+alg+'.4',delimiter=' ',usecols=[5,7],names=["th","time"])
     
-    ax.set_xlim(0,0.7)
-    original_ticks = [0, 0.2, 0.4, 0.6]
+    ax.set_xlim(0, 3.0)
+    original_ticks = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
     ax.set_xticks(original_ticks)
 
-    target_labels = [0, 0.2, 0.4, 0.6]
+    target_labels = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
     ax.set_xticklabels(target_labels)
 
-    ax.set_ylim(0,52)
+    ax.set_ylim(0, 110 if alg=="lpcc" else 52)
     
     # ax.plot(df1["time"][::100],df1["th"][::100]/1e9)
     # ax.plot(df2["time"][::100],df2["th"][::100]/1e9)

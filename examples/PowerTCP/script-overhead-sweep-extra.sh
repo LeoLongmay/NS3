@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Supplementary sweep: run only the NEW larger flow counts (4096, 16384, 32768).
+# Supplementary sweep: run the larger flow counts (4096, 8192, 16384).
 # SIM_STOP is scaled per flow count to ensure all flows finish.
 
 set -e
@@ -16,8 +16,8 @@ CCMODE=(1       3      9)
 FLOWCTL=(0      0      0)
 TRANSPORT=(0    0      0)
 
-FLOW_COUNTS=(4096 16384 32768)
-PER_RUN_TIMEOUT=3600   # 60 minutes per run (larger sims)
+FLOW_COUNTS=(64 256 1024 4096 8192)
+PER_RUN_TIMEOUT=5400   # 90 minutes per run (larger sims)
 
 mkdir -p "$OUT_ROOT" "$FLOW_DIR"
 
@@ -39,9 +39,9 @@ for idx in "${!algs[@]}"; do
         # Scale SIM_STOP based on flow count:
         #   flows start at 0.13s; each host (64 total) sends N/64 flows of 1MB.
         #   Serialization at 100Gbps: N/64 * 80us. Add 2x headroom.
-        if   (( N <= 4096 ));  then SIM_STOP=0.25
-        elif (( N <= 16384 )); then SIM_STOP=0.40
-        else                        SIM_STOP=0.60
+        if   (( N <= 1024 ));  then SIM_STOP=0.20
+        elif (( N <= 4096 ));  then SIM_STOP=0.25
+        else                        SIM_STOP=0.50
         fi
 
         run_dir="$OUT_ROOT/$alg/$N"

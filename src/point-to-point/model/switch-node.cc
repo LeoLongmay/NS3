@@ -175,15 +175,16 @@ SwitchNode::SwitchNode() {
 	m_biccEcnClearCount = 0;
 	m_biccSoftVoqEnqueueCount = 0;
 	m_biccSoftVoqDequeueCount = 0;
-	    uint64_t inactiveThreshold = 50000; // 50us in ns time steps
 	m_flowTable = CreateObject<RDMAFlowTable>();
-	m_flowTable->SetInactiveThreshold(inactiveThreshold);
+	m_flowTable->SetInactiveThreshold(m_flowTableInactiveThresholdNs);
 
     ScheduleCleanFlowTable();
 }
 
 void SwitchNode::ScheduleCleanFlowTable() {
-    m_flowTable->CleanInactiveFlows();
+    if (m_flowTableMaintenance) {
+        m_flowTable->CleanInactiveFlows();
+    }
 	const uint64_t nowTs = static_cast<uint64_t>(Simulator::Now().GetTimeStep());
 	const uint64_t keepTs = std::max<uint64_t>(1000000ULL, static_cast<uint64_t>(m_lpccPerFlowFcnpCooldownUs) * 1000ULL * 8ULL);
 	for (auto it = m_lpccFlowLastFcnpTs.begin(); it != m_lpccFlowLastFcnpTs.end();) {
@@ -194,8 +195,15 @@ void SwitchNode::ScheduleCleanFlowTable() {
 		}
 	}
 
-    m_cleanFlowEvent = Simulator::Schedule(MicroSeconds(50),
+    m_cleanFlowEvent = Simulator::Schedule(NanoSeconds(m_flowTableCleanIntervalNs),
                                            &SwitchNode::ScheduleCleanFlowTable, this);
+}
+
+void SwitchNode::SetFlowTableInactiveThresholdNs(uint64_t ns) {
+    m_flowTableInactiveThresholdNs = ns;
+    if (m_flowTable) {
+        m_flowTable->SetInactiveThreshold(ns);
+    }
 }
 
 void SwitchNode::ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k) {
@@ -394,7 +402,7 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 		// std::cout << "inDev: " << inDev << " outDev: " << idx << " qIndex: " << qIndex << std::endl;
 		// qIndex %= 8;
 			m_bytes[inDev][idx][qIndex] += p->GetSize();
-			if (ch.l3Prot == 0x11 && qIndex != 0) {
+			if (m_flowTableMaintenance && ch.l3Prot == 0x11 && qIndex != 0) {
 				m_flowTable->InsertOrUpdateFlowOnEgress(Ipv4Address(ch.sip), Ipv4Address(ch.dip),
 				                                        ch.udp.sport, ch.udp.dport, idx, qIndex, ch.udp.pg,
 				                                        p->GetSize());
@@ -465,7 +473,7 @@ bool SwitchNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> pack
 	int outDevSigned = GetOutDev(packet, ch);
 	uint32_t outDev = outDevSigned >= 0 ? static_cast<uint32_t>(outDevSigned) : 0;
 
-	if (ch.l3Prot == 0x11) {
+	if (m_flowTableMaintenance && ch.l3Prot == 0x11) {
 		PppHeader ppp;
 		Ipv4Header h;
 		UdpHeader udph;

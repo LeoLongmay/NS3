@@ -1,12 +1,12 @@
 examples/PowerTCP/config-workload.txtENABLE_QCN			Yes
 PACKET_PAYLOAD_SIZE		1000
-TOPOLOGY_FILE			/home/master01/CC_Exp/examples/PowerTCP/topology_dci_lpcc.txt
+TOPOLOGY_FILE			/home/master01/CC_Exp/examples/PowerTCP/topology_simple.txt
 FLOW_FILE			/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/workload/flows_40%load.txt
 TRACE_FILE			/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_in_trace.txt
 TRACE_OUTPUT_FILE		/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_out_trace.txt
 FCT_OUTPUT_FILE		/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_out_fct.txt
 PFC_OUTPUT_FILE				/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_out_pfc.txt
-SIMULATOR_STOP_TIME		6
+SIMULATOR_STOP_TIME		4
 CC_MODE		3
 ALPHA_RESUME_INTERVAL		1
 RATE_DECREASE_INTERVAL		4
@@ -49,11 +49,9 @@ PMAX_MAP				 100000000000 0.2 200000000000 0.2 400000000000 0.2
 BUFFER_SIZE				4
 QLEN_MON_FILE				/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_out_qlen.txt
 QLEN_MON_START				2000000000
-QLEN_MON_END				4000000000
+QLEN_MON_END				2400000000
 FLOWGEN_START_TIME		2
-FLOWGEN_STOP_TIME		4
-RANDOM_SEED			4001
-maxRtt=960480 maxBdp=12006000 minRtt=20160
-ERROR: node:1 NACK NIC cannot find the flow
-ERROR: node:7 NACK NIC cannot find the flow
-SimulationSeconds 8982.2
+FLOWGEN_STOP_TIME		2.4
+RANDOM_SEED			4002
+maxRtt=1200400 maxBdp=15005000 minRtt=20160
+SimulationSeconds 543.095

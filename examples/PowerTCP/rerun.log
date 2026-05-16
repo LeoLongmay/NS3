@@ -1,0 +1,10 @@
+[*] alg=hpcc cc=3 N=64 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/hpcc/64
+    elapsed=6s, fct=64, ft=36000
+[*] alg=hpcc cc=3 N=256 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/hpcc/256
+    elapsed=49s, fct=256, ft=36000
+[*] alg=hpcc cc=3 N=1024 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/hpcc/1024
+    elapsed=256s, fct=1018, ft=36000
+[*] alg=hpcc cc=3 N=4096 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/hpcc/4096
+    (run failed/timeout)
+    elapsed=3600s, fct=2133, ft=36162
+[*] alg=dcqcn cc=1 N=4096 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/dcqcn/4096

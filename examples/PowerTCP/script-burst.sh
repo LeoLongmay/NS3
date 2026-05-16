@@ -179,18 +179,115 @@ for algorithm in "${algs[@]}"; do
 				# --lpccWr=2.0
 				# --lpccKr=0.12
 
-				# v9: AI freeze at qRatio>=5 (code-level) + v7 steady params + v8 emergency
-				--lpccEpsilon=2000000
-				--lpccThetaUs=3000                # back to v7's 3ms (smooth steady state)
-				--lpccFcnpMinIntervalUs=500
-				--lpccPerFlowFcnpCooldownUs=1500
-				--lpccFcnpTopK=3                  # gentle steady-state touch
-				--lpccFcnpTopKHigh=13             # keep v8: emergency hits all flows
-				--lpccFcnpKHighThreshBytes=5000000  # keep v8: emergency engages early
-				--lpccIncreaseIntervalUs=65
-				--lpccIncreaseFactor=0.10
-				--lpccWr=2.0
-				--lpccKr=0.12
+				# v9 (saved):
+				# --lpccEpsilon=2000000
+				# --lpccThetaUs=3000                # back to v7's 3ms (smooth steady state)
+				# --lpccFcnpMinIntervalUs=500
+				# --lpccPerFlowFcnpCooldownUs=1500
+				# --lpccFcnpTopK=3                  # gentle steady-state touch
+				# --lpccFcnpTopKHigh=13             # keep v8: emergency hits all flows
+				# --lpccFcnpKHighThreshBytes=5000000  # keep v8: emergency engages early
+				# --lpccIncreaseIntervalUs=65
+				# --lpccIncreaseFactor=0.10
+				# --lpccWr=2.0
+				# --lpccKr=0.12
+
+				# v10 (saved): nearly hit target state (400G/<10MB) at t=0-11ms & t=70-79ms,
+				# but cyclic collapse-recovery because per-FCNP cut (~48%) > AI growth (1.57x)
+				# per cycle. Root cause was hidden defaults: QueueTargetRatio=0.375 (target only
+				# 1.5MB at eps=4MB), DropCapHigh=0.5, AiSuppressMultiplier=15.
+				# --lpccEpsilon=4000000
+				# --lpccThetaUs=1000
+				# --lpccFcnpMinIntervalUs=200
+				# --lpccPerFlowFcnpCooldownUs=400
+				# --lpccFcnpTopK=5
+				# --lpccFcnpTopKHigh=24
+				# --lpccFcnpKHighThreshBytes=8000000
+				# --lpccIncreaseIntervalUs=80
+				# --lpccIncreaseFactor=0.04
+				# --lpccWr=4.0
+				# --lpccKr=0.08
+
+				# v11 (saved, FAILED): route B with both qTgtRatio AND dropCapHigh relaxed.
+				# Buffer saturated at 134MB (avg 108MB, th=349G in incast window) like v9.
+				# Two simultaneous weakenings (dropCap 0.5->0.3, wr 4.0->2.0) made cuts
+				# too gentle for the 23-flow incast burst.
+				# --lpccEpsilon=4000000
+				# --lpccThetaUs=1000
+				# --lpccFcnpMinIntervalUs=200
+				# --lpccPerFlowFcnpCooldownUs=400
+				# --lpccFcnpTopK=5
+				# --lpccFcnpTopKHigh=18
+				# --lpccFcnpKHighThreshBytes=8000000
+				# --lpccIncreaseIntervalUs=80
+				# --lpccIncreaseFactor=0.04
+				# --lpccWr=2.0
+				# --lpccKr=0.08
+				# --lpccQueueTargetRatio=1.5
+				# --lpccDropCapHigh=0.3
+				# --lpccAiSuppressMultiplier=5
+
+				# v12 (saved): incast hit 400G+ with qlen <50MB, settled qlen <1.3MB but
+				# throughput stuck at 246G — AI gain too small to recoup gentle steady-state
+				# FCNP cuts in the qRatio < 1 interpolation band.
+				# --lpccEpsilon=4000000
+				# --lpccThetaUs=1000
+				# --lpccFcnpMinIntervalUs=200
+				# --lpccPerFlowFcnpCooldownUs=400
+				# --lpccFcnpTopK=5
+				# --lpccFcnpTopKHigh=24
+				# --lpccFcnpKHighThreshBytes=8000000
+				# --lpccIncreaseIntervalUs=80
+				# --lpccIncreaseFactor=0.04
+				# --lpccWr=4.0
+				# --lpccKr=0.08
+				# --lpccQueueTargetRatio=1.5
+				# --lpccDropCapHigh=0.5
+				# --lpccAiSuppressMultiplier=5
+
+				# v13 (saved, FAILED): incFactor 0.10 was too aggressive — after queue
+				# drained at t=15ms, AI explosion refilled buffer to 134MB cap and
+				# pinned there for the rest of the run.
+				# --lpccIncreaseFactor=0.10  (rest same as v12)
+
+				# v14 (saved): reached dynamic equilibrium (qlen 8-15MB oscillating around
+				# 6MB target, th 240-270G stable) but th stuck at 250G regardless of
+				# incFactor. Diagnosis: per-flow FCNP firing 2-3x per theta with 44%
+				# cut each, AI 2.07x can't keep up.
+				# --lpccPerFlowFcnpCooldownUs=400  (rest same)
+
+				# v15 (saved, FAILED): cooldown 1500us -> queue blew to 134MB cap at sw72.
+				# --lpccPerFlowFcnpCooldownUs=1500  (rest same as v14)
+
+				# v14 (saved, qlen<10MB target): qlen avg 10MB peak 22MB,
+				# Port 4 (72->74) settled 246G.
+				# --lpccQueueTargetRatio=1.5         (rest same as v16)
+
+				# v16 (saved, FAILED): qTgtRatio=3.0 -> target 12MB, dropCapHigh
+				# threshold at qlen>=24MB came in too late; burst pushed buffer to
+				# 50MB+ before high-cap kicked in, then drifted to 134MB cap.
+				# --lpccQueueTargetRatio=3.0  (rest same as v17)
+
+				# v17: bisect qTgtRatio between v14 (1.5, qlen ok / th 246G) and
+				# v16 (3.0, qlen blew up).
+				#   qTgtRatio = 2.0 -> target 8MB, dropCapHigh at qlen>=16MB.
+				# Steady-state qlen 8-16MB gets gentle cuts; ANY excursion to
+				# 16-20MB triggers dropCapHigh=0.5 -> hard pullback.
+				# Expected: Port 4 ~300-350G with qlen mostly <20MB.
+				--lpccEpsilon=4000000
+				--lpccThetaUs=1000
+				--lpccFcnpMinIntervalUs=200
+				--lpccPerFlowFcnpCooldownUs=400
+				--lpccFcnpTopK=5
+				--lpccFcnpTopKHigh=24
+				--lpccFcnpKHighThreshBytes=8000000
+				--lpccIncreaseIntervalUs=80
+				--lpccIncreaseFactor=0.06
+				--lpccWr=4.0
+				--lpccKr=0.08
+				--lpccQueueTargetRatio=2.0
+				--lpccDropCapHigh=0.5
+				--lpccAiSuppressMultiplier=5
 
 			)
 		fi

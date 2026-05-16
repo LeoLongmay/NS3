@@ -95,6 +95,8 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
 		gemini.rttBaseNs = 0;
 		gemini.rttMinWindowNs = 0;
 		gemini.lastReductionTsNs = 0;
+		gemini.rttBaseWindowStartNs = 0;
+		gemini.rttBaseCandidateNs = 0;
 		gemini.m_lastUpdateSeq = 0;
 		gemini.batchSizePkts = 0;
 		gemini.ecnCntPkts = 0;

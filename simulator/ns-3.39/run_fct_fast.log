@@ -1,0 +1,3 @@
+[done] load=40% alg=DCQCN out=/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/DCQCN/DCQCN_out_fct.txt
+[done] load=40% alg=LPCC out=/home/master01/CC_Exp/simulator/ns-3.39/mix/40%load/LPCC/LPCC_out_fct.txt
+[all done] outputs at: /home/master01/CC_Exp/simulator/ns-3.39/mix

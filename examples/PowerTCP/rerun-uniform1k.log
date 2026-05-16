@@ -1,0 +1,15 @@
+[*] alg=lpcc N=4096 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_uniform1k/lpcc/4096
+    elapsed=4s, fct=4096, ft=45000
+## UNIFORM-1K RUN FINISHED ##
+[*] alg=lpcc N=16384 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_uniform1k/lpcc/16384
+    elapsed=8s, fct=16384, ft=45000
+## UNIFORM-1K RUN FINISHED ##
+[*] alg=lpcc N=65536 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_uniform1k/lpcc/65536
+    elapsed=44s, fct=65536, ft=45000
+[*] alg=lpcc N=262144 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_uniform1k/lpcc/262144
+    elapsed=679s, fct=262144, ft=45000
+[*] alg=lpcc N=1048576 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_uniform1k/lpcc/1048576
+/home/master01/CC_Exp/examples/PowerTCP/script-rerun-uniform1k.sh: line 26: 35441 Killed                  timeout "$PER_RUN_TIMEOUT" "$BIN" --conf="$run_conf" --algorithm="$cc" --transportMode="$tp" --flowControlMode="$fc" --wien="$wien" --delayWien="$delay" --windowCheck="$window" > "$run_dir/run.log" 2>&1
+    (run failed/timeout)
+    elapsed=2478s, fct=129248, ft=32850
+## UNIFORM-1K RUN FINISHED ##

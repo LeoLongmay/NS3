@@ -191,7 +191,7 @@ void ScheduleFlowInputs(){
 			n.Get(flow_input.src)->AddApplication(sender);
 			Time appStart = Simulator::Now() + NanoSeconds(1);
 			sender->SetStartTime(appStart);
-			sender->SetStopTime(Seconds(flow_input.start_time) + MilliSeconds(100 * flow_num));
+			sender->SetStopTime(Seconds(simulator_stop_time));
 
 			PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), flow_input.dport));
 			ApplicationContainer sinkApp = sink.Install(n.Get(flow_input.dst));
@@ -217,9 +217,9 @@ void ScheduleFlowInputs(){
 					},
 					g_fct_output, static_cast<uint32_t>(flow_input.src), static_cast<uint32_t>(flow_input.dst), static_cast<uint16_t>(port), static_cast<uint16_t>(flow_input.dport)));
 			sinkApp.Start(appStart);
-			sinkApp.Stop(Seconds(flow_input.start_time) + MilliSeconds(100 * flow_num));
+			sinkApp.Stop(Seconds(simulator_stop_time));
 		} else {
-			RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win?(global_t==1?maxBdp:pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]):0, global_t==1?maxRtt:pairRtt[flow_input.src][flow_input.dst], pairBw[flow_input.src][flow_input.dst], Seconds(flow_input.start_time)+MilliSeconds(100*flow_num));
+			RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win?(global_t==1?maxBdp:pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]):0, global_t==1?maxRtt:pairRtt[flow_input.src][flow_input.dst], pairBw[flow_input.src][flow_input.dst], Seconds(simulator_stop_time));
 			ApplicationContainer appCon = clientHelper.Install(n.Get(flow_input.src));
 			appCon.Start(Seconds(0)); // setting the correct time here conflicts with Sim time since there is already a schedule event that triggered this function at desired time.
 		}

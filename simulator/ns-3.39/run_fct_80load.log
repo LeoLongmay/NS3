@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "run_fct.py", line 388, in <module>
+    main()
+  File "run_fct.py", line 367, in main
+    run_cmd(
+  File "run_fct.py", line 230, in run_cmd
+    subprocess.run(cmd, cwd=cwd, check=True, stdout=logf, stderr=subprocess.STDOUT)
+  File "/usr/lib/python3.8/subprocess.py", line 516, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/home/master01/CC_Exp/simulator/ns-3.39/build/scratch/ns3.39-fct-eval-default', '--conf=/home/master01/CC_Exp/simulator/ns-3.39/mix/80%load/DCQCN/config.txt', '--algorithm=1', '--transportMode=0', '--flowControlMode=0', '--windowCheck=0', '--wien=false', '--delayWien=false', '--randomSeed=8001']' died with <Signals.SIGTERM: 15>.

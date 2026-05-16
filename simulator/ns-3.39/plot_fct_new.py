@@ -406,8 +406,8 @@ def main():
         dest="time_limit_end",
         action="store",
         type=int,
-        default=10_000_000_000,
-        help="only consider flows that finish before T (ns), default=10000000000",
+        default=6_000_000_000,
+        help="only consider flows that finish before T (ns), default=6000000000 (matches run_fct.py simulator_stop=6.0s)",
     )
     parser.add_argument("--step", type=int, default=4, help="percentile step for x-axis buckets")
     parser.add_argument(

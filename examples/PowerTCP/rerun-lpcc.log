@@ -1,0 +1,10 @@
+[*] alg=lpcc N=64 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/lpcc/64
+    elapsed=5s, fct=64, ft=36000
+[*] alg=lpcc N=256 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/lpcc/256
+    elapsed=36s, fct=256, ft=36000
+[*] alg=lpcc N=1024 SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/lpcc/1024
+    elapsed=197s, fct=1024, ft=36000
+[*] alg=lpcc N=4096 SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead/lpcc/4096
+    (run failed/timeout)
+    elapsed=3600s, fct=1346, ft=35946
+##  LPCC RERUN FINISHED  ##

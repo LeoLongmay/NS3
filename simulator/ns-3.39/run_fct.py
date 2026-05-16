@@ -11,7 +11,7 @@ ALGO_MATRIX = {
     "HPCC": {"algorithm": 3, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "Timely": {"algorithm": 7, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "PowerTCP": {"algorithm": 3, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "true", "delayWien": "false"},
-    "LPCC": {"algorithm": 9, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
+    "LPCC": {"algorithm": 9, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "BICC": {"algorithm": 12, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "GEMINI": {"algorithm": 11, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "Bifrost": {"algorithm": 1, "transportMode": 0, "flowControlMode": 1, "windowCheck": 0, "wien": "false", "delayWien": "false"},
@@ -298,8 +298,8 @@ def main() -> None:
     # 1) Generate baseline workload in [flowgen_start, baseline_flowgen_stop].
     # 2) Stretch all flow start times linearly to [flowgen_start, flowgen_stop].
     flowgen_start = 2.0
-    baseline_flowgen_stop = 3.0
-    flowgen_stop = 4.0
+    baseline_flowgen_stop = 2.2
+    flowgen_stop = 2.4
     simulator_stop = 6.0
 
     for load in args.loads:

@@ -98,6 +98,9 @@ private:
 
 	    Ptr<RDMAFlowTable> m_flowTable; // flow table
 	    EventId m_cleanFlowEvent;
+	    uint64_t m_flowTableInactiveThresholdNs{50000}; // default 50us; overridable from config
+	    uint64_t m_flowTableCleanIntervalNs{50000};     // default 50us; overridable from config
+	    bool m_flowTableMaintenance{true};              // false skips Insert*/Clean* for A/B no-op tests
 		uint64_t m_lastFcnpSentTs[pCnt][qCnt];
 		uint64_t m_lastBiccNsSentTs[pCnt][qCnt];
 		BifrostState m_bifrost[pCnt][qCnt];
@@ -189,6 +192,9 @@ public:
 	bool SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> packet, CustomHeader &ch);
 	void SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Packet> p);
 	Ptr<RDMAFlowTable> GetFlowTable() const { return m_flowTable; }
+	void SetFlowTableInactiveThresholdNs(uint64_t ns);
+	void SetFlowTableCleanIntervalNs(uint64_t ns) { m_flowTableCleanIntervalNs = ns; }
+	void SetFlowTableMaintenance(bool on) { m_flowTableMaintenance = on; }
 	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
 	void ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k);
 	void SetBifrostPortEnabled(uint32_t inPort, bool enabled);

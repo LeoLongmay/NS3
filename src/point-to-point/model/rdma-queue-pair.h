@@ -112,6 +112,8 @@ public:
 			uint64_t rttBaseNs;
 			uint64_t rttMinWindowNs;
 			uint64_t lastReductionTsNs;
+			uint64_t rttBaseWindowStartNs;
+			uint64_t rttBaseCandidateNs;
 			uint32_t m_lastUpdateSeq;
 			uint32_t batchSizePkts;
 			uint32_t ecnCntPkts;

@@ -1,0 +1,16 @@
+[*] alg=dcqcn N=64 maint=on SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/on/64
+    elapsed=4s, fct=64, ft=36000
+[*] alg=dcqcn N=64 maint=off SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/off/64
+    elapsed=5s, fct=64, ft=36000
+[*] alg=dcqcn N=256 maint=on SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/on/256
+    elapsed=17s, fct=256, ft=36000
+[*] alg=dcqcn N=256 maint=off SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/off/256
+    elapsed=15s, fct=256, ft=36000
+[*] alg=dcqcn N=1024 maint=on SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/on/1024
+    elapsed=123s, fct=1024, ft=36000
+[*] alg=dcqcn N=1024 maint=off SIM_STOP=0.20 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/off/1024
+    elapsed=116s, fct=1024, ft=36000
+[*] alg=dcqcn N=4096 maint=on SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/on/4096
+    (run failed/timeout)
+    elapsed=3600s, fct=598, ft=37026
+[*] alg=dcqcn N=4096 maint=off SIM_STOP=0.25 -> /home/master01/CC_Exp/examples/PowerTCP/dump_burst_overhead_ab/off/4096

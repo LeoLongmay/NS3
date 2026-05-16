@@ -6,6 +6,7 @@
 #include "ns3/simulator.h"
 
 #include <functional>
+#include <list>
 #include <unordered_map>
 #include <vector>
 
@@ -33,14 +34,6 @@ struct RDMAFlowKey {
     }
 };
 
-// Flow Table Entry
-struct RDMAFlowEntry {
-    RDMAFlowKey key;
-    uint64_t last_ts; // The timestamp of the last received packet in the flow
-    uint64_t last_pkt_bytes; // Last observed packet size on this flow
-    double ewma_rate_bps; // Smoothed per-flow rate estimate
-};
-
 struct RDMAPortQueueKey {
     uint32_t port;
     uint32_t qIndex;
@@ -59,6 +52,24 @@ struct RDMAEgressFlowKey {
     bool operator==(const RDMAEgressFlowKey& other) const {
         return flow == other.flow && port == other.port && qIndex == other.qIndex && pg == other.pg;
     }
+};
+
+// Flow Table Entry (ingress). Includes an LRU-list iterator so eviction is O(1) per expired flow.
+struct RDMAFlowEntry {
+    RDMAFlowKey key;
+    uint64_t last_ts; // The timestamp of the last received packet in the flow
+    uint64_t last_pkt_bytes; // Last observed packet size on this flow
+    double ewma_rate_bps; // Smoothed per-flow rate estimate
+    std::list<RDMAFlowKey>::iterator lru_it;
+};
+
+// Egress flow table entry — separate type because its LRU list holds RDMAEgressFlowKey.
+struct RDMAEgressFlowEntry {
+    RDMAFlowKey flow;
+    uint64_t last_ts;
+    uint64_t last_pkt_bytes;
+    double ewma_rate_bps;
+    std::list<RDMAEgressFlowKey>::iterator lru_it;
 };
 
 class RDMAFlowTable : public Object {
@@ -140,7 +151,11 @@ private:
     };
 
     std::unordered_map<RDMAFlowKey, RDMAFlowEntry, FlowKeyHash> m_flowMap{};
-    std::unordered_map<RDMAEgressFlowKey, RDMAFlowEntry, EgressFlowKeyHash> m_egressFlowMap{};
+    std::unordered_map<RDMAEgressFlowKey, RDMAEgressFlowEntry, EgressFlowKeyHash> m_egressFlowMap{};
+    // LRU lists keyed by last_ts (oldest at front, freshest at back).
+    // Insert: push_back; Update: splice to end; Cleanup: pop_front while expired.
+    std::list<RDMAFlowKey> m_flowLru{};
+    std::list<RDMAEgressFlowKey> m_egressLru{};
     std::unordered_map<Ipv4Address, uint32_t> m_dipFlowCount{};
     std::unordered_map<Ipv4Address, uint32_t> m_sipFlowCount{};
     std::unordered_map<RDMAPortQueueKey, uint32_t, PortQueueKeyHash> m_egressFlowCount{};

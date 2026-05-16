@@ -102,6 +102,9 @@ string qlen_mon_file;
 
 string flow_table_mon_file;
 uint64_t flow_table_mon_interval_ns = 100000;
+uint64_t flow_table_inactive_threshold_ns = 50000; // per-switch flow-table inactivity threshold
+uint64_t flow_table_clean_interval_ns = 50000;     // per-switch flow-table eviction sweep period
+int flow_table_maintenance = 1;                    // 0 disables Insert*/Clean* (A/B no-op test)
 FILE* g_flow_table_output = nullptr;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
@@ -583,6 +586,11 @@ int main(int argc, char *argv[])
 	double lpccIncreaseFactorArg = -1.0;
 	double lpccWrArg = -1.0;
 	double lpccKrArg = -1.0;
+	double lpccQueueTargetRatioArg = -1.0;
+	double lpccDropCapHighArg = -1.0;
+	int32_t lpccAiSuppressMultiplierArg = -1;
+	int32_t monitorSwitchIdArg = -1;
+	int64_t monitorThroughputBpsArg = -1;
 	std::string confFile = "/home/master01/CC_Exp/examples/PowerTCP/config-burst.txt";
 	std::cout << confFile;
 	CommandLine cmd;
@@ -605,6 +613,11 @@ int main(int argc, char *argv[])
 	cmd.AddValue("lpccIncreaseFactor", "LPCC AI factor beta (<=0 means keep built-in default)", lpccIncreaseFactorArg);
 	cmd.AddValue("lpccWr", "LPCC FCNP decrease cap wr (<=0 means keep built-in default)", lpccWrArg);
 	cmd.AddValue("lpccKr", "LPCC RTT-inflation decrease cap kr (<=0 means keep built-in default)", lpccKrArg);
+	cmd.AddValue("lpccQueueTargetRatio", "LPCC steady-state queue target / epsilon (<=0 means keep built-in default 0.375)", lpccQueueTargetRatioArg);
+	cmd.AddValue("lpccDropCapHigh", "LPCC single-step rate-drop cap at high qRatio (<=0 means keep built-in default 0.5)", lpccDropCapHighArg);
+	cmd.AddValue("lpccAiSuppressMultiplier", "LPCC AI suppression window in increaseInterval units after FCNP (<=0 means keep built-in default 15)", lpccAiSuppressMultiplierArg);
+	cmd.AddValue("monitorSwitchId", "Switch id to instrument for queue/throughput dump (-1 means keep built-in default 72)", monitorSwitchIdArg);
+	cmd.AddValue("monitorThroughputBps", "Data rate (bps) used to pick the monitored port at the instrumented switch (<=0 means keep built-in default 400G)", monitorThroughputBpsArg);
 
 	cmd.Parse (argc, argv);
 	conf.open(confFile.c_str());
@@ -927,6 +940,15 @@ int main(int argc, char *argv[])
 		} else if (key.compare("FLOW_TABLE_MON_INTERVAL_NS") == 0) {
 			conf >> flow_table_mon_interval_ns;
 			std::cout << "FLOW_TABLE_MON_INTERVAL_NS\t\t\t\t" << flow_table_mon_interval_ns << '\n';
+		} else if (key.compare("FLOW_TABLE_INACTIVE_THRESHOLD_NS") == 0) {
+			conf >> flow_table_inactive_threshold_ns;
+			std::cout << "FLOW_TABLE_INACTIVE_THRESHOLD_NS\t\t\t\t" << flow_table_inactive_threshold_ns << '\n';
+		} else if (key.compare("FLOW_TABLE_CLEAN_INTERVAL_NS") == 0) {
+			conf >> flow_table_clean_interval_ns;
+			std::cout << "FLOW_TABLE_CLEAN_INTERVAL_NS\t\t\t\t" << flow_table_clean_interval_ns << '\n';
+		} else if (key.compare("FLOW_TABLE_MAINTENANCE") == 0) {
+			conf >> flow_table_maintenance;
+			std::cout << "FLOW_TABLE_MAINTENANCE\t\t\t\t" << flow_table_maintenance << '\n';
 		} else if (key.compare("MULTI_RATE") == 0) {
 			int v;
 			conf >> v;
@@ -1009,7 +1031,10 @@ int main(int argc, char *argv[])
 		          << " incIntUs=" << (lpccIncreaseIntervalUsArg > 0 ? std::to_string(lpccIncreaseIntervalUsArg) : std::string("attr-default"))
 		          << " beta=" << (lpccIncreaseFactorArg > 0 ? std::to_string(lpccIncreaseFactorArg) : std::string("attr-default"))
 		          << " wr=" << (lpccWrArg > 0 ? std::to_string(lpccWrArg) : std::string("attr-default"))
-		          << " kr=" << (lpccKrArg > 0 ? std::to_string(lpccKrArg) : std::string("attr-default")) << "\n";
+		          << " kr=" << (lpccKrArg > 0 ? std::to_string(lpccKrArg) : std::string("attr-default"))
+		          << " qTgtRatio=" << (lpccQueueTargetRatioArg > 0 ? std::to_string(lpccQueueTargetRatioArg) : std::string("attr-default"))
+		          << " dropCapHigh=" << (lpccDropCapHighArg > 0 ? std::to_string(lpccDropCapHighArg) : std::string("attr-default"))
+		          << " aiSuppMult=" << (lpccAiSuppressMultiplierArg > 0 ? std::to_string(lpccAiSuppressMultiplierArg) : std::string("attr-default")) << "\n";
 	}
 
 	// Set Pint
@@ -1237,6 +1262,9 @@ int main(int argc, char *argv[])
 	for (uint32_t i = 0; i < node_num; i++) {
 		if (n.Get(i)->GetNodeType()) { // is switch
 			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
+			sw->SetFlowTableInactiveThresholdNs(flow_table_inactive_threshold_ns);
+			sw->SetFlowTableCleanIntervalNs(flow_table_clean_interval_ns);
+			sw->SetFlowTableMaintenance(flow_table_maintenance != 0);
 			// uint32_t shift = 3; // by default 1/8
 			double alpha = 1.0 / 8;
 				sw->m_mmu->SetAlphaIngress(alpha);
@@ -1303,7 +1331,10 @@ int main(int argc, char *argv[])
 			g_monitorWholeSwitchBuffer = false;
 			g_monitorContainerName = "unknown";
 			g_monitorThroughputPortIdx = -1;
-			const int32_t requestedSwitchId = 72;
+			const int32_t requestedSwitchId = (monitorSwitchIdArg >= 0) ? monitorSwitchIdArg : 72;
+			if (monitorThroughputBpsArg > 0) {
+				g_monitorThroughputTargetBps = static_cast<uint64_t>(monitorThroughputBpsArg);
+			}
 			auto fixedIt = switchIdToNum.find(static_cast<uint32_t>(requestedSwitchId));
 			if (fixedIt != switchIdToNum.end()) {
 				g_monitorSwitchId = requestedSwitchId;
@@ -1414,6 +1445,15 @@ int main(int argc, char *argv[])
 				}
 				if (lpccKrArg > 0) {
 					rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKrArg));
+				}
+				if (lpccQueueTargetRatioArg > 0) {
+					rdmaHw->SetAttribute("LpccQueueTargetRatio", DoubleValue(lpccQueueTargetRatioArg));
+				}
+				if (lpccDropCapHighArg > 0) {
+					rdmaHw->SetAttribute("LpccDropCapHigh", DoubleValue(lpccDropCapHighArg));
+				}
+				if (lpccAiSuppressMultiplierArg > 0) {
+					rdmaHw->SetAttribute("LpccAiSuppressMultiplier", UintegerValue(static_cast<uint32_t>(lpccAiSuppressMultiplierArg)));
 				}
 				rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
 				rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
