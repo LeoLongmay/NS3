@@ -4,11 +4,11 @@
 # 
 # This file includes the relevant testing commands required for 
 # testing this directory and lists subdirectories to be tested as well.
-add_test(ctest-example-sixlowpan "ns3.39-example-sixlowpan-debug")
+add_test(ctest-example-sixlowpan "ns3.39-example-sixlowpan-optimized")
 set_tests_properties(ctest-example-sixlowpan PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/sixlowpan/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;1;build_lib_example;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;0;")
-add_test(ctest-example-ping-lr-wpan "ns3.39-example-ping-lr-wpan-debug")
+add_test(ctest-example-ping-lr-wpan "ns3.39-example-ping-lr-wpan-optimized")
 set_tests_properties(ctest-example-ping-lr-wpan PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/sixlowpan/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;12;build_lib_example;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;0;")
-add_test(ctest-example-ping-lr-wpan-beacon "ns3.39-example-ping-lr-wpan-beacon-debug")
+add_test(ctest-example-ping-lr-wpan-beacon "ns3.39-example-ping-lr-wpan-beacon-optimized")
 set_tests_properties(ctest-example-ping-lr-wpan-beacon PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/sixlowpan/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;23;build_lib_example;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;0;")
-add_test(ctest-example-ping-lr-wpan-mesh-under "ns3.39-example-ping-lr-wpan-mesh-under-debug")
+add_test(ctest-example-ping-lr-wpan-mesh-under "ns3.39-example-ping-lr-wpan-mesh-under-optimized")
 set_tests_properties(ctest-example-ping-lr-wpan-mesh-under PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/sixlowpan/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;34;build_lib_example;/home/master01/CC_Exp/src/sixlowpan/examples/CMakeLists.txt;0;")

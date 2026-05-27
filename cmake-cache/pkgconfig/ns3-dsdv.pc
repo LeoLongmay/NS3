@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-internet
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-dsdv-debug  -lns3.39-internet-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-dsdv-optimized  -lns3.39-internet-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

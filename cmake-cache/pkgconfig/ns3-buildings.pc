@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-mobility ns3-propagation
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-buildings-debug  -lns3.39-mobility-debug -lns3.39-propagation-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-buildings-optimized  -lns3.39-mobility-optimized -lns3.39-propagation-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

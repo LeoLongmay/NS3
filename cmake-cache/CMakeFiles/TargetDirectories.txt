@@ -2,14 +2,12 @@
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/install/local.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/install.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/rebuild_cache.dir
+/home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_spectrum.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_topology-read.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/assemble-introspected-command-line.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_uan.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_wifi.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/edit_cache.dir
-/home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_spectrum.dir
-/home/master01/CC_Exp/cmake-cache/CMakeFiles/stdlib_pch-debug.dir
-/home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_bridge.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_olsr.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_wimax.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/check-version.dir
@@ -17,6 +15,8 @@
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/sphinx_tutorial.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_traffic-control.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/stdlib_pch_exec.dir
+/home/master01/CC_Exp/cmake-cache/CMakeFiles/stdlib_pch-optimized.dir
+/home/master01/CC_Exp/cmake-cache/CMakeFiles/sphinx.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_tap-bridge.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/list_install_components.dir
@@ -40,7 +40,6 @@
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/sphinx_manual.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/doxygen-no-build.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_stats.dir
-/home/master01/CC_Exp/cmake-cache/CMakeFiles/sphinx.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_propagation.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_nix-vector-routing.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_netanim.dir
@@ -60,6 +59,7 @@
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/all-test-targets.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_config-store.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_buildings.dir
+/home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_bridge.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_applications.dir
 /home/master01/CC_Exp/cmake-cache/CMakeFiles/uninstall_pkgconfig_aodv.dir
 /home/master01/CC_Exp/cmake-cache/src/CMakeFiles/install/strip.dir

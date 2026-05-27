@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-network
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-topology-read-debug  -lns3.39-network-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-topology-read-optimized  -lns3.39-network-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

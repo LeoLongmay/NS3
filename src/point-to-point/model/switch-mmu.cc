@@ -808,8 +808,18 @@ bool SwitchMmu::CheckEgressAdmission(uint32_t port, uint32_t qIndex, uint32_t ps
 			        // or if the switch buffer is full
 			        || (psize + totalUsed > bufferPool) )
 			{
-				std::cout << "dropping lossless packet at egress admission port " << port << " qIndex " << qIndex << " egress_bytes " << egress_bytes[port][qIndex] << " threshold " << Threshold(port, qIndex, "egress", type, unsched)
-				          << std::endl;
+				static uint64_t s_losslessDropCount = 0;
+				static uint64_t s_losslessDropNextReport = 1;
+				++s_losslessDropCount;
+				if (s_losslessDropCount == s_losslessDropNextReport) {
+					std::cout << "dropping lossless packet at egress admission switch " << m_switchIdForLog
+					          << " port " << port
+					          << " qIndex " << qIndex
+					          << " egress_bytes " << egress_bytes[port][qIndex]
+					          << " threshold " << Threshold(port, qIndex, "egress", type, unsched)
+					          << " (total_drops=" << s_losslessDropCount << ")" << std::endl;
+					s_losslessDropNextReport += 10000;
+				}
 				return false;
 			}
 			else {

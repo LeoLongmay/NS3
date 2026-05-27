@@ -4,15 +4,15 @@
 # 
 # This file includes the relevant testing commands required for 
 # testing this directory and lists subdirectories to be tested as well.
-add_test(ctest-csma-one-subnet "ns3.39-csma-one-subnet-debug")
+add_test(ctest-csma-one-subnet "ns3.39-csma-one-subnet-optimized")
 set_tests_properties(ctest-csma-one-subnet PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;11;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")
-add_test(ctest-csma-broadcast "ns3.39-csma-broadcast-debug")
+add_test(ctest-csma-broadcast "ns3.39-csma-broadcast-optimized")
 set_tests_properties(ctest-csma-broadcast PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;11;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")
-add_test(ctest-csma-packet-socket "ns3.39-csma-packet-socket-debug")
+add_test(ctest-csma-packet-socket "ns3.39-csma-packet-socket-optimized")
 set_tests_properties(ctest-csma-packet-socket PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;11;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")
-add_test(ctest-csma-multicast "ns3.39-csma-multicast-debug")
+add_test(ctest-csma-multicast "ns3.39-csma-multicast-optimized")
 set_tests_properties(ctest-csma-multicast PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;11;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")
-add_test(ctest-csma-raw-ip-socket "ns3.39-csma-raw-ip-socket-debug")
+add_test(ctest-csma-raw-ip-socket "ns3.39-csma-raw-ip-socket-optimized")
 set_tests_properties(ctest-csma-raw-ip-socket PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;21;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")
-add_test(ctest-csma-ping "ns3.39-csma-ping-debug")
+add_test(ctest-csma-ping "ns3.39-csma-ping-optimized")
 set_tests_properties(ctest-csma-ping PROPERTIES  WORKING_DIRECTORY "/home/master01/CC_Exp/build/src/csma/examples/" _BACKTRACE_TRIPLES "/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1584;add_test;/home/master01/CC_Exp/build-support/macros-and-definitions.cmake;1659;set_runtime_outputdirectory;/home/master01/CC_Exp/build-support/custom-modules/ns3-module-macros.cmake;439;build_exec;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;31;build_lib_example;/home/master01/CC_Exp/src/csma/examples/CMakeLists.txt;0;")

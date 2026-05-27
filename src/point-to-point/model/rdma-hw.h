@@ -177,9 +177,21 @@ public:
 	 * BiCC
 	 *********************/
 	uint64_t m_biccBlendBaseRttNs;
+	enum BiccLoop { BICC_NS = 0, BICC_ETE = 1 };
 	void InitBiCcState(Ptr<RdmaQueuePair> qp);
-	void UpdateBiCcNsLoop(Ptr<RdmaQueuePair> qp, const CustomHeader& ch);
-	void UpdateBiCcEteLoop(Ptr<RdmaQueuePair> qp, bool cnp);
+	// Paper §III-C: each loop runs a full DCQCN state machine. The Bicc* methods
+	// below mirror DCQCN's MLX methods but operate on bicc.ns or bicc.ete based
+	// on the BiccLoop tag.
+	void BiCcCnpReceived(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcUpdateAlpha(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcScheduleUpdateAlpha(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcScheduleDecreaseRate(Ptr<RdmaQueuePair> qp, BiccLoop loop, uint32_t delta);
+	void BiCcCheckRateDecrease(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcRateIncEventTimer(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcRateIncEvent(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcFastRecovery(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcActiveIncrease(Ptr<RdmaQueuePair> qp, BiccLoop loop);
+	void BiCcHyperIncrease(Ptr<RdmaQueuePair> qp, BiccLoop loop);
 	void BlendBiCcRate(Ptr<RdmaQueuePair> qp);
 
 	/**********************

@@ -8,6 +8,7 @@
 #include "ns3/double.h"
 #include "switch-node.h"
 #include "qbb-net-device.h"
+#include "qbb-header.h"
 #include "ppp-header.h"
 #include "ns3/int-header.h"
 #include "ns3/simulator.h"
@@ -146,6 +147,36 @@ TypeId SwitchNode::GetTypeId (void)
 	                                  UintegerValue(1024),
 	                                  MakeUintegerAccessor(&SwitchNode::m_biccSoftVoqMaxPkts),
 	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisCnpIntervalUs",
+	                                  "THEMIS PNP: minimum per-flow CNP reflection interval (us).",
+	                                  UintegerValue(50),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisCnpIntervalUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisTrpAlphaInit",
+	                                  "THEMIS TRP: initial alpha for Algorithm 1.",
+	                                  UintegerValue(5),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisTrpAlphaInit),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisTrpBetaUs",
+	                                  "THEMIS TRP: silence threshold to enter recover phase (us).",
+	                                  UintegerValue(500),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisTrpBetaUs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisTrpLoopDelayNs",
+	                                  "THEMIS TRP: delay per recirculation loop (ns).",
+	                                  UintegerValue(1000),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisTrpLoopDelayNs),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisTrpMaxLoops",
+	                                  "THEMIS TRP: hard ceiling on loop_num per flow.",
+	                                  UintegerValue(64),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisTrpMaxLoops),
+	                                  MakeUintegerChecker<uint32_t>())
+						.AddAttribute("ThemisLonghaulDelayCutoffUs",
+	                                  "THEMIS: port-delay threshold (us) for ESW longhaul classification.",
+	                                  UintegerValue(100),
+	                                  MakeUintegerAccessor(&SwitchNode::m_themisLonghaulCutoffUs),
+	                                  MakeUintegerChecker<uint32_t>())
 
 	                    ;
 	return tid;
@@ -155,6 +186,7 @@ SwitchNode::SwitchNode() {
 	m_ecmpSeed = m_id;
 	m_node_type = 1;
 	m_mmu = CreateObject<SwitchMmu>();
+	m_mmu->SetSwitchId(m_id);
 	for (uint32_t i = 0; i < pCnt; i++)
 		for (uint32_t j = 0; j < pCnt; j++)
 			for (uint32_t k = 0; k < qCnt; k++)
@@ -175,6 +207,8 @@ SwitchNode::SwitchNode() {
 	m_biccEcnClearCount = 0;
 	m_biccSoftVoqEnqueueCount = 0;
 	m_biccSoftVoqDequeueCount = 0;
+	m_themisPnpCnpCount = 0;
+	m_themisTrpDelayCount = 0;
 	m_flowTable = CreateObject<RDMAFlowTable>();
 	m_flowTable->SetInactiveThreshold(m_flowTableInactiveThresholdNs);
 
@@ -333,7 +367,18 @@ void SwitchNode::CheckAndSendPfc(uint32_t inDev, uint32_t qIndex) {
 	Ptr<QbbNetDevice> device = DynamicCast<QbbNetDevice>(m_devices[inDev]);
 	if (m_mmu->CheckShouldPause(inDev, qIndex)) {
 		device->SendPfc(qIndex, 0);
-		// std::cout << "sending PFC" << std::endl;
+		// Diagnostic: sample PFC PAUSE events (first 200 + every 10000th after)
+		static uint64_t s_pfcPauseCount = 0;
+		static uint64_t s_pfcPauseNext = 1;
+		++s_pfcPauseCount;
+		if (s_pfcPauseCount <= 200 || s_pfcPauseCount == s_pfcPauseNext) {
+			std::cout << "PFC PAUSE switch " << m_id
+			          << " ingress_port " << inDev
+			          << " qIndex " << qIndex
+			          << " time " << Simulator::Now().GetSeconds()
+			          << " (total_pauses=" << s_pfcPauseCount << ")" << std::endl;
+			if (s_pfcPauseCount > 200) s_pfcPauseNext += 10000;
+		}
 		m_mmu->SetPause(inDev, qIndex);
 	}
 }
@@ -344,6 +389,17 @@ void SwitchNode::CheckAndSendResume(uint32_t inDev, uint32_t qIndex) {
 	Ptr<QbbNetDevice> device = DynamicCast<QbbNetDevice>(m_devices[inDev]);
 	if (m_mmu->CheckShouldResume(inDev, qIndex)) {
 		device->SendPfc(qIndex, 1);
+		static uint64_t s_pfcResumeCount = 0;
+		static uint64_t s_pfcResumeNext = 1;
+		++s_pfcResumeCount;
+		if (s_pfcResumeCount <= 200 || s_pfcResumeCount == s_pfcResumeNext) {
+			std::cout << "PFC RESUME switch " << m_id
+			          << " ingress_port " << inDev
+			          << " qIndex " << qIndex
+			          << " time " << Simulator::Now().GetSeconds()
+			          << " (total_resumes=" << s_pfcResumeCount << ")" << std::endl;
+			if (s_pfcResumeCount > 200) s_pfcResumeNext += 10000;
+		}
 		m_mmu->SetResume(inDev, qIndex);
 	}
 }
@@ -490,6 +546,16 @@ bool SwitchNode::SwitchReceiveFromDevice(Ptr<NetDevice> device, Ptr<Packet> pack
 			MaybeHandleBiccAckRelease(inDev, outDev, ch);
 		}
 		if (MaybeHandleBiccNearDestinationIngress(inDev, outDev, packet, ch)) {
+			return true;
+		}
+	}
+
+	if (m_ccMode == 13 && outDevSigned >= 0) {
+		// TRP intercepts inbound CNPs (does NOT consume them — DCQCN sender
+		// still needs the CNP). Returns false unconditionally.
+		MaybeHandleThemisInboundCnp(inDev, outDev, ch);
+		// TRP delays outbound throttled-flow packets via Simulator::Schedule.
+		if (MaybeApplyThemisTrpDelay(inDev, outDev, packet, ch)) {
 			return true;
 		}
 	}
@@ -656,6 +722,12 @@ void SwitchNode::SwitchNotifyDequeue(uint32_t ifIndex, uint32_t qIndex, Ptr<Pack
 				}
 			}
 		}
+		if (m_ccMode == 13) {
+			// THEMIS PNP: at sender-side DCI, reflect a CNP back to the local
+			// sender on any ECN-CE data packet and clear the ECN bit to keep
+			// the receiver from generating a duplicate CNP after the WAN RTT.
+			MaybeGenerateThemisPnpCnp(ifIndex, qIndex, inDev, p);
+		}
 		//CheckAndSendPfc(inDev, qIndex);
 		CheckAndSendResume(inDev, qIndex);
 	}
@@ -790,7 +862,7 @@ int SwitchNode::log2apprx(int x, int b, int m, int l) {
 
 bool SwitchNode::IsLpccWanNode() const {
 	uint32_t id = GetId();
-	return id >= 21 && id <= 25;
+	return id >= 74 && id <= 81;
 }
 
 bool SwitchNode::IsLonghaulPort(uint32_t portId) const {
@@ -912,6 +984,229 @@ void SwitchNode::MaybeApplyBiccEcnClear(uint32_t inDev, uint32_t outDev, Ptr<Pac
 	packet->AddHeader(ppp);
 }
 
+// ============================================================================
+// THEMIS (Niu et al., ICNP 2025) — DCQCN patch deployed at the DC-edge switch.
+// Reuses BiCC's ESW port-classification idiom but keys off its own cutoff so
+// THEMIS and BiCC can be benchmarked independently.
+// ============================================================================
+bool SwitchNode::IsThemisLonghaulPort(uint32_t portId) const {
+	if (portId == 0 || portId >= GetNDevices()) {
+		return false;
+	}
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[portId]);
+	if (dev == nullptr || dev->GetChannel() == nullptr) {
+		return false;
+	}
+	uint64_t delay = DynamicCast<QbbChannel>(dev->GetChannel())->GetDelay().GetTimeStep();
+	return delay >= static_cast<uint64_t>(m_themisLonghaulCutoffUs) * 1000ULL;
+}
+
+bool SwitchNode::IsThemisSenderSideDciPath(uint32_t inDev, uint32_t outDev) const {
+	return !IsThemisLonghaulPort(inDev) && IsThemisLonghaulPort(outDev);
+}
+
+bool SwitchNode::IsThemisReceiverSideDciPath(uint32_t inDev, uint32_t outDev) const {
+	return IsThemisLonghaulPort(inDev) && !IsThemisLonghaulPort(outDev);
+}
+
+void SwitchNode::MaybeGenerateThemisPnpCnp(uint32_t ifIndex, uint32_t qIndex, uint32_t inDev, Ptr<Packet> p) {
+	// PNP only fires at the sender-side DCI (DC→WAN outbound).
+	if (!IsThemisSenderSideDciPath(inDev, ifIndex)) {
+		return;
+	}
+
+	// Peek L4 protocol — only act on UDP data packets.
+	CustomHeader orig(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+	orig.getInt = 0;
+	Ptr<Packet> protoPeek = p->Copy();
+	protoPeek->PeekHeader(orig);
+	if (orig.l3Prot != 0x11) {
+		return;
+	}
+
+	// Inspect IP header ECN bits without mutating p.
+	Ptr<Packet> ipPeek = p->Copy();
+	PppHeader pppPeek;
+	Ipv4Header hPeek;
+	ipPeek->RemoveHeader(pppPeek);
+	ipPeek->RemoveHeader(hPeek);
+	if (hPeek.GetEcn() != Ipv4Header::ECN_CE) {
+		return;
+	}
+
+	// Per-flow CNP cooldown (DCQCN cnp_interval semantics, default 50us).
+	const uint64_t nowTs = Simulator::Now().GetTimeStep();
+	const uint64_t intervalTs = static_cast<uint64_t>(m_themisCnpIntervalUs) * 1000ULL;
+	ThemisFlowKey key{orig.sip, orig.dip, orig.udp.sport, orig.udp.dport, orig.udp.pg};
+	auto cooldownIt = m_themisLastPnpCnpTs.find(key);
+	if (cooldownIt != m_themisLastPnpCnpTs.end() && nowTs - cooldownIt->second < intervalTs) {
+		return;
+	}
+
+	// Build reflected CNP (FCNP channel 0xF9, qIndex=2 marks THEMIS PNP).
+	PppHeader pppIn;
+	Ipv4Header hIn;
+	UdpHeader udpIn;
+	Ptr<Packet> pktCopy = p->Copy();
+	pktCopy->RemoveHeader(pppIn);
+	pktCopy->RemoveHeader(hIn);
+	pktCopy->PeekHeader(udpIn);
+
+	Ipv4Address srcip = hIn.GetDestination();
+	Ipv4Address dstip = hIn.GetSource();
+	PppHeader nppp = pppIn;
+	Ipv4Header nh = hIn;
+	nh.SetSource(srcip);
+	nh.SetDestination(dstip);
+	nh.SetProtocol(0xF9);
+	nh.SetEcn(Ipv4Header::ECN_NotECT);
+
+	CustomHeader nch(CustomHeader::L2_Header | CustomHeader::L3_Header | CustomHeader::L4_Header);
+	nch.sip = srcip.Get();
+	nch.dip = dstip.Get();
+	nch.l3Prot = 0xF9;
+	nch.fcnp.timestamp = nowTs;
+	nch.fcnp.qIndex = 2; // THEMIS PNP marker
+	nch.fcnp.pg = orig.udp.pg;
+	nch.fcnp.dport = orig.udp.sport;
+	Ptr<QbbNetDevice> dev = DynamicCast<QbbNetDevice>(m_devices[ifIndex]);
+	nch.fcnp.qlen = m_mmu->egress_bytes[ifIndex][qIndex];
+	nch.fcnp.m_flowCount = m_flowTable ? m_flowTable->GetFlowCountByEgress(ifIndex, qIndex) : 0;
+	nch.fcnp.linkRateBps = dev ? dev->GetDataRate().GetBitRate() : 0;
+
+	Ptr<Packet> fbPkt = Create<Packet>();
+	fbPkt->AddHeader(nch);
+	fbPkt->AddHeader(nh);
+	fbPkt->AddHeader(nppp);
+	InterfaceTag inTag(inDev);
+	fbPkt->AddPacketTag(inTag);
+	SendToDev(fbPkt, nch);
+
+	// Clear ECN on the OUTGOING data packet so the remote receiver does not
+	// also generate a duplicate CNP for the same congestion event.
+	PppHeader pppOut;
+	Ipv4Header hOut;
+	p->RemoveHeader(pppOut);
+	p->RemoveHeader(hOut);
+	hOut.SetEcn(Ipv4Header::ECN_NotECT);
+	p->AddHeader(hOut);
+	p->AddHeader(pppOut);
+
+	m_themisLastPnpCnpTs[key] = nowTs;
+	m_themisPnpCnpCount++;
+}
+
+// ---------- THEMIS TRP: Temporary Reaction Point ----------
+// Algorithm 1 from the paper, deployed at the sender-side DCI.
+// Inbound CNPs (longhaul→local) drive the throttle state machine; outbound
+// data packets (local→longhaul) of a throttled flow are scheduled with a
+// per-flow delay ≈ loop_num × loop_delay (model of paper's packet recirculation).
+SwitchNode::ThemisFlowKey SwitchNode::MakeThemisFlowKeyFromUdp(const CustomHeader& ch) const {
+	return ThemisFlowKey{ch.sip, ch.dip, ch.udp.sport, ch.udp.dport, ch.udp.pg};
+}
+
+SwitchNode::ThemisFlowKey SwitchNode::MakeThemisFlowKeyFromAck(const CustomHeader& ch) const {
+	// ACK is reverse-direction relative to its data flow: ACK.sip = remote
+	// receiver, ACK.dip = local sender. Swap to align with the PNP/UDP key
+	// (which is built from the sender-host view: sip=local sender, dip=remote).
+	return ThemisFlowKey{ch.dip, ch.sip, ch.ack.dport, ch.ack.sport, ch.ack.pg};
+}
+
+void SwitchNode::ThemisAdvanceFlowState(const ThemisFlowKey& key) {
+	auto it = m_themisFlowState.find(key);
+	if (it == m_themisFlowState.end()) {
+		return;
+	}
+	ThemisFlowState& st = it->second;
+	if (st.flow_status == THEMIS_NORMAL) {
+		return;
+	}
+	const uint64_t nowTs = Simulator::Now().GetTimeStep();
+	const uint64_t betaTs = static_cast<uint64_t>(m_themisTrpBetaUs) * 1000ULL;
+	if (nowTs - st.last_cnp_ts < betaTs) {
+		return;
+	}
+	// β silence elapsed → step toward recovery.
+	if (st.flow_status == THEMIS_THROTTLED) {
+		st.flow_status = THEMIS_RECOVER;
+		st.alpha = std::max<uint32_t>(m_themisTrpAlphaInit, st.alpha / 2);
+		st.cnp_num = 0;
+		if (st.loop_num > 0) {
+			st.loop_num -= 1; // gentler than paper's instant drop, smoother release
+		}
+	} else if (st.flow_status == THEMIS_RECOVER) {
+		// Another full β without CNPs → fully NORMAL.
+		st.flow_status = THEMIS_NORMAL;
+		st.loop_num = 0;
+		st.alpha = m_themisTrpAlphaInit;
+	}
+}
+
+bool SwitchNode::MaybeHandleThemisInboundCnp(uint32_t inDev, uint32_t outDev, const CustomHeader& ch) {
+	// Only act on inbound (longhaul→local) at the sender-side DCI.
+	if (!IsThemisReceiverSideDciPath(inDev, outDev)) {
+		return false;
+	}
+	if (ch.l3Prot != 0xFC && ch.l3Prot != 0xFD) {
+		return false;
+	}
+	uint8_t cnpBit = (ch.ack.flags >> qbbHeader::FLAG_CNP) & 1u;
+	if (cnpBit == 0) {
+		return false;
+	}
+	ThemisFlowKey key = MakeThemisFlowKeyFromAck(ch);
+	ThemisFlowState& st = m_themisFlowState[key];
+	const uint64_t nowTs = Simulator::Now().GetTimeStep();
+	if (st.alpha == 0) {
+		st.alpha = m_themisTrpAlphaInit; // freshly default-constructed state guard
+	}
+	st.cnp_num += 1;
+	st.last_cnp_ts = nowTs;
+	st.flow_status = THEMIS_THROTTLED;
+	// Paper Algorithm 1: every α-th CNP (1, α+1, 2α+1, ...) → loop_num++; α++.
+	if (st.alpha > 0 && (st.cnp_num % st.alpha) == 1u) {
+		if (st.loop_num < m_themisTrpMaxLoops) {
+			st.loop_num += 1;
+		}
+		st.alpha += 1;
+	}
+	// CNP must still propagate to the local sender — DCQCN-MLX needs it too.
+	return false;
+}
+
+bool SwitchNode::MaybeApplyThemisTrpDelay(uint32_t inDev, uint32_t outDev, Ptr<Packet> packet, CustomHeader& ch) {
+	// Only delay outbound (local→longhaul) UDP data packets at sender-side DCI.
+	if (!IsThemisSenderSideDciPath(inDev, outDev)) {
+		return false;
+	}
+	if (ch.l3Prot != 0x11) {
+		return false;
+	}
+	ThemisFlowKey key = MakeThemisFlowKeyFromUdp(ch);
+	ThemisAdvanceFlowState(key);
+	auto it = m_themisFlowState.find(key);
+	if (it == m_themisFlowState.end()) {
+		return false;
+	}
+	ThemisFlowState& st = it->second;
+	if (st.flow_status == THEMIS_NORMAL || st.loop_num == 0) {
+		return false;
+	}
+	const uint64_t nowTs = Simulator::Now().GetTimeStep();
+	uint64_t delayNs = static_cast<uint64_t>(st.loop_num) * static_cast<uint64_t>(m_themisTrpLoopDelayNs);
+	// Preserve per-flow packet order: never schedule earlier than the previous
+	// scheduled send for this flow.
+	uint64_t sendAtTs = nowTs + delayNs;
+	if (sendAtTs <= st.last_scheduled_send_ts) {
+		sendAtTs = st.last_scheduled_send_ts + 1;
+	}
+	st.last_scheduled_send_ts = sendAtTs;
+	Simulator::Schedule(NanoSeconds(sendAtTs - nowTs),
+	                    &SwitchNode::SendToDev, this, packet, ch);
+	m_themisTrpDelayCount++;
+	return true;
+}
+
 bool SwitchNode::MaybeHandleBiccNearDestinationIngress(uint32_t inDev, uint32_t outDev, Ptr<Packet> packet, CustomHeader& ch) {
 	if (ch.l3Prot != 0x11) {
 		return false;
@@ -1013,6 +1308,12 @@ SwitchNode::~SwitchNode() {
 		          << " ecn_clear=" << m_biccEcnClearCount
 		          << " softvoq_enq=" << m_biccSoftVoqEnqueueCount
 		          << " softvoq_deq=" << m_biccSoftVoqDequeueCount
+		          << std::endl;
+	}
+	if (m_ccMode == 13 && (m_themisPnpCnpCount > 0 || m_themisTrpDelayCount > 0)) {
+		std::cout << "THEMISStats node=" << GetId()
+		          << " pnp_cnp=" << m_themisPnpCnpCount
+		          << " trp_delay=" << m_themisTrpDelayCount
 		          << std::endl;
 	}
 }

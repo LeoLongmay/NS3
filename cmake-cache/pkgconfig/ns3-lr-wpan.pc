@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-network ns3-core ns3-mobility ns3-spectrum ns3-propagation
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-lr-wpan-debug  -lns3.39-network-debug -lns3.39-core-debug -lns3.39-mobility-debug -lns3.39-spectrum-debug -lns3.39-propagation-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-lr-wpan-optimized  -lns3.39-network-optimized -lns3.39-core-optimized -lns3.39-mobility-optimized -lns3.39-spectrum-optimized -lns3.39-propagation-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

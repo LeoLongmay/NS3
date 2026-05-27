@@ -346,7 +346,7 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		qp->SetWin(m_bps.GetBitRate() * 1 * baseRtt * 1e-9 / 8);
 	qp->m_rate = m_bps;
 	qp->m_max_rate = m_bps;
-	if (m_cc_mode == 1) {
+	if (m_cc_mode == 1 || m_cc_mode == 13) {
 		qp->mlx.m_targetRate = m_bps;
 	} else if (m_cc_mode == 3) {
 		qp->hp.m_curRate = m_bps;
@@ -359,6 +359,16 @@ void RdmaHw::AddQueuePair(uint64_t size, uint16_t pg, Ipv4Address sip, Ipv4Addre
 		} else if (m_cc_mode == 9) {
 			qp->mlx.m_targetRate = m_bps;
 	        qp->lpcc.m_targetRate = m_bps;
+	        // CRITICAL FIX: schedule LPCC AI timer at QP creation.
+	        // Previously this was only attempted inside ReceiveCnp's lazy-init
+	        // block (line ~509), guarded by `qp->m_rate == 0`. But AddQueuePair
+	        // sets m_rate = m_bps above (line 347), so the lazy-init condition
+	        // never fires → the AI timer was NEVER scheduled → AI never ran.
+	        // 6-flow Plan 3 tests accidentally looked OK because MD landed flows
+	        // near fair share by luck; staggered 4-flow exposed the bug (Src 3
+	        // stuck at 21.74G with no AI to push it to 25G).
+	        qp->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_increaseInterval),
+	                                                  &RdmaHw::RateIncEventTimerLpcc, this, qp);
 		} else if (m_cc_mode == 11) {
 			qp->useExplicitWin = true;
 			qp->explicitWinBytes = qp->m_win;
@@ -490,7 +500,7 @@ int RdmaHw::ReceiveCnp(Ptr<Packet> p, CustomHeader &ch) {
 	if (qp->m_rate == 0)			//lazy initialization
 	{
 		qp->m_rate = dev->GetDataRate();
-		if (m_cc_mode == 1) {
+		if (m_cc_mode == 1 || m_cc_mode == 13) {
 			qp->mlx.m_targetRate = dev->GetDataRate();
 		} else if (m_cc_mode == 3) {
 			qp->hp.m_curRate = dev->GetDataRate();
@@ -502,6 +512,9 @@ int RdmaHw::ReceiveCnp(Ptr<Packet> p, CustomHeader &ch) {
 			qp->tmly.m_curRate = dev->GetDataRate();
 		} else if (m_cc_mode == 9) { // lpcc
 			qp->lpcc.m_targetRate = dev->GetDataRate();
+			// NOTE: LPCC AI timer is scheduled in AddQueuePair (not here).
+			// This ReceiveCnp lazy-init path is unreachable in practice because
+			// AddQueuePair already sets qp->m_rate = m_bps before any CNP arrives.
 		} else if (m_cc_mode == 10) {
 			qp->hpccPint.m_curRate = dev->GetDataRate();
 		} else if (m_cc_mode == 12) {
@@ -544,19 +557,17 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 
 	// handle cnp
 	if (cnp) {
-		if (m_cc_mode == 1) { // mlx version
+		if (m_cc_mode == 1 || m_cc_mode == 13) { // mlx version (THEMIS=cc_mode 13 reuses DCQCN-MLX on the sender)
 			cnp_received_mlx(qp);
 		} else if (m_cc_mode == 9) { // lpcc
-			// Mutual exclusion: if FCNP was received recently, prefer LPCC loop and suppress CNP-driven DCQCN loop.
-			uint64_t nowTs = Simulator::Now().GetTimeStep();
-			uint64_t guardTs = static_cast<uint64_t>(m_theta) * 1000ULL;
-			bool recentFcnp = qp->lpcc.m_lastFcnpTs != 0 && guardTs > 0 &&
-			                  (nowTs - qp->lpcc.m_lastFcnpTs) < guardTs;
-			if (!recentFcnp) {
-				cnp_received_mlx(qp);
-			}
+			// Plan 3: ignore CNP entirely in LPCC mode.
+			// DCQCN's CNP-driven α-AIMD is calibrated for ~50μs DCN RTT;
+			// at 10ms WAN RTT it dominates over LPCC's fair-share-aware
+			// control by overwriting q->m_rate via DCQCN-AI averaging
+			// (rdma-hw.cc:931,947,963). FCNP is the sole congestion signal.
 		} else if (m_cc_mode == 12) {
-			UpdateBiCcEteLoop(qp, true);
+			// Paper §III-C: end-to-end CNP drives R_ETE via deployed CC's algo (DCQCN).
+			BiCcCnpReceived(qp, BICC_ETE);
 		}
 	}
 
@@ -574,9 +585,10 @@ int RdmaHw::ReceiveAck(Ptr<Packet> p, CustomHeader &ch) {
 		} else if (m_cc_mode == 10) {
 			HandleAckHpPint(qp, p, ch);
 		} else if (m_cc_mode == 12) {
-			if (!cnp) {
-				UpdateBiCcEteLoop(qp, false);
-			}
+			// Both engines' AI is driven by their own m_rpTimer (lazy-init on
+			// first CNP/FCNP), not by ACK arrivals. Per ACK we just re-blend
+			// to refresh qp->m_rate (Eq. 3 EWMA advances with time).
+			InitBiCcState(qp);
 			BlendBiCcRate(qp);
 		}
 	// ACK may advance the on-the-fly window, allowing more packets to send
@@ -608,63 +620,69 @@ int RdmaHw::Receive(Ptr<Packet> p, CustomHeader &ch) {
 				return 0;
 			}
 			if (m_cc_mode == 12 && nch.fcnp.qIndex == 1) {
-				UpdateBiCcNsLoop(qp, nch);
+				// Paper §III-B: near-source feedback drives R_NS via deployed CC's algo (DCQCN).
+				BiCcCnpReceived(qp, BICC_NS);
 				BlendBiCcRate(qp);
 				return 0;
 			}
 			if (m_cc_mode == 12) {
 				return 0;
 			}
+			if (m_cc_mode == 13 && nch.fcnp.qIndex == 2) {
+				// THEMIS PNP CNP: sender-side ESW reflected this CNP because an
+				// outbound ECN-CE data packet of this flow passed through the
+				// sender-side DCI. Treat exactly as a DCQCN CNP arrival.
+				cnp_received_mlx(qp);
+				return 0;
+			}
+			if (m_cc_mode == 13) {
+				// Ignore other FCNP variants (LPCC qIndex=0, BiCC qIndex=1) under THEMIS.
+				return 0;
+			}
 			const uint64_t nowTs = Simulator::Now().GetTimeStep();
 			qp->lpcc.m_lastCongRateBps = nch.fcnp.linkRateBps;
 			qp->lpcc.m_lastFcnpQlen = nch.fcnp.qlen;
+
+			// DIAG-SRC3: log every FCNP RECEIVE for Src 3 (regardless of MD trigger)
+			if (qp->dport == 10003) {
+				std::cout << "DIAG_FCNPRX t=" << Simulator::Now().GetSeconds()
+				          << " Src3 fcnp.qlen=" << nch.fcnp.qlen/1e6 << "MB"
+				          << " fcnp.flowCount=" << nch.fcnp.m_flowCount
+				          << " fcnp.linkRate=" << nch.fcnp.linkRateBps/1e9 << "G"
+				          << " m_rate_now=" << (double)qp->m_rate.GetBitRate()/1e9 << "G"
+				          << std::endl;
+			}
 
 			// Note: m_lastFcnpTs / m_lastProcessedFcnpTs are only updated when a FCNP
 			// actually triggers a rate decrease (below). A debounce-dropped FCNP must NOT
 			// refresh either timestamp, otherwise the AI suppression gate keyed on these
 			// timestamps would freeze rate growth permanently during sustained congestion.
 
-			// FCNP debounce/cooldown:
-			// ignore repeated FCNP bursts within a short window to avoid excessive
-			// back-to-back decreases from clustered feedback packets.
-			const uint64_t cooldownUs = std::max<uint64_t>(
-				2ULL * static_cast<uint64_t>(m_increaseInterval),
-				std::max<uint64_t>(200ULL, static_cast<uint64_t>(m_theta) / 4ULL));
-			const uint64_t cooldownTs = cooldownUs * 1000ULL;
-			if (qp->lpcc.m_lastProcessedFcnpTs != 0 &&
-			    nowTs > qp->lpcc.m_lastProcessedFcnpTs &&
-			    nowTs - qp->lpcc.m_lastProcessedFcnpTs < cooldownTs) {
-				return 0;
-			}
+			// Tier-2 revision: removed sender-side FCNP dedup entirely. The
+			// switch-side `lpccPerFlowFcnpCooldownUs` (CLI knob) is the single
+			// source of truth for FCNP rate limiting. The previous sender-side
+			// dedup (250μs-1ms originally, then 1-RTT in Tier-2 C) was redundant
+			// with switch-side cooldown and over-constrained cold-start response.
 
+			// Stage 1: Removed FCNP-triggered AI timer reset.
+			// The per-RTT MD guard inside UpdateRateLpcc() handles MD throttling.
+			// AI timer continues on its own cadence — no longer synchronized to FCNP arrivals.
 			if (qp->lpcc.m_first_cnp) {
 				qp->lpcc.m_lastDecreaseRate = nowTs;
 				qp->lpcc.m_lastProcessedFcnpTs = nowTs;
 				qp->lpcc.m_lastFcnpTs = nowTs;
 				qp->lpcc.m_first_cnp = false;
 				UpdateRateLpcc(qp, nch);
-
-			qp->lpcc.m_rpTimeStage = 0;
-        	qp->lpcc.m_decrease_cnp_arrived = false;
-        	Simulator::Cancel(qp->lpcc.m_rpTimer);
-        	qp->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_increaseInterval),
-                                               &RdmaHw::RateIncEventTimerLpcc, this, qp);
-			return 0;
-		}
+				return 0;
+			}
 
 			if (nowTs - qp->lpcc.m_lastDecreaseRate >= m_theta * 1000) {
 				qp->lpcc.m_lastDecreaseRate = nowTs;
 				qp->lpcc.m_lastProcessedFcnpTs = nowTs;
 				qp->lpcc.m_lastFcnpTs = nowTs;
 				UpdateRateLpcc(qp, nch);
-
-			qp->lpcc.m_rpTimeStage = 0;
-        	qp->lpcc.m_decrease_cnp_arrived = false;
-        	Simulator::Cancel(qp->lpcc.m_rpTimer);
-        	qp->lpcc.m_rpTimer = Simulator::Schedule(MicroSeconds(m_increaseInterval),
-                                               &RdmaHw::RateIncEventTimerLpcc, this, qp);
-			return 0;
-		}
+				return 0;
+			}
 	}
 	return 0;
 }
@@ -977,59 +995,156 @@ void RdmaHw::HyperIncreaseMlx(Ptr<RdmaQueuePair> q) {
 }
 
 /**********************
- * BiCC
+ * BiCC — paper §III-C: DCQCN wrapper with two parallel rate loops
+ *
+ * R_NS  : near-source DCQCN engine, driven by FCNP from DCI-switch
+ * R_ETE : end-to-end DCQCN engine, driven by intra-DC CNP from receiver
+ * R_BiCC = EWMA-blended min(R_NS, R_ETE)  (Eq. 1-3 of the paper)
+ *
+ * Each engine independently runs the full DCQCN-MLX state machine
+ * (alpha EWMA + fast-recovery + AI + HAI). The implementation mirrors
+ * cnp_received_mlx / CheckRateDecreaseMlx / RateIncEventTimerMlx /
+ * FastRecoveryMlx / ActiveIncreaseMlx / HyperIncreaseMlx but operates
+ * on qp->bicc.ns or qp->bicc.ete instead of qp->mlx.
  *********************/
+
+namespace {
+inline ns3::RdmaQueuePair::BiccDcqcnEngine& BiCcGetEngine(Ptr<RdmaQueuePair> qp, RdmaHw::BiccLoop loop) {
+	return (loop == RdmaHw::BICC_NS) ? qp->bicc.ns : qp->bicc.ete;
+}
+}
+
 void RdmaHw::InitBiCcState(Ptr<RdmaQueuePair> qp) {
 	if (qp->bicc.initialized) {
 		return;
 	}
+	// DCQCN start: m_rate stays at line rate; targetRate also; first_cnp=true.
+	// Lazy-init of timers happens inside BiCcCnpReceived on first CNP arrival —
+	// exactly mirroring how cnp_received_mlx lazy-inits for vanilla DCQCN.
 	DataRate init = qp->m_rate.GetBitRate() > 0 ? qp->m_rate : qp->m_max_rate;
 	if (init.GetBitRate() == 0) {
 		init = m_minRate;
 	}
-	qp->bicc.nsRate = init;
-	qp->bicc.eteRate = init;
+	for (auto* eng : {&qp->bicc.ns, &qp->bicc.ete}) {
+		eng->m_rate = init;
+		eng->m_targetRate = init;
+		eng->m_alpha = 0;
+		eng->m_alpha_cnp_arrived = false;
+		eng->m_decrease_cnp_arrived = false;
+		eng->m_first_cnp = true;
+		eng->m_rpTimeStage = 0;
+	}
 	qp->bicc.blendedRate = init;
 	qp->bicc.lastBlendTsNs = Simulator::Now().GetTimeStep();
-	qp->bicc.lastNsAiTsNs = qp->bicc.lastBlendTsNs;
-	qp->bicc.lastEteAiTsNs = qp->bicc.lastBlendTsNs;
 	qp->bicc.initialized = true;
 }
 
-void RdmaHw::UpdateBiCcNsLoop(Ptr<RdmaQueuePair> qp, const CustomHeader& ch) {
+void RdmaHw::BiCcCnpReceived(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
 	InitBiCcState(qp);
-	uint64_t now = Simulator::Now().GetTimeStep();
-	uint64_t linkRateBps = ch.fcnp.linkRateBps > 0 ? ch.fcnp.linkRateBps : qp->m_max_rate.GetBitRate();
-	uint64_t refRttNs = m_biccBlendBaseRttNs > 0 ? m_biccBlendBaseRttNs : std::max<uint64_t>(qp->m_baseRtt, 1);
-	double budgetBytes = (double(linkRateBps) * double(refRttNs)) / 8e9;
-	if (budgetBytes < 1.0) {
-		budgetBytes = 1.0;
+	auto& eng = BiCcGetEngine(qp, loop);
+	eng.m_alpha_cnp_arrived = true;
+	eng.m_decrease_cnp_arrived = true;
+	if (eng.m_first_cnp) {
+		// Lazy-init this engine's DCQCN state on first congestion signal.
+		eng.m_alpha = 1;
+		eng.m_alpha_cnp_arrived = false;
+		BiCcScheduleUpdateAlpha(qp, loop);
+		BiCcScheduleDecreaseRate(qp, loop, 1);
+		eng.m_rate = DataRate(uint64_t(m_rateOnFirstCNP * double(eng.m_rate.GetBitRate())));
+		eng.m_targetRate = eng.m_rate;
+		eng.m_first_cnp = false;
 	}
-	double pressure = std::min(1.0, ch.fcnp.qlen / budgetBytes);
-	double curBps = std::max<double>(qp->bicc.nsRate.GetBitRate(), m_minRate.GetBitRate());
-	double dec = 1.0 - 0.5 * pressure;
-	double nextBps = std::max<double>(m_minRate.GetBitRate(), curBps * dec);
-	qp->bicc.nsRate = DataRate(uint64_t(nextBps));
-	qp->bicc.lastNsAiTsNs = now;
 }
 
-void RdmaHw::UpdateBiCcEteLoop(Ptr<RdmaQueuePair> qp, bool cnp) {
-	InitBiCcState(qp);
-	uint64_t now = Simulator::Now().GetTimeStep();
-	double curBps = std::max<double>(qp->bicc.eteRate.GetBitRate(), m_minRate.GetBitRate());
-	if (cnp) {
-		double nextBps = std::max<double>(m_minRate.GetBitRate(), curBps * 0.8);
-		qp->bicc.eteRate = DataRate(uint64_t(nextBps));
-		qp->bicc.lastEteAiTsNs = now;
-		return;
+void RdmaHw::BiCcUpdateAlpha(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	if (eng.m_alpha_cnp_arrived) {
+		eng.m_alpha = (1 - m_g) * eng.m_alpha + m_g;
+	} else {
+		eng.m_alpha = (1 - m_g) * eng.m_alpha;
 	}
-	uint64_t aiIntervalNs = std::max<uint64_t>(1, uint64_t(m_rpgTimeReset * 1000.0));
-	if (now - qp->bicc.lastEteAiTsNs >= aiIntervalNs) {
-		uint64_t maxRate = std::max<uint64_t>(qp->m_max_rate.GetBitRate(), m_minRate.GetBitRate());
-		uint64_t nextBps = std::min<uint64_t>(maxRate, qp->bicc.eteRate.GetBitRate() + m_rai.GetBitRate());
-		qp->bicc.eteRate = DataRate(nextBps);
-		qp->bicc.lastEteAiTsNs = now;
+	eng.m_alpha_cnp_arrived = false;
+	BiCcScheduleUpdateAlpha(qp, loop);
+}
+
+void RdmaHw::BiCcScheduleUpdateAlpha(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	eng.m_eventUpdateAlpha = Simulator::Schedule(
+		MicroSeconds(m_alpha_resume_interval),
+		&RdmaHw::BiCcUpdateAlpha, this, qp, loop);
+}
+
+void RdmaHw::BiCcScheduleDecreaseRate(Ptr<RdmaQueuePair> qp, BiccLoop loop, uint32_t delta) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	eng.m_eventDecreaseRate = Simulator::Schedule(
+		MicroSeconds(m_rateDecreaseInterval) + NanoSeconds(delta),
+		&RdmaHw::BiCcCheckRateDecrease, this, qp, loop);
+}
+
+void RdmaHw::BiCcCheckRateDecrease(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	BiCcScheduleDecreaseRate(qp, loop, 0);
+	if (eng.m_decrease_cnp_arrived) {
+		bool clamp = true;
+		if (!m_EcnClampTgtRate) {
+			if (eng.m_rpTimeStage == 0)
+				clamp = false;
+		}
+		if (clamp)
+			eng.m_targetRate = eng.m_rate;
+		eng.m_rate = std::max(m_minRate, eng.m_rate * (1 - eng.m_alpha / 2));
+		eng.m_rpTimeStage = 0;
+		eng.m_decrease_cnp_arrived = false;
+		Simulator::Cancel(eng.m_rpTimer);
+		eng.m_rpTimer = Simulator::Schedule(
+			MicroSeconds(m_rpgTimeReset),
+			&RdmaHw::BiCcRateIncEventTimer, this, qp, loop);
 	}
+}
+
+void RdmaHw::BiCcRateIncEventTimer(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	eng.m_rpTimer = Simulator::Schedule(
+		MicroSeconds(m_rpgTimeReset),
+		&RdmaHw::BiCcRateIncEventTimer, this, qp, loop);
+	BiCcRateIncEvent(qp, loop);
+	eng.m_rpTimeStage++;
+}
+
+void RdmaHw::BiCcRateIncEvent(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	if (eng.m_rpTimeStage < m_rpgThreshold) {
+		BiCcFastRecovery(qp, loop);
+	} else if (eng.m_rpTimeStage == m_rpgThreshold) {
+		BiCcActiveIncrease(qp, loop);
+	} else {
+		BiCcHyperIncrease(qp, loop);
+	}
+}
+
+void RdmaHw::BiCcFastRecovery(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	eng.m_rate = (eng.m_rate / 2) + (eng.m_targetRate / 2);
+}
+
+void RdmaHw::BiCcActiveIncrease(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	uint32_t nic_idx = GetNicIdxOfQp(qp);
+	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
+	eng.m_targetRate += m_rai;
+	if (eng.m_targetRate > dev->GetDataRate())
+		eng.m_targetRate = dev->GetDataRate();
+	eng.m_rate = (eng.m_rate / 2) + (eng.m_targetRate / 2);
+}
+
+void RdmaHw::BiCcHyperIncrease(Ptr<RdmaQueuePair> qp, BiccLoop loop) {
+	auto& eng = BiCcGetEngine(qp, loop);
+	uint32_t nic_idx = GetNicIdxOfQp(qp);
+	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
+	eng.m_targetRate += m_rhai;
+	if (eng.m_targetRate > dev->GetDataRate())
+		eng.m_targetRate = dev->GetDataRate();
+	eng.m_rate = (eng.m_rate / 2) + (eng.m_targetRate / 2);
 }
 
 void RdmaHw::BlendBiCcRate(Ptr<RdmaQueuePair> qp) {
@@ -1040,7 +1155,7 @@ void RdmaHw::BlendBiCcRate(Ptr<RdmaQueuePair> qp) {
 	if (tau > T) {
 		tau = T;
 	}
-	uint64_t rmin = std::min<uint64_t>(qp->bicc.nsRate.GetBitRate(), qp->bicc.eteRate.GetBitRate());
+	uint64_t rmin = std::min<uint64_t>(qp->bicc.ns.m_rate.GetBitRate(), qp->bicc.ete.m_rate.GetBitRate());
 	uint64_t blended = qp->bicc.blendedRate.GetBitRate();
 	if (blended == 0) {
 		blended = rmin;
@@ -1699,150 +1814,113 @@ void RdmaHw::RateIncEventTimerLpcc(Ptr<RdmaQueuePair> q) {
 }
 
 void RdmaHw::RateIncEventLpcc(Ptr<RdmaQueuePair> q) {
+	// Stage 3: Radically simplified hybrid AI.
+	// Removed:
+	//   - 5-tier piecewise adaptiveBeta (qRatio-based)
+	//   - 3-tier piecewise aiFloor
+	//   - fastRecoverQuietTs suppression window
+	//   - queue-target guard secondary scaling
+	//   - effectiveQlen FCNP timeout machinery
+	// Kept core idea: multiplicative for warm flows + additive for fair-share convergence.
+	// Additive coefficient: 0.001 × fair (baseline). With plan 2 (ECN off at
+	// DCI switches 74-78), DCQCN-CNP MD is severed and LPCC should converge
+	// to fair share via AI add alone, balanced only by FCNP-MD on overshoot.
 	uint32_t nic_idx = GetNicIdxOfQp(q);
 	Ptr<QbbNetDevice> dev = m_nic[nic_idx].dev;
+	const double lineRate = std::max(1.0, (double)dev->GetDataRate().GetBitRate());
+	const double r = std::max(1.0, (double)q->m_rate.GetBitRate());
+	const double gap = std::max(0.0, (lineRate - r) / lineRate);
 
-	// AI gating logic:
-	//   (1) suppress AI for a configurable number of increaseIntervals after a
-	//       *processed* FCNP — debounce-dropped FCNPs no longer hold AI down.
-	//   (2) shape AI strength by qRatio = effectiveQlen / queueTarget.
-	const double kLpccQueueTargetBytes = GetLpccQueueTargetBytes();
-	const double lineRate = std::max<double>(1.0, dev->GetDataRate().GetBitRate());
-	const double rateNow = std::max<double>(1.0, q->m_rate.GetBitRate());
-	const double gapRatio = std::max(0.0, (lineRate - rateNow) / lineRate);
+	// Queue-aware on/off switch: multiplicative term is gated by qRatio < 1.
+	// When queue is above target the multiplicative term goes to 0 (no exponential
+	// over-shoot). Additive term always applies — it's bounded and benign.
+	const double qTarget = std::max(1.0, GetLpccQueueTargetBytes());
+	const double qRatio = (double)q->lpcc.m_lastFcnpQlen / qTarget;
+	const double mult = (qRatio < 1.0) ? std::min(gap, (double)m_beta) : 0.0;
 
-	uint32_t effectiveQlen = q->lpcc.m_lastFcnpQlen;
-	const uint64_t nowTs = Simulator::Now().GetTimeStep();
-	const uint64_t thetaTs = std::max<uint64_t>(1ULL, m_theta) * 1000ULL;
-	const uint64_t incTs = std::max<uint64_t>(1ULL, m_increaseInterval) * 1000ULL;
-	const uint64_t fastRecoverQuietTs =
-	    static_cast<uint64_t>(std::max<uint32_t>(1u, m_lpccAiSuppressMultiplier)) * incTs;
-	const uint64_t ageSinceProcessedTs =
-	    (q->lpcc.m_lastProcessedFcnpTs != 0 && nowTs > q->lpcc.m_lastProcessedFcnpTs)
-	        ? (nowTs - q->lpcc.m_lastProcessedFcnpTs)
-	        : 0;
+	const uint16_t flowCount = std::max<uint16_t>(1, q->lpcc.m_flowCount);
+	const double fair = lineRate / flowCount;
+	// Rate-deficit boost: flows below fair share get extra additive growth
+	// proportional to their deficit. This actively counters "first-mover
+	// advantage" where earlier flows (e.g. Src 0) keep ~2G above fair while
+	// later flows are at fair. Boost only when r < fair (zero for fast flows).
+	const double deficit = std::max(0.0, fair - r);
+	const double add = 0.001 * fair + 0.001 * deficit;
 
-	// Keep the last FCNP queue signal until theta timeout, then clear it.
-	if (q->lpcc.m_lastProcessedFcnpTs == 0 || q->lpcc.m_lastFcnpQlen == 0) {
-		effectiveQlen = 0;
-	} else if (ageSinceProcessedTs >= thetaTs) {
-		effectiveQlen = 0;
-		q->lpcc.m_lastFcnpQlen = 0;
+	const uint64_t newBps = std::min((uint64_t)lineRate,
+	                                 (uint64_t)(r * (1.0 + mult) + add));
+	q->m_rate = DataRate(newBps);
+
+	// DIAG-SRC3: log AI ticks for the 4th flow (dport == 10003)
+	if (q->dport == 10003) {
+		static uint64_t s_aiCnt = 0;
+		++s_aiCnt;
+		// log every 100th tick (8ms) — captures m_rate evolution
+		if (s_aiCnt % 100 == 0) {
+			std::cout << "DIAG_AI t=" << Simulator::Now().GetSeconds()
+			          << " Src3 m_rate_pre=" << r/1e9 << "G"
+			          << " m_rate_post=" << newBps/1e9 << "G"
+			          << " qRatio=" << qRatio
+			          << " mult=" << mult
+			          << " add=" << add/1e6 << "Mbps"
+			          << " flowCount=" << flowCount
+			          << " fair=" << fair/1e9 << "G"
+			          << " lastFcnpQlen=" << q->lpcc.m_lastFcnpQlen/1e6 << "MB"
+			          << std::endl;
+		}
 	}
-
-	// Suppress AI only while a recently *processed* FCNP is still within the
-	// quiet window. Debounce-dropped FCNPs do not refresh m_lastProcessedFcnpTs
-	// any more, so they no longer freeze AI growth.
-	if (q->lpcc.m_lastProcessedFcnpTs != 0 && ageSinceProcessedTs < fastRecoverQuietTs) {
-		return;
-	}
-
-	const double qRatio = std::max(0.0, double(effectiveQlen) / std::max(1.0, kLpccQueueTargetBytes));
-	double adaptiveBeta = m_beta;
-	if (qRatio >= 5.0) {
-		// v9: severely saturated queue (queue >> queueTarget, e.g. PFC-locked at cap)
-		//   → freeze AI almost completely. Lets aggregate decay under repeated FCNP
-		//   cuts so PFC eventually drains and the queue escapes the cap.
-		adaptiveBeta = m_beta * 0.02;
-	} else if (qRatio >= 1.5) {
-		adaptiveBeta = m_beta * 0.20;
-	} else if (qRatio >= 1.0) {
-		adaptiveBeta = m_beta * 0.50;
-	} else if (qRatio >= 0.5) {
-		adaptiveBeta = m_beta * 0.90;
-	} else {
-		adaptiveBeta = std::min(0.25, m_beta * 1.40);
-	}
-
-	// Queue-target guard: above target -> throttle AI but avoid hard freeze.
-	if (effectiveQlen > kLpccQueueTargetBytes) {
-		double over = std::min(2.0, (double(effectiveQlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
-		adaptiveBeta *= std::max(0.20, 1.0 - 0.60 * over);
-	}
-
-	const double baseIncRatio = std::max(0.0, std::min(gapRatio, adaptiveBeta));
-	double aiFloor = 0.0;
-	if (qRatio < 0.5) {
-		// v7: lowered from 0.30 to 0.05 to eliminate AI explosion when queue empties.
-		// Prevents the sawtooth bistability where queue under-shoot kicks AI into
-		// 28%/tick recovery mode (which then overshoots line rate).
-		aiFloor = std::min(gapRatio, std::max(0.005, gapRatio * 0.05));
-	} else if (qRatio < 1.0) {
-		aiFloor = std::min(gapRatio, std::max(0.003, gapRatio * 0.03));
-	} else if (qRatio < 1.2) {
-		aiFloor = std::min(gapRatio, 0.001);
-	}
-	// Fast recovery branch keyed on processed FCNP quiet time.
-	const bool queueQuietLongEnough = (effectiveQlen == 0) &&
-	                                  (q->lpcc.m_lastProcessedFcnpTs == 0 ||
-	                                   (nowTs > q->lpcc.m_lastProcessedFcnpTs &&
-	                                    nowTs - q->lpcc.m_lastProcessedFcnpTs >= fastRecoverQuietTs));
-	if (queueQuietLongEnough) {
-		const double fastFloor = std::min(gapRatio, std::max(0.02, gapRatio * 0.40));
-		aiFloor = std::max(aiFloor, fastFloor);
-	}
-
-	const double incRatio = std::max(baseIncRatio, aiFloor);
-	q->m_rate *= (1.0 + incRatio);
 }
 
 void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
-	uint32_t m_qlen = ch.fcnp.qlen;
-	if (m_epsilon == 0) {
+	// Stage 1: Gemini-style per-RTT MD guard, relaxed to 3/4 RTT (7.5ms for 10ms RTT).
+	// Trade-off: 5ms (1/2 RTT) over-cut, 10ms (full RTT) PFC cascade.
+	// 7.5ms allows one moderate cut per ~3/4 RTT, hopefully balancing both.
+	uint64_t nowNs = Simulator::Now().GetNanoSeconds();
+	uint64_t baseRttNs = (qp->lpcc.m_minRtt > 0) ? qp->lpcc.m_minRtt : 10000000ULL;
+	uint64_t mdGuardNs = baseRttNs * 3 / 4;  // 3/4 RTT guard (= 7.5ms for 10ms RTT)
+	if (qp->lpcc.m_lastReductionTsNs != 0 &&
+	    nowNs - qp->lpcc.m_lastReductionTsNs < mdGuardNs) {
 		return;
 	}
-	// m_k now directly reflects queue overshoot vs epsilon. The previous
-	// rttlEff/m_rtts factor used FCNP's reverse one-way travel time, which
-	// has the wrong direction and made the first decrease accidentally
-	// weaker than steady-state. Drop it.
-	double m_k = (1.0 * m_qlen / m_epsilon - 1.0);
-	m_k = std::max(0.0, std::min(m_k, 1.2));
 
-	uint64_t congRateBps = ch.fcnp.linkRateBps;
-	if (congRateBps == 0) {
-		return;
-	}
-	const double rateRatio = 1.0 * qp->m_rate.GetBitRate() / congRateBps;
-	double flowFactor = std::sqrt(std::max(1.0, static_cast<double>(ch.fcnp.m_flowCount)));
-	flowFactor = std::min(flowFactor, 3.0);
-	double m_p = rateRatio * flowFactor;
-	m_p = std::max(0.0, std::min(m_p, 4.0));
+	// Stage 2: Simplified fair-share-aware MD.
+	// Removed: dropCap piecewise lerp, qPenalty queue-target penalty, flowFactor sqrt.
+	// Pure "fast cuts faster": signal = k × excess, where excess = max(0, m_rate/fair - 1).
+	// At k=1 the formula converges to fair share in ONE step: new_rate = m_rate / (1 + excess) = fair.
+	if (m_epsilon == 0 || ch.fcnp.linkRateBps == 0) return;
+
+	double k = std::max(0.0, std::min((double)ch.fcnp.qlen / m_epsilon - 1.0, 1.2));
+	double fair = (double)ch.fcnp.linkRateBps / std::max<uint16_t>(1, ch.fcnp.m_flowCount);
+	double excess = std::max(0.0, (double)qp->m_rate.GetBitRate() / fair - 1.0);
 	qp->lpcc.m_flowCount = ch.fcnp.m_flowCount;
 
-	// Queue-target-aware decrease intensity.
-	const double kLpccQueueTargetBytes = GetLpccQueueTargetBytes();
-	double qPenalty = 1.0;
-	if (m_qlen > kLpccQueueTargetBytes) {
-		double over = std::min(1.0, (double(m_qlen) - kLpccQueueTargetBytes) / kLpccQueueTargetBytes);
-		qPenalty += 0.5 * over;
-	}
-	const double decreaseSignal = std::max(std::min(m_k * m_p * qPenalty, m_wr), 0.0);
-	DataRate new_rate = qp->m_rate * (1.0 / (1 + decreaseSignal));
+	if (excess == 0.0) return;  // slow / at-fair flows: AI only, no MD, no guard reset
 
-	// Piecewise single-step drop cap (parameterised):
-	//   qlen <= queueTarget       -> dropCapLow
-	//   queueTarget < qlen < hi   -> linear lerp from low to high
-	//   qlen >= queueTarget * R   -> dropCapHigh
-	const double rateBps = std::max(1.0, static_cast<double>(qp->m_rate.GetBitRate()));
-	double dropFrac = 1.0 - (static_cast<double>(new_rate.GetBitRate()) / rateBps);
-	const double hiRatio = std::max(1.0 + 1e-6, m_lpccDropCapHighRatio);
-	const double qOverTarget = (kLpccQueueTargetBytes > 0.0)
-	                               ? (static_cast<double>(m_qlen) / kLpccQueueTargetBytes)
-	                               : 0.0;
-	double dropCap;
-	if (qOverTarget <= 1.0) {
-		dropCap = m_lpccDropCapLow;
-	} else if (qOverTarget < hiRatio) {
-		const double t = (qOverTarget - 1.0) / (hiRatio - 1.0);
-		dropCap = m_lpccDropCapLow + (m_lpccDropCapHigh - m_lpccDropCapLow) * t;
-	} else {
-		dropCap = m_lpccDropCapHigh;
+	double signal = std::min(k * excess, (double)m_wr);
+	uint64_t newBps = (uint64_t)((double)qp->m_rate.GetBitRate() / (1.0 + signal));
+	// Restore floor at fair share: removing it doubled oscillation (spread
+	// 7.7G→14.9G) without reducing first-mover advantage. Floor is the
+	// right safety net; the gap should be addressed elsewhere.
+	newBps = std::max(newBps, (uint64_t)fair);
+	uint64_t finalBps = std::max(newBps, (uint64_t)(m_minRate.GetBitRate() * 10ULL));
+	qp->m_rate = DataRate(finalBps);
+
+	qp->lpcc.m_lastReductionTsNs = nowNs;
+
+	// DIAG-SRC3: log every FCNP-MD event for Src 3
+	if (qp->dport == 10003) {
+		std::cout << "DIAG_FCNPMD t=" << Simulator::Now().GetSeconds()
+		          << " Src3 m_rate_pre=" << (double)qp->m_rate.GetBitRate()/1e9 << "G(post)"
+		          << " fair=" << fair/1e9 << "G"
+		          << " excess=" << excess
+		          << " k=" << k
+		          << " signal=" << signal
+		          << " newBps=" << newBps/1e9 << "G"
+		          << " final=" << finalBps/1e9 << "G"
+		          << " fcnp.qlen=" << ch.fcnp.qlen/1e6 << "MB"
+		          << " fcnp.flowCount=" << ch.fcnp.m_flowCount
+		          << std::endl;
 	}
-	if (dropFrac > dropCap) {
-		new_rate = qp->m_rate * (1.0 - dropCap);
-	}
-	new_rate = std::max(new_rate, m_minRate * 10.0); // 1Gbps floor
-	qp->m_rate = new_rate;
 }
 
 void RdmaHw::HandleAckLpcc(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHeader &ch) {
@@ -1870,20 +1948,11 @@ void RdmaHw::UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHea
             return;
         }
 
-	        const uint64_t thetaTs = std::max<uint64_t>(1ULL, m_theta) * 1000ULL;
-	        const uint64_t noAckReduceWindowTs = thetaTs;
-	        if (qp->lpcc.m_lastDecreaseRate != 0 &&
-	            noAckReduceWindowTs > 0 &&
-	            nowTs - qp->lpcc.m_lastDecreaseRate < noAckReduceWindowTs) {
-	            qp->lpcc.m_lastUpdateSeq = qp->snd_nxt;
-	            return;
-	        }
-	        // ACK path should only be a light correction when FCNP has been quiet
-	        // for a long enough interval.
-	        const uint64_t ackQuietWindowTs = thetaTs * 4ULL;
-	        if (qp->lpcc.m_lastFcnpTs != 0 &&
-	            nowTs > qp->lpcc.m_lastFcnpTs &&
-	            nowTs - qp->lpcc.m_lastFcnpTs < ackQuietWindowTs) {
+	        // Stage 1: 3/4 RTT MD guard shared with FCNP-path MD.
+	        uint64_t baseRttNs = (qp->lpcc.m_minRtt > 0) ? qp->lpcc.m_minRtt : 10000000ULL;
+	        uint64_t mdGuardNs = baseRttNs * 3 / 4;
+	        if (qp->lpcc.m_lastReductionTsNs != 0 &&
+	            nowTs - qp->lpcc.m_lastReductionTsNs < mdGuardNs) {
 	            qp->lpcc.m_lastUpdateSeq = qp->snd_nxt;
 	            return;
 	        }
@@ -1912,9 +1981,25 @@ void RdmaHw::UpdateRateLpccOnAck(Ptr<RdmaQueuePair> qp, Ptr<Packet> p, CustomHea
         // 	std::cout << "--------------------------------------" << std::endl;
 		// }
         // ChangeRate(qp, new_rate);
+        DataRate ackPre = qp->m_rate;
 			qp->m_rate = new_rate;
 	        // qp->lpcc.m_curRate = new_rate;
             qp->lpcc.m_lastUpdateSeq = qp->snd_nxt;
+            qp->lpcc.m_lastReductionTsNs = nowTs;  // Stage 1: record MD timestamp for per-RTT guard
+
+        // DIAG-SRC3: log every ACK-MD event for Src 3
+        if (qp->dport == 10003) {
+            std::cout << "DIAG_ACKMD t=" << Simulator::Now().GetSeconds()
+                      << " Src3 m_rate_pre=" << (double)ackPre.GetBitRate()/1e9 << "G"
+                      << " m_rate_post=" << (double)new_rate.GetBitRate()/1e9 << "G"
+                      << " m_rttl=" << m_rttl/1000.0 << "us"
+                      << " minRtt=" << qp->lpcc.m_minRtt/1000.0 << "us"
+                      << " rttInflation=" << rttInflation
+                      << " m_p=" << m_p
+                      << " ackKr=" << ackKr
+                      << " lastCongRate=" << qp->lpcc.m_lastCongRateBps/1e9 << "G"
+                      << std::endl;
+        }
 	    } else {
 	        qp->lpcc.m_lastUpdateSeq = qp->snd_nxt;
 			qp->lpcc.m_lastRtt = nowTs - ch.ack.ih.ts;

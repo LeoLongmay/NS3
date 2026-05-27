@@ -85,6 +85,16 @@ protected:
 	uint64_t m_biccEcnClearCount;
 	uint64_t m_biccSoftVoqEnqueueCount;
 	uint64_t m_biccSoftVoqDequeueCount;
+	// THEMIS (cc_mode=13): DCQCN-patch deployed at ESW. PNP reflects CNP on
+	// outbound ECN-CE; TRP intercepts inbound CNP and delays outbound packets.
+	uint32_t m_themisCnpIntervalUs;        // per-flow PNP CNP min interval (default 50us)
+	uint32_t m_themisTrpAlphaInit;         // Algorithm 1 initial alpha (default 5)
+	uint32_t m_themisTrpBetaUs;            // recover-phase silence threshold (default 500us)
+	uint32_t m_themisTrpLoopDelayNs;       // delay per recirculation loop (default 1000ns)
+	uint32_t m_themisTrpMaxLoops;          // hard ceiling on loop_num (default 64)
+	uint32_t m_themisLonghaulCutoffUs;     // port-delay threshold for ESW classification (default 100us)
+	uint64_t m_themisPnpCnpCount;          // stats: PNP-generated CNP count
+	uint64_t m_themisTrpDelayCount;        // stats: TRP-delayed packet count
 
 private:
 	int GetOutDev(Ptr<const Packet>, CustomHeader &ch);
@@ -167,6 +177,47 @@ private:
 				}
 			};
 			std::unordered_map<LpccFeedbackFlowKey, uint64_t, LpccFeedbackFlowKeyHasher> m_lpccFlowLastFcnpTs;
+			// THEMIS per-flow state. Key is sender-local 5-tuple (sip=local sender,
+			// dip=remote receiver, sport/dport=sender's). For inbound CNPs the
+			// raw ACK header is in receiver's perspective and must be swapped via
+			// MakeThemisFlowKeyFromAck before lookup, so PNP/TRP share one table.
+			struct ThemisFlowKey {
+				uint32_t sip;
+				uint32_t dip;
+				uint16_t sport;
+				uint16_t dport;
+				uint16_t pg;
+				bool operator==(const ThemisFlowKey& other) const {
+					return sip == other.sip && dip == other.dip &&
+					       sport == other.sport && dport == other.dport &&
+					       pg == other.pg;
+				}
+			};
+			struct ThemisFlowKeyHasher {
+				size_t operator()(const ThemisFlowKey& key) const {
+					size_t h = std::hash<uint32_t>{}(key.sip);
+					h = h * 1315423911u + std::hash<uint32_t>{}(key.dip);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.sport);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.dport);
+					h = h * 1315423911u + std::hash<uint16_t>{}(key.pg);
+					return h;
+				}
+			};
+			enum ThemisStatus : uint8_t { THEMIS_NORMAL = 0, THEMIS_THROTTLED = 1, THEMIS_RECOVER = 2 };
+			struct ThemisFlowState {
+				uint32_t loop_num;              // current recirculation count (paper Algorithm 1)
+				uint32_t cnp_num;               // CNPs received in current beta window
+				uint32_t alpha;                 // current step threshold
+				uint64_t last_cnp_ts;           // ns of most recent inbound CNP
+				uint64_t last_scheduled_send_ts;// ns; for outbound packet-order preservation
+				uint8_t  flow_status;           // ThemisStatus
+				ThemisFlowState()
+					: loop_num(0), cnp_num(0), alpha(5),
+					  last_cnp_ts(0), last_scheduled_send_ts(0),
+					  flow_status(THEMIS_NORMAL) {}
+			};
+			std::unordered_map<ThemisFlowKey, ThemisFlowState, ThemisFlowKeyHasher> m_themisFlowState;
+			std::unordered_map<ThemisFlowKey, uint64_t, ThemisFlowKeyHasher> m_themisLastPnpCnpTs;
 
     // callback for scheduled flow table cleanup
     void ScheduleCleanFlowTable();
@@ -180,6 +231,16 @@ private:
 	void MaybeHandleBiccAckRelease(uint32_t inDev, uint32_t outDev, const CustomHeader& ch);
 	void DrainBiccDstQueue(uint32_t dstIp);
 	BiccAckFlowKey GetBiccAckFlowKey(const CustomHeader& ch) const;
+	// THEMIS (cc_mode=13) helpers
+	bool IsThemisLonghaulPort(uint32_t portId) const;
+	bool IsThemisSenderSideDciPath(uint32_t inDev, uint32_t outDev) const;
+	bool IsThemisReceiverSideDciPath(uint32_t inDev, uint32_t outDev) const;
+	void MaybeGenerateThemisPnpCnp(uint32_t ifIndex, uint32_t qIndex, uint32_t inDev, Ptr<Packet> p);
+	ThemisFlowKey MakeThemisFlowKeyFromUdp(const CustomHeader& ch) const;
+	ThemisFlowKey MakeThemisFlowKeyFromAck(const CustomHeader& ch) const;
+	bool MaybeHandleThemisInboundCnp(uint32_t inDev, uint32_t outDev, const CustomHeader& ch);
+	bool MaybeApplyThemisTrpDelay(uint32_t inDev, uint32_t outDev, Ptr<Packet> packet, CustomHeader& ch);
+	void ThemisAdvanceFlowState(const ThemisFlowKey& key);
 public:
 	Ptr<SwitchMmu> m_mmu;
 
@@ -195,7 +256,7 @@ public:
 	void SetFlowTableInactiveThresholdNs(uint64_t ns);
 	void SetFlowTableCleanIntervalNs(uint64_t ns) { m_flowTableCleanIntervalNs = ns; }
 	void SetFlowTableMaintenance(bool on) { m_flowTableMaintenance = on; }
-	void SetEpsilon(uint16_t epsilon) {m_epsilon = epsilon;}
+	void SetEpsilon(uint32_t epsilon) {m_epsilon = epsilon;}
 	void ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k);
 	void SetBifrostPortEnabled(uint32_t inPort, bool enabled);
 	// static uint32_t cnp_count;

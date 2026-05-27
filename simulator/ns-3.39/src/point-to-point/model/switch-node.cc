@@ -675,7 +675,7 @@ int SwitchNode::log2apprx(int x, int b, int m, int l) {
 
 bool SwitchNode::IsLpccWanNode() const {
 	uint32_t id = GetId();
-	return id >= 21 && id <= 25;
+	return id >= 74 && id <= 81;
 }
 
 bool SwitchNode::IsLonghaulPort(uint32_t portId) const {

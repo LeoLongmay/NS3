@@ -17,6 +17,10 @@ public:
 
 	SwitchMmu(void);
 
+	// Diagnostic: set the owning SwitchNode's ID for drop log identification
+	void SetSwitchId(uint32_t id) { m_switchIdForLog = id; }
+	uint32_t m_switchIdForLog = 0;
+
 	bool CheckIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t psize, uint32_t type, uint32_t unsched);
 	bool CheckEgressAdmission(uint32_t port, uint32_t qIndex, uint32_t psize, uint32_t type, uint32_t unsched);
 	void UpdateIngressAdmission(uint32_t port, uint32_t qIndex, uint32_t psize, uint32_t type, uint32_t unsched);

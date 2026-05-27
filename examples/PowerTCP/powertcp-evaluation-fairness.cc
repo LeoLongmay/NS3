@@ -80,6 +80,12 @@ double   bicc_dst_bdp_factor = 0.1;
 uint32_t bicc_longhaul_cutoff_us = 100;
 uint32_t bicc_ns_fb_interval_us = 75;
 uint64_t bicc_blend_t_ns = 2000000;
+uint32_t themis_cnp_interval_us = 50;
+uint32_t themis_trp_alpha_init = 5;
+uint32_t themis_trp_beta_us = 500;
+uint32_t themis_trp_loop_delay_ns = 1000;
+uint32_t themis_trp_max_loops = 64;
+uint32_t themis_longhaul_cutoff_us = 100;
 
 bool clamp_target_rate = false, l2_back_to_zero = false;
 double error_rate_per_link = 0.0;
@@ -159,9 +165,17 @@ std::unordered_map<uint32_t, unordered_map<uint32_t, uint16_t> > portNumder;
 struct FlowInput{
 	uint64_t src, dst, pg, maxPacketCount, port, dport;
 	double start_time;
+	double stop_time;  // per-flow stop time in seconds; <=0 means run to sim end
 	uint32_t idx;
 };
 FlowInput flow_input = {0};
+
+// Fairness-experiment-only: per-source stop flag. When a flow's stop_time fires,
+// we set this to skip that source in PrintResultsFlow. Without this, some CC modes
+// (HPCC) keep filling the NIC tx counter via rate-paced retransmissions or window
+// drainage, so naturally relying on qp_finish->flow_idx_complete++ doesn't trigger.
+// Keyed by source node ID (matches the Src container keying).
+std::map<uint32_t, bool> g_src_stopped;
 uint32_t flow_num;
 uint64_t tcp_flow_id = 0;
 FILE *g_fct_output = nullptr;
@@ -170,8 +184,8 @@ Ipv4Address node_id_to_ip(uint32_t id);
 
 void ReadFlowInput(){
 	if (flow_input.idx < flow_num){
-		flowf >> flow_input.src >> flow_input.dst >> flow_input.pg >> flow_input.dport >> flow_input.maxPacketCount >> flow_input.start_time;
-		std::cout << "Flow "<< flow_input.src << " " << flow_input.dst << " " << flow_input.pg << " " << flow_input.dport << " " << flow_input.maxPacketCount << " " << flow_input.start_time << " " << Simulator::Now().GetSeconds() << std::endl;
+		flowf >> flow_input.src >> flow_input.dst >> flow_input.pg >> flow_input.dport >> flow_input.maxPacketCount >> flow_input.start_time >> flow_input.stop_time;
+		std::cout << "Flow "<< flow_input.src << " " << flow_input.dst << " " << flow_input.pg << " " << flow_input.dport << " " << flow_input.maxPacketCount << " start=" << flow_input.start_time << " stop=" << flow_input.stop_time << " now=" << Simulator::Now().GetSeconds() << std::endl;
 		NS_ASSERT(n.Get(flow_input.src)->GetNodeType() == 0 && n.Get(flow_input.dst)->GetNodeType() == 0);
 	}
 }
@@ -222,6 +236,31 @@ void ScheduleFlowInputs(){
 			RdmaClientHelper clientHelper(flow_input.pg, serverAddress[flow_input.src], serverAddress[flow_input.dst], port, flow_input.dport, flow_input.maxPacketCount, has_win?(global_t==1?maxBdp:pairBdp[n.Get(flow_input.src)][n.Get(flow_input.dst)]):0, global_t==1?maxRtt:pairRtt[flow_input.src][flow_input.dst], pairBw[flow_input.src][flow_input.dst], Seconds(simulator_stop_time));
 			ApplicationContainer appCon = clientHelper.Install(n.Get(flow_input.src));
 			appCon.Start(Seconds(0)); // setting the correct time here conflicts with Sim time since there is already a schedule event that triggered this function at desired time.
+
+			// Fairness-experiment-only: per-flow forced stop time via Simulator::Schedule.
+			// Truncates qp->m_size when stop_time fires; only affects this experiment.
+			if (flow_input.stop_time > 0.0) {
+				Ptr<Node> srcNode = n.Get(flow_input.src);
+				uint32_t srcId = flow_input.src;
+				uint32_t dipVal = serverAddress[flow_input.dst].Get();
+				uint16_t portVal = static_cast<uint16_t>(port);
+				uint16_t pgVal = static_cast<uint16_t>(flow_input.pg);
+				Time delay = Seconds(flow_input.stop_time) - Simulator::Now();
+				Simulator::Schedule(delay, [srcNode, srcId, dipVal, portVal, pgVal]() {
+					Ptr<RdmaDriver> rdma = srcNode->GetObject<RdmaDriver>();
+					if (!rdma) return;
+					Ptr<RdmaQueuePair> qp = rdma->m_rdma->GetQp(dipVal, portVal, pgVal);
+					if (qp && !qp->IsFinished()) {
+						qp->m_size = qp->snd_nxt;
+						std::cout << "FLOW_STOP t=" << Simulator::Now().GetSeconds()
+						          << " sport=" << portVal << " bytes=" << qp->snd_nxt << std::endl;
+					}
+					// Explicitly mark this source as stopped so the dumper skips it.
+					// Some CC modes (HPCC) don't naturally drain to IsFinished() after
+					// m_size truncation; without this flag the dump file keeps growing.
+					g_src_stopped[srcId] = true;
+				});
+			}
 		}
 		// get the next flow input
 		flow_input.idx++;
@@ -443,6 +482,12 @@ void PrintResults(std::map<uint32_t,NetDeviceContainer> ToR,uint32_t numToRs,dou
 
 void PrintResultsFlow(std::map<uint32_t,NetDeviceContainer> Src,uint32_t numFlows,double delay){
 	for (uint32_t i=flow_idx_complete; i<numFlows;i++){
+		// Skip sources that have been explicitly stopped by the fairness-experiment
+		// stop_time logic. Required because some CC modes don't trigger qp_finish()
+		// naturally after m_size truncation, so flow_idx_complete may not advance.
+		auto stopIt = g_src_stopped.find(i);
+		if (stopIt != g_src_stopped.end() && stopIt->second) continue;
+
 		double throughputTotal=0;
 
 		for (uint32_t j=0; j< Src[i].GetN();j++){
@@ -475,6 +520,21 @@ int main(int argc, char *argv[])
 	uint32_t windowCheck=1;
 	uint32_t transportModeArg = transport_mode;
 	uint32_t flowControlModeArg = flow_control_mode;
+	// LPCC CLI overrides (mirror powertcp-evaluation-burst.cc). -1/-1.0 = keep built-in default.
+	int32_t lpccEpsilonArg = -1;
+	int32_t lpccFcnpMinIntervalUsArg = -1;
+	int32_t lpccPerFlowFcnpCooldownUsArg = -1;
+	int32_t lpccFcnpTopKArg = -1;
+	int32_t lpccFcnpTopKHighArg = -1;
+	int32_t lpccFcnpKHighThreshBytesArg = -1;
+	double lpccThetaUsArg = -1.0;
+	int32_t lpccIncreaseIntervalUsArg = -1;
+	double lpccIncreaseFactorArg = -1.0;
+	double lpccWrArg = -1.0;
+	double lpccKrArg = -1.0;
+	double lpccQueueTargetRatioArg = -1.0;
+	double lpccDropCapHighArg = -1.0;
+	int32_t lpccAiSuppressMultiplierArg = -1;
 	// std::string confFile = "/home/vamsi/src/phd/codebase/ns3-datacenter/simulator/ns-3.39/examples/PowerTCP/config-fairness.txt";
 	std::string confFile = "/home/leo/PowerTCP-RAW/ns-3.39/examples/PowerTCP/config-fairness.txt";
 
@@ -488,6 +548,20 @@ int main(int argc, char *argv[])
 	cmd.AddValue("windowCheck","windowCheck",windowCheck);
 	cmd.AddValue("transportMode","specify transport mode. 0=RDMA, 1=TCP_BBR",transportModeArg);
 	cmd.AddValue("flowControlMode","specify flow control mode. 0=PFC (default, including BICC), 1=Bifrost (legacy baseline)",flowControlModeArg);
+	cmd.AddValue("lpccEpsilon", "LPCC queue threshold in bytes (<=0 means keep built-in default)", lpccEpsilonArg);
+	cmd.AddValue("lpccFcnpMinIntervalUs", "LPCC switch FCNP min interval in microseconds (<=0 means keep built-in default)", lpccFcnpMinIntervalUsArg);
+	cmd.AddValue("lpccPerFlowFcnpCooldownUs", "LPCC per-flow fCNP cooldown in microseconds (<=0 means keep built-in default)", lpccPerFlowFcnpCooldownUsArg);
+	cmd.AddValue("lpccFcnpTopK", "LPCC switch FCNP fanout top-K flows per congested queue (<=0 means keep built-in default)", lpccFcnpTopKArg);
+	cmd.AddValue("lpccFcnpTopKHigh", "LPCC switch FCNP dynamic high-queue fanout top-K (<=0 means keep built-in default)", lpccFcnpTopKHighArg);
+	cmd.AddValue("lpccFcnpKHighThreshBytes", "LPCC switch FCNP dynamic-K queue threshold in bytes (<=0 means keep built-in default)", lpccFcnpKHighThreshBytesArg);
+	cmd.AddValue("lpccThetaUs", "LPCC decrease-cycle interval in microseconds (<=0 means keep built-in default)", lpccThetaUsArg);
+	cmd.AddValue("lpccIncreaseIntervalUs", "LPCC AI timer interval in microseconds (<=0 means keep built-in default)", lpccIncreaseIntervalUsArg);
+	cmd.AddValue("lpccIncreaseFactor", "LPCC AI factor beta (<=0 means keep built-in default)", lpccIncreaseFactorArg);
+	cmd.AddValue("lpccWr", "LPCC FCNP decrease cap wr (<=0 means keep built-in default)", lpccWrArg);
+	cmd.AddValue("lpccKr", "LPCC RTT-inflation decrease cap kr (<=0 means keep built-in default)", lpccKrArg);
+	cmd.AddValue("lpccQueueTargetRatio", "LPCC steady-state queue target / epsilon (<=0 means keep built-in default 0.375)", lpccQueueTargetRatioArg);
+	cmd.AddValue("lpccDropCapHigh", "LPCC single-step rate-drop cap at high qRatio (<=0 means keep built-in default 0.5)", lpccDropCapHighArg);
+	cmd.AddValue("lpccAiSuppressMultiplier", "LPCC AI suppression window in increaseInterval units after FCNP (<=0 means keep built-in default 15)", lpccAiSuppressMultiplierArg);
 
 	cmd.Parse (argc,argv);
 	conf.open(confFile.c_str());
@@ -805,6 +879,24 @@ int main(int argc, char *argv[])
 		}else if (key.compare("BICC_BLEND_T_NS") == 0){
 			conf >> bicc_blend_t_ns;
 			std::cout << "BICC_BLEND_T_NS\t\t\t\t" << bicc_blend_t_ns << '\n';
+		}else if (key.compare("THEMIS_CNP_INTERVAL_US") == 0){
+			conf >> themis_cnp_interval_us;
+			std::cout << "THEMIS_CNP_INTERVAL_US\t\t\t" << themis_cnp_interval_us << '\n';
+		}else if (key.compare("THEMIS_TRP_ALPHA_INIT") == 0){
+			conf >> themis_trp_alpha_init;
+			std::cout << "THEMIS_TRP_ALPHA_INIT\t\t\t" << themis_trp_alpha_init << '\n';
+		}else if (key.compare("THEMIS_TRP_BETA_US") == 0){
+			conf >> themis_trp_beta_us;
+			std::cout << "THEMIS_TRP_BETA_US\t\t\t" << themis_trp_beta_us << '\n';
+		}else if (key.compare("THEMIS_TRP_LOOP_DELAY_NS") == 0){
+			conf >> themis_trp_loop_delay_ns;
+			std::cout << "THEMIS_TRP_LOOP_DELAY_NS\t\t" << themis_trp_loop_delay_ns << '\n';
+		}else if (key.compare("THEMIS_TRP_MAX_LOOPS") == 0){
+			conf >> themis_trp_max_loops;
+			std::cout << "THEMIS_TRP_MAX_LOOPS\t\t\t" << themis_trp_max_loops << '\n';
+		}else if (key.compare("THEMIS_LONGHAUL_CUTOFF_US") == 0){
+			conf >> themis_longhaul_cutoff_us;
+			std::cout << "THEMIS_LONGHAUL_CUTOFF_US\t\t" << themis_longhaul_cutoff_us << '\n';
 		}else if (key.compare("TRANSPORT_MODE") == 0){
 			conf >> transport_mode;
 			std::cout << "TRANSPORT_MODE\t\t\t" << transport_mode << '\n';
@@ -880,6 +972,12 @@ int main(int argc, char *argv[])
 		Config::SetDefault("ns3::TcpSocket::InitialCwnd", UintegerValue(bbr_init_cwnd));
 		Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(bbr_snd_buf_mb * 1024 * 1024));
 		Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(bbr_rcv_buf_mb * 1024 * 1024));
+		// Bug 3 root cause: ns3::TcpSocketState::MaxPacingRate defaults to 4 Gb/s,
+		// which BBR's SetPacingRate min()-caps with (tcp-bbr.cc:223). On a 100 Gbps
+		// DCI link this hardcodes BBR throughput to ~4 Gbps regardless of cwnd or
+		// BtlBw estimate. Lift the cap to 200 Gb/s (well above link rate) so BBR
+		// can actually probe up to the bottleneck.
+		Config::SetDefault("ns3::TcpSocketState::MaxPacingRate", DataRateValue(DataRate("200Gb/s")));
 	}
 
 	// set int_multi
@@ -896,10 +994,13 @@ int main(int argc, char *argv[])
 	else // others, no extra header
 		IntHeader::mode = IntHeader::NONE;
 
-	// lpcc: epsilon
-	uint16_t epsilon = 0;
+	// lpcc: epsilon — CLI override wins, else fall back to 4 MB (aligned with v17 burst profile;
+	// was 4000 = 4 KB, far too tight for DCI). This value is fed to both sw->SetEpsilon and
+	// rdmaHw->SetAttribute("LpccEpsilon", ...) below. If --lpccEpsilon is passed via CLI it takes
+	// precedence over both.
+	uint32_t epsilon = 0;
 	if (cc_mode == 9) {
-		epsilon = 4000;
+		epsilon = (lpccEpsilonArg > 0) ? static_cast<uint32_t>(lpccEpsilonArg) : 4000000;
 	}
 
 	// Set Pint
@@ -943,6 +1044,12 @@ int main(int argc, char *argv[])
 	Config::SetDefault("ns3::SwitchNode::BiccDstBdpFactor",            DoubleValue(bicc_dst_bdp_factor));
 	Config::SetDefault("ns3::SwitchNode::BiccLonghaulDelayCutoffUs",   UintegerValue(bicc_longhaul_cutoff_us));
 	Config::SetDefault("ns3::SwitchNode::BiccNsFeedbackMinIntervalUs", UintegerValue(bicc_ns_fb_interval_us));
+	Config::SetDefault("ns3::SwitchNode::ThemisCnpIntervalUs",         UintegerValue(themis_cnp_interval_us));
+	Config::SetDefault("ns3::SwitchNode::ThemisTrpAlphaInit",          UintegerValue(themis_trp_alpha_init));
+	Config::SetDefault("ns3::SwitchNode::ThemisTrpBetaUs",             UintegerValue(themis_trp_beta_us));
+	Config::SetDefault("ns3::SwitchNode::ThemisTrpLoopDelayNs",        UintegerValue(themis_trp_loop_delay_ns));
+	Config::SetDefault("ns3::SwitchNode::ThemisTrpMaxLoops",           UintegerValue(themis_trp_max_loops));
+	Config::SetDefault("ns3::SwitchNode::ThemisLonghaulDelayCutoffUs", UintegerValue(themis_longhaul_cutoff_us));
 
 	for (uint32_t i = 0; i < node_num; i++){
 		if (node_type[i] == 0){
@@ -958,6 +1065,24 @@ int main(int argc, char *argv[])
 			allNodes.Add(sw);
 			sw->SetAttribute("EcnEnabled", BooleanValue(enable_qcn));
 			sw->SetEpsilon(epsilon);
+			// LPCC switch-side CLI overrides (mirror burst.cc:1536-1549). Apply only when user
+			// passed a positive value via CLI; otherwise switch-node.cc attribute defaults apply.
+			// Note: lpccEpsilonArg already feeds the local 'epsilon' var above via SetEpsilon.
+			if (lpccFcnpMinIntervalUsArg > 0) {
+				sw->SetAttribute("FcnpMinIntervalUs", UintegerValue(static_cast<uint32_t>(lpccFcnpMinIntervalUsArg)));
+			}
+			if (lpccPerFlowFcnpCooldownUsArg > 0) {
+				sw->SetAttribute("LpccPerFlowFcnpCooldownUs", UintegerValue(static_cast<uint32_t>(lpccPerFlowFcnpCooldownUsArg)));
+			}
+			if (lpccFcnpTopKArg > 0) {
+				sw->SetAttribute("LpccFcnpTopK", UintegerValue(static_cast<uint32_t>(lpccFcnpTopKArg)));
+			}
+			if (lpccFcnpTopKHighArg > 0) {
+				sw->SetAttribute("LpccFcnpTopKHigh", UintegerValue(static_cast<uint32_t>(lpccFcnpTopKHighArg)));
+			}
+			if (lpccFcnpKHighThreshBytesArg > 0) {
+				sw->SetAttribute("LpccFcnpKHighThreshBytes", UintegerValue(static_cast<uint32_t>(lpccFcnpKHighThreshBytesArg)));
+			}
 			if (node_type[i]==1){
 				torNodes.Add(sw);
 				sw->SetNodeType(1);
@@ -1095,8 +1220,8 @@ int main(int argc, char *argv[])
 	for (uint32_t i = 0; i < node_num; i++) {
 		if (n.Get(i)->GetNodeType()) { // is switch
 			Ptr<SwitchNode> sw = DynamicCast<SwitchNode>(n.Get(i));
-			// uint32_t shift = 3; // by default 1/8
-			double alpha = 1.0/8;
+			// DCI tune: alpha 1/8 → 1/2 to give PFC threshold ~100MB (was 25MB) on 256MB buffer
+			double alpha = 1.0/2;
 			sw->m_mmu->SetAlphaIngress(alpha);
 			uint64_t totalHeadroom = 0;
 			for (uint32_t j = 1; j < sw->GetNDevices(); j++) {
@@ -1187,6 +1312,32 @@ int main(int argc, char *argv[])
 			rdmaHw->SetAttribute("PowerTCPEnabled", BooleanValue(wien));
 			rdmaHw->SetAttribute("PowerTCPdelay", BooleanValue(delayWien));
 			rdmaHw->SetAttribute("LpccEpsilon", UintegerValue(epsilon));
+			// LPCC sender-side CLI overrides (mirror burst.cc:1434-1457). Only apply if user passed
+			// a positive value via CLI; otherwise the C++ attribute defaults from rdma-hw.cc apply.
+			if (lpccThetaUsArg > 0) {
+				rdmaHw->SetAttribute("LpccTheta", DoubleValue(lpccThetaUsArg));
+			}
+			if (lpccIncreaseIntervalUsArg > 0) {
+				rdmaHw->SetAttribute("LpccIncreaseInterval", UintegerValue(static_cast<uint32_t>(lpccIncreaseIntervalUsArg)));
+			}
+			if (lpccIncreaseFactorArg > 0) {
+				rdmaHw->SetAttribute("LpccIncreaseFactor", DoubleValue(lpccIncreaseFactorArg));
+			}
+			if (lpccWrArg > 0) {
+				rdmaHw->SetAttribute("Lpcc_m_wr", DoubleValue(lpccWrArg));
+			}
+			if (lpccKrArg > 0) {
+				rdmaHw->SetAttribute("Lpcc_m_kr", DoubleValue(lpccKrArg));
+			}
+			if (lpccQueueTargetRatioArg > 0) {
+				rdmaHw->SetAttribute("LpccQueueTargetRatio", DoubleValue(lpccQueueTargetRatioArg));
+			}
+			if (lpccDropCapHighArg > 0) {
+				rdmaHw->SetAttribute("LpccDropCapHigh", DoubleValue(lpccDropCapHighArg));
+			}
+			if (lpccAiSuppressMultiplierArg > 0) {
+				rdmaHw->SetAttribute("LpccAiSuppressMultiplier", UintegerValue(static_cast<uint32_t>(lpccAiSuppressMultiplierArg)));
+			}
 			rdmaHw->SetAttribute("GeminiDelayThreshNs", UintegerValue(gemini_delay_thresh_ns));
 			rdmaHw->SetAttribute("GeminiWanBeta", DoubleValue(gemini_beta));
 			rdmaHw->SetAttribute("GeminiH", DoubleValue(gemini_h));
@@ -1292,7 +1443,13 @@ int main(int argc, char *argv[])
 	if (flow_num > 0){
 		if (transport_mode == TRANSPORT_MODE_TCP_BBR) {
 			for (uint32_t idx = 0; idx < flow_num; ++idx) {
-				flowf >> flow_input.src >> flow_input.dst >> flow_input.pg >> flow_input.dport >> flow_input.maxPacketCount >> flow_input.start_time;
+				// Bug 1 fix: BBR path now reads the 7th column (stop_time) too,
+				// matching ReadFlowInput()'s parse format. Without this, a 7-column
+				// flow file (used by the fairness experiment) silently misaligns —
+				// row N+1's `src` gets row N's `stop_time` token, parsing fails for
+				// uint32_t, and BulkSendApplication's bind aborts at sim start.
+				flowf >> flow_input.src >> flow_input.dst >> flow_input.pg >> flow_input.dport
+				      >> flow_input.maxPacketCount >> flow_input.start_time >> flow_input.stop_time;
 				uint32_t port = portNumder[flow_input.src][flow_input.dst]++;
 				Ptr<BulkSendApplication> sender = CreateObject<BulkSendApplication>();
 				sender->SetAttribute("Protocol", TypeIdValue(TcpSocketFactory::GetTypeId()));
@@ -1305,7 +1462,21 @@ int main(int argc, char *argv[])
 				sender->SetAttribute("Local", AddressValue(InetSocketAddress(serverAddress[flow_input.src], port)));
 				n.Get(flow_input.src)->AddApplication(sender);
 				sender->SetStartTime(Seconds(flow_input.start_time));
-				sender->SetStopTime(Seconds(simulator_stop_time));
+				// Bug 2 fix: honor per-flow stop_time for BBR too. For TCP/BBR we
+				// stop the BulkSendApplication directly (no RDMA QP to truncate),
+				// and flag g_src_stopped so PrintResultsFlow skips this source
+				// after stop — matches RDMA path's force-stop semantics.
+				bool useStopTime = (flow_input.stop_time > 0.0);
+				Time stopT = useStopTime ? Seconds(flow_input.stop_time) : Seconds(simulator_stop_time);
+				sender->SetStopTime(stopT);
+				if (useStopTime) {
+					uint32_t srcId = flow_input.src;
+					Simulator::Schedule(stopT, [srcId]() {
+						g_src_stopped[srcId] = true;
+						std::cout << "FLOW_STOP t=" << Simulator::Now().GetSeconds()
+						          << " srcId=" << srcId << " (TCP/BBR)" << std::endl;
+					});
+				}
 
 				PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), flow_input.dport));
 				ApplicationContainer sinkApp = sink.Install(n.Get(flow_input.dst));

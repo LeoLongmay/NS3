@@ -135,14 +135,28 @@ public:
 	        uint64_t m_minRtt;
 			uint64_t m_lastFcnpTs;
 			uint64_t m_lastProcessedFcnpTs;
+			uint64_t m_lastReductionTsNs;  // Stage 1: Gemini-style per-RTT MD guard timestamp
 	    }lpcc;
+	// BiCC paper §III: two parallel DCQCN engines blended via EWMA min(R_NS, R_ETE).
+	// ns = near-source loop (FCNP from sender-side DCI-switch)
+	// ete = end-to-end loop (intra-DC CNP from receiver, like vanilla DCQCN)
+	struct BiccDcqcnEngine {
+		DataRate m_rate;                  // current per-loop rate (R_NS or R_ETE)
+		DataRate m_targetRate;            // DCQCN's target rate
+		double m_alpha;
+		EventId m_eventUpdateAlpha;
+		EventId m_eventDecreaseRate;
+		EventId m_rpTimer;
+		bool m_alpha_cnp_arrived;
+		bool m_decrease_cnp_arrived;
+		bool m_first_cnp;
+		uint32_t m_rpTimeStage;
+	};
 	struct {
-		DataRate nsRate;
-		DataRate eteRate;
+		BiccDcqcnEngine ns;
+		BiccDcqcnEngine ete;
 		DataRate blendedRate;
 		uint64_t lastBlendTsNs;
-		uint64_t lastNsAiTsNs;
-		uint64_t lastEteAiTsNs;
 		bool initialized;
 	} bicc;
 

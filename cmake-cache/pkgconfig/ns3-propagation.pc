@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-network ns3-mobility
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-propagation-debug  -lns3.39-network-debug -lns3.39-mobility-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-propagation-optimized  -lns3.39-network-optimized -lns3.39-mobility-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

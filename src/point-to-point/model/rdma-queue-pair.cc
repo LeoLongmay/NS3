@@ -80,13 +80,21 @@ RdmaQueuePair::RdmaQueuePair(uint16_t pg, Ipv4Address _sip, Ipv4Address _dip, ui
 			lpcc.m_minRtt = 0;
 			lpcc.m_lastFcnpTs = 0;
 			lpcc.m_lastProcessedFcnpTs = 0;
-			bicc.nsRate = 0;
-		bicc.eteRate = 0;
-		bicc.blendedRate = 0;
-		bicc.lastBlendTsNs = 0;
-		bicc.lastNsAiTsNs = 0;
-		bicc.lastEteAiTsNs = 0;
-		bicc.initialized = false;
+			lpcc.m_lastReductionTsNs = 0;
+			// BiCC engines (ns & ete): DCQCN state zero-init. m_first_cnp=true so
+			// the first CNP/FCNP triggers lazy-init in BiCcCnpReceived.
+			for (auto* eng : {&bicc.ns, &bicc.ete}) {
+				eng->m_rate = 0;
+				eng->m_targetRate = 0;
+				eng->m_alpha = 0;
+				eng->m_alpha_cnp_arrived = false;
+				eng->m_decrease_cnp_arrived = false;
+				eng->m_first_cnp = true;
+				eng->m_rpTimeStage = 0;
+			}
+			bicc.blendedRate = 0;
+			bicc.lastBlendTsNs = 0;
+			bicc.initialized = false;
 
 		hpccPint.m_lastUpdateSeq = 0;
 		hpccPint.m_incStage = 0;

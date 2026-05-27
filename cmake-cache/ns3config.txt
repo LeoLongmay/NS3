@@ -1,8 +1,8 @@
 ---- Summary of ns-3 settings:
-Build profile                 : debug
+Build profile                 : optimized
 Build directory               : /home/master01/CC_Exp/build
-Build with runtime asserts    : [32mON[0m
-Build with runtime logging    : [32mON[0m
+Build with runtime asserts    : OFF (not requested)
+Build with runtime logging    : OFF (not requested)
 Build version embedding       : OFF (not requested)
 BRITE Integration             : [31mOFF (missing dependency)[0m
 DES Metrics event collection  : OFF (not requested)

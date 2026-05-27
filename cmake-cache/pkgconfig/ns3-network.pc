@@ -9,5 +9,5 @@ Version: 3.39
 Requires:  ns3-core ns3-stats
 Requires.private: 
 Cflags: -I"${includedir}"  -I/usr/include
-Libs: -L"${libdir}" -lns3.39-network-debug  -lns3.39-core-debug -lns3.39-stats-debug -l-lpthread
+Libs: -L"${libdir}" -lns3.39-network-optimized  -lns3.39-core-optimized -lns3.39-stats-optimized -l-lpthread
 Libs.private: -L"${libdir}" 

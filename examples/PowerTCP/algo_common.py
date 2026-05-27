@@ -24,6 +24,7 @@ ALGO_MATRIX: Dict[str, dict] = {
     "PowerTCP": {"algorithm": 3,  "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "true",  "delayWien": "false"},
     "LPCC":     {"algorithm": 9,  "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "BICC":     {"algorithm": 12, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
+    "THEMIS":   {"algorithm": 13, "transportMode": 0, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "GEMINI":   {"algorithm": 11, "transportMode": 0, "flowControlMode": 0, "windowCheck": 1, "wien": "false", "delayWien": "false"},
     "Bifrost":  {"algorithm": 1,  "transportMode": 0, "flowControlMode": 1, "windowCheck": 0, "wien": "false", "delayWien": "false"},
     "BBR":      {"algorithm": 0,  "transportMode": 1, "flowControlMode": 0, "windowCheck": 0, "wien": "false", "delayWien": "false"},
@@ -182,7 +183,8 @@ LPCC_PROFILES: Dict[str, dict] = {
 
     # v17 [CURRENT]: bisect qTgtRatio between v14 (1.5) and v16 (3.0).
     # qTgtRatio=2.0 → target 8MB, dropCapHigh at qlen>=16MB.
-    # Expected: Port 4 ~300-350G with qlen mostly <20MB.
+    # lpccIncreaseFactor: 0.06 → 0.01 to reduce AIMD oscillation amplitude
+    # (mult term explosively grew m_rate +6%/tick = +120%/ms when queue empty).
     "v17": {
         "lpccEpsilon": 4000000,
         "lpccThetaUs": 1000,
@@ -192,7 +194,7 @@ LPCC_PROFILES: Dict[str, dict] = {
         "lpccFcnpTopKHigh": 24,
         "lpccFcnpKHighThreshBytes": 8000000,
         "lpccIncreaseIntervalUs": 80,
-        "lpccIncreaseFactor": 0.06,
+        "lpccIncreaseFactor": 0.001,
         "lpccWr": 4.0,
         "lpccKr": 0.08,
         "lpccQueueTargetRatio": 2.0,
@@ -311,11 +313,14 @@ def ensure_build(target: str, skip: bool = False, ns3_root: Path = None) -> Path
     subdir = parts[0] if len(parts) > 1 else "scratch"
     basename = parts[-1]
 
-    # Try both debug and default variants.
-    for variant in ("debug", "default"):
+    # Prefer optimized > default > debug. Also support release (no suffix).
+    for variant in ("optimized", "default", "debug"):
         candidate = ns3_root / "build" / subdir / f"ns3.39-{basename}-{variant}"
         if candidate.exists():
             return candidate
+    candidate = ns3_root / "build" / subdir / f"ns3.39-{basename}"
+    if candidate.exists():
+        return candidate
     raise FileNotFoundError(
         f"Built binary not found for target '{target}' "
         f"under {ns3_root / 'build' / subdir}"
