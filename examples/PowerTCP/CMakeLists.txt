@@ -26,8 +26,21 @@ build_example(
 )
 build_example(
   NAME powertcp-evaluation-workload
-  SOURCE_FILES 
+  SOURCE_FILES
     powertcp-evaluation-workload.cc
+    cdf.c
+  HEADER_FILES
+    cdf.h
+  LIBRARIES_TO_LINK
+    ${libpoint-to-point}
+    ${libtraffic-control}
+    ${libinternet}
+    ${libapplications}
+)
+build_example(
+  NAME powertcp-evaluation-fct
+  SOURCE_FILES
+    powertcp-evaluation-fct.cc
     cdf.c
   HEADER_FILES
     cdf.h

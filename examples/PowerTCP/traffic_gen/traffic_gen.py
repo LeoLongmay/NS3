@@ -5,6 +5,8 @@ import heapq
 from optparse import OptionParser
 from custom_rand import CustomRand
 
+FIXED_RANDOM_SEED = 1024
+
 class Flow:
 	def __init__(self, src, dst, size, t):
 		self.src, self.dst, self.size, self.t = src, dst, size, t
@@ -38,12 +40,18 @@ if __name__ == "__main__":
 	parser.add_option("-o", "--output", dest = "output", help = "the output file", default = "tmp_traffic.txt")
 	options,args = parser.parse_args()
 
+	# Use a fixed seed so generated workloads are reproducible across runs.
+	random.seed(FIXED_RANDOM_SEED)
+
 	base_t = 2000000000 # 2000000000
 
 	if not options.nhost:
 		print("please use -n to enter number of hosts")
 		sys.exit(0)
 	nhost = int(options.nhost)
+	if nhost != 16:
+		print("this traffic mode requires nhost == 16 (nodes 0-7 and 8-15)")
+		sys.exit(1)
 	load = float(options.load)
 	bandwidth = translate_bandwidth(options.bandwidth)
 	time = float(options.time)*1e9 # translates to ns
@@ -51,6 +59,8 @@ if __name__ == "__main__":
 	if bandwidth == None:
 		print("bandwidth format incorrect")
 		sys.exit(0)
+	dc_a = list(range(0, 8))
+	dc_b = list(range(8, 16))
 
 	fileName = options.cdf_file
 	file = open(fileName,"r")
@@ -72,18 +82,19 @@ if __name__ == "__main__":
 	# generate flows
 	avg = customRand.getAvg()
 	avg_inter_arrival = 1/(bandwidth*load/8./avg)*1000000000
-	n_flow_estimate = int(time / avg_inter_arrival * nhost)
 	n_flow = 0
-	ofile.write("%d \n"%n_flow_estimate)
+	header_width = 20
+	ofile.write("%*d\n"%(header_width, 0))
 	host_list = [(base_t + int(poisson(avg_inter_arrival)), i) for i in range(nhost)]
 	heapq.heapify(host_list)
 	while len(host_list) > 0:
 		t,src = host_list[0]
 		inter_t = int(poisson(avg_inter_arrival))
 		new_tuple = (src, t + inter_t)
-		dst = random.randint(0, nhost-1)
-		while (dst == src):
-			dst = random.randint(0, nhost-1)
+		if src < 8:
+			dst = random.choice(dc_b)
+		else:
+			dst = random.choice(dc_a)
 		if (t + inter_t > time + base_t):
 			heapq.heappop(host_list)
 		else:
@@ -94,7 +105,7 @@ if __name__ == "__main__":
 			ofile.write("%d %d 3 %d %.9f\n"%(src, dst, size, t * 1e-9))
 			heapq.heapreplace(host_list, (t + inter_t, src))
 	ofile.seek(0)
-	ofile.write("%d"%n_flow)
+	ofile.write("%*d\n"%(header_width, n_flow))
 	ofile.close()
 
 '''

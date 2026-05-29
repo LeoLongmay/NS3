@@ -31,8 +31,9 @@
 *.out
 *.app
 
-./build/
-./__pycache__/
+/build/
+/cmake-cache/
+__pycache__/
 .lock*
 .waf*
 examples/PowerTCP/dump_*/

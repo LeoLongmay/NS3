@@ -71,9 +71,9 @@ plt.rcParams.update({'font.size': 18})
 # algnames={}
 # algnames["bbr"]="BBR"
 
-# algs=list(["bicc"])
-# algnames={}
-# algnames["bicc"]="BICC"
+algs=list(["lpcc"])
+algnames={}
+algnames["lpcc"]="LPCC"
 # 
 
 # algs=list(["dcqcn", "gemini", "bbr", "bicc"])
@@ -83,13 +83,20 @@ plt.rcParams.update({'font.size': 18})
 # algnames["bbr"]="BBR"
 # algnames["gemini"]="GEMINI"
 
-algs=list(["lpcc"])
-algnames={}
-algnames["lpcc"]="LPCC"
+# algs=list(["dctcp", "hpcc", "timely"])
+# algnames={}
+# algnames["dctcp"]="DCTCP"
+# algnames["hpcc"]="HPCC"
+# algnames["timely"]="TIMELY"
 
-# algs=list(["dcqcn"])
+# 之前已画好的算法：
+# algs=list(["dcqcn", "bicc", "gemini", "themis", "lpcc"])
 # algnames={}
 # algnames["dcqcn"]="DCQCN"
+# algnames["bicc"]="BiCC"
+# algnames["gemini"]="Gemini"
+# algnames["themis"]="THEMIS"
+# algnames["lpcc"]="LPCC"
 
 #%%
 
@@ -111,6 +118,7 @@ for i in range(1,3):
 for alg in algs:
 
     df = pd.read_csv(results+'result-'+alg+'.burst',delimiter=' ',usecols=[5,9,11,13],names=["th","qlen","time","power"])
+    df = df.dropna()  # drop rows where any column is NaN (avoids x/y length mismatch)
 
     fig,ax = plt.subplots(1,1)
     # fig.suptitle(alg)
@@ -119,19 +127,18 @@ for alg in algs:
     ax1=ax.twinx()
     # ax.set_yticks([10e9,25e9,40e9,55e9,70e9,85e9,100e9])
     # ax.set_yticklabels(["10","25","40","55","70","85","100"])
-    ax.set_ylim(0, 420e9)
-    ax.set_yticks([0, 100e9, 200e9, 300e9, 400e9])
-    ax.set_yticklabels(["0","100","200","300","400"])
+    ax.set_ylim(0, 105e9)
+    ax.set_yticks([0, 25e9, 50e9, 75e9, 100e9])
+    ax.set_yticklabels(["0","25","50","75","100"])
     ax.set_ylabel("Throughput (Gbps)")
 
-    start=0.14
-    xtics=[i*0.02+start for i in range(0,8)]
+    xtics=[i*0.3 for i in range(0,6)]
     ax.set_xticks(xtics)
-    xticklabels=[str(i * 20) for i in range(0,8)]
+    xticklabels=[str(int(i * 300) / 1000) for i in range(0,6)]
     ax.set_xticklabels(xticklabels)
 
-    ax.set_xlabel("Time (ms)")
-    ax.set_xlim(0.1395,0.25)
+    ax.set_xlabel("Time (s)")
+    ax.set_xlim(0, 1.5)
     # ax.plot(df["time"],df["th"],label="Throughput",c='#1979a9',lw=2)
     ax.plot(
         df["time"].dropna().to_numpy(),
@@ -140,7 +147,7 @@ for alg in algs:
         c='#1979a9',
         lw=2
     )
-    ax1.set_ylim(0,150)
+    ax1.set_ylim(0,300)
     ax1.set_ylabel("Queue length (MB)")
     # ax1.plot(df["time"],df["qlen"]/(1000),c='r',label="Qlen",lw=2)
     ax1.plot(

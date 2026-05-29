@@ -46,7 +46,8 @@ ALGO_ORDER = [
     "PowerTCP",
     "Gemini",
     "Bifrost",
-    "BBR",
+    # "BBR",
+    "THEMIS",
     "LPCC",
 ]
 
@@ -212,10 +213,10 @@ def get_curve(rows, time_start, time_end, step):
 
 def discover_inputs(mix_dir: Path):
     load_map = {}
-    for load_dir in sorted(mix_dir.glob("*%load")):
+    for load_dir in sorted(mix_dir.glob("*%load*")):
         if not load_dir.is_dir():
             continue
-        m = re.match(r"^(\d+)%load$", load_dir.name)
+        m = re.match(r"^(\d+)%load(?:_\w+)?$", load_dir.name)
         if not m:
             continue
         alg_files = {}

@@ -4,13 +4,15 @@ import subprocess
 from pathlib import Path
 from typing import List, Tuple
 
-from algo_common import ALGO_MATRIX, SCRIPT_DIR, NS3_ROOT, resolve_algorithms, run_cmd
+from algo_common import ALGO_MATRIX, SCRIPT_DIR, REPO_ROOT, resolve_algorithms, run_cmd
 
+# All FCT artifacts now live under the outer ns-3 (REPO_ROOT). The previously
+# used simulator/ns-3.39 tree is fully redundant for THEMIS+ workflows.
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run fct-eval for 9 CC algorithms under multiple loads")
+    parser = argparse.ArgumentParser(description="Run fct-eval for CC algorithms under multiple loads")
     parser.add_argument("--topology", default=str(SCRIPT_DIR / "topology_simple.txt"))
-    parser.add_argument("--cdf", default=str(NS3_ROOT / "traffic_gen" / "tempcdf.txt"))
+    parser.add_argument("--cdf", default=str(SCRIPT_DIR / "traffic_gen" / "tempcdf.txt"))
     parser.add_argument("--loads", nargs="+", type=int, default=[40, 80], help="load percentages, e.g., 40 80")
     parser.add_argument(
         "--algs",
@@ -20,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--sim-time", type=float, default=2.0, help="traffic generation time window in seconds")
     parser.add_argument("--seed-base", type=int, default=1)
-    parser.add_argument("--traffic-script", default=str(NS3_ROOT / "traffic_gen" / "traffic_gen.py"))
+    parser.add_argument("--traffic-script", default=str(SCRIPT_DIR / "traffic_gen" / "traffic_gen.py"))
     parser.add_argument("--base-conf", default=str(SCRIPT_DIR / "config-workload.txt"))
     parser.add_argument("--output-root", default=str(SCRIPT_DIR / "mix"))
     parser.add_argument("--skip-build", action="store_true")
@@ -243,9 +245,9 @@ def main() -> None:
     algo_plan = resolve_algorithms(args.algs)
 
     if not args.skip_build:
-        run_cmd(["./ns3", "build", "scratch/fct-eval"], cwd=NS3_ROOT)
+        run_cmd(["cmake", "--build", "cmake-cache", "--target", "powertcp-evaluation-fct"], cwd=REPO_ROOT)
 
-    binary = NS3_ROOT / "build" / "scratch" / "ns3.39-fct-eval-default"
+    binary = REPO_ROOT / "build" / "examples" / "PowerTCP" / "ns3.39-powertcp-evaluation-fct-optimized"
     if not binary.exists():
         raise FileNotFoundError(f"Built binary not found: {binary}")
 
@@ -284,7 +286,7 @@ def main() -> None:
             "-o",
             str(flow_file),
         ]
-        run_cmd(traffic_cmd, cwd=NS3_ROOT)
+        run_cmd(traffic_cmd, cwd=REPO_ROOT)
         stretch_flow_start_times(flow_file, flowgen_start, baseline_flowgen_stop, flowgen_stop)
 
         # Rollback logic (old version, do not delete):
@@ -333,7 +335,7 @@ def main() -> None:
                     f"--delayWien={conf['delayWien']}",
                     f"--randomSeed={args.seed_base + load * 100 + idx}",
                 ],
-                cwd=NS3_ROOT,
+                cwd=REPO_ROOT,
                 log_path=run_log,
             )
             print(f"[done] load={load}% alg={alg_name} out={fct_file}")

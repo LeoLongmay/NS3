@@ -1898,10 +1898,13 @@ void RdmaHw::UpdateRateLpcc(Ptr<RdmaQueuePair> qp, CustomHeader &ch) {
 
 	double signal = std::min(k * excess, (double)m_wr);
 	uint64_t newBps = (uint64_t)((double)qp->m_rate.GetBitRate() / (1.0 + signal));
-	// Restore floor at fair share: removing it doubled oscillation (spread
-	// 7.7G→14.9G) without reducing first-mover advantage. Floor is the
-	// right safety net; the gap should be addressed elsewhere.
-	newBps = std::max(newBps, (uint64_t)fair);
+	// Floor at (drainMargin × fair): undershoot fair share to drain in-flight backlog.
+	// Plan D: more aggressive, uncapped qratio (margin can go down to 0.5).
+	// At qratio=3 (qlen=3×epsilon) margin=0.70; at qratio=5 margin=0.50 (clamp).
+	// Goal: break the AI-vs-MD equilibrium that traps qlen at ~11MB with plan A.
+	double qratio = (double)ch.fcnp.qlen / std::max<uint32_t>(1, m_epsilon);
+	double drainMargin = std::max(0.5, 1.0 - 0.10 * qratio);
+	newBps = std::max(newBps, (uint64_t)(fair * drainMargin));
 	uint64_t finalBps = std::max(newBps, (uint64_t)(m_minRate.GetBitRate() * 10ULL));
 	qp->m_rate = DataRate(finalBps);
 
