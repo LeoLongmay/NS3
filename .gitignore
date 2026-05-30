@@ -40,3 +40,9 @@ examples/PowerTCP/dump_*/
 examples/PowerTCP/results_*/
 examples/PowerTCP/sweep_*/
 *.log
+
+# LPCC sensitivity-analysis 中间数据 (保留 run-sensitivity*.sh 脚本与 plots/, 只挡 .burst 数据与临时绘图 CWD)
+examples/PowerTCP/sensitivity-analysis/data/
+examples/PowerTCP/sensitivity-analysis/*/data/
+examples/PowerTCP/sensitivity-analysis/.plotwork/
+examples/PowerTCP/sensitivity-analysis/*/.plotwork/

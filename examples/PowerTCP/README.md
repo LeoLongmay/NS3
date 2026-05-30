@@ -6,7 +6,18 @@ All experiment scripts live in this directory (`examples/PowerTCP/`). Each exper
 
 DCQCN, DCTCP, HPCC, Timely, PowerTCP, LPCC, BICC, GEMINI, Bifrost, BBR
 
-Algorithm definitions are centralized in `algo_common.py`. All runners share the same `ALGO_MATRIX`, so adding or modifying an algorithm only requires a single edit.
+Algorithm definitions are centralized in `algo_common.py`. All runners share the same `ALGO_MATRIX`, so adding or modifying an algorithm only requires a single edit. The `--algorithm` value passed to a binary is the internal `cc_mode`; the common ones are **LPCC=9**, HPCC=3 (PowerTCP=3 with `--wien=true`), DCQCN=1, DCTCP=8, Timely=7, GEMINI=11, BICC=12, THEMIS=13, BBR=0 (`--transportMode=1`), Bifrost=1 (`--flowControlMode=1`).
+
+## Build
+
+Binaries are emitted to `build/examples/PowerTCP/` (e.g. `ns3.39-powertcp-evaluation-burst-optimized`). From the repository root:
+
+```bash
+cd /home/master01/CC_Exp
+./ns3 build           # or ./waf
+```
+
+The `run_*.py` runners compile automatically; pass `--skip-build` to reuse an existing binary.
 
 ## Incast (Burst)
 
@@ -62,6 +73,28 @@ python3 run_fct.py --algs DCQCN LPCC --loads 40 60 --skip-build
 python3 plot_fct_new.py --mix-dir mix
 ```
 
+## Parameter Sensitivity Analysis (LPCC)
+
+Three independent sweeps over key LPCC parameters live under `sensitivity-analysis/`. Each is a self-contained shell script that runs a grid of burst simulations (reusing the burst binary) and produces a comparable grid of throughput/queue plots. They are long-running — launch them in the background:
+
+```bash
+cd /home/master01/CC_Exp
+# Acceleration params: IncreaseFactor x IncreaseInterval (3x3 grid)
+nohup bash examples/PowerTCP/sensitivity-analysis/run-sensitivity.sh \
+    > examples/PowerTCP/sensitivity-analysis/run.log 2>&1 &
+# Deceleration params: Wr x Theta (3x3 grid)
+nohup bash examples/PowerTCP/sensitivity-analysis/run-sensitivity-wr-theta.sh \
+    > examples/PowerTCP/sensitivity-analysis/wr-theta/run.log 2>&1 &
+# Queue threshold: Epsilon (6-point ladder)
+nohup bash examples/PowerTCP/sensitivity-analysis/run-sensitivity-epsilon.sh \
+    > examples/PowerTCP/sensitivity-analysis/epsilon/run.log 2>&1 &
+```
+
+Each sweep takes ~12–14 min per cell (3 in parallel by default; set `MAX_PARALLEL=1` to serialize or `=9` to go faster). Only `lpccWr`/`lpccThetaUs`/`lpccEpsilon` (etc.) vary — all other parameters stay fixed at the verified burst operating point. Output:
+
+- Plots: `sensitivity-analysis/{plots, wr-theta/plots, epsilon/plots}/` — sort by filename for the grid / ladder reading order.
+- Intermediate `data/*.burst` and raw `dump_burst/*.out` are **gitignored** (regenerated on each run).
+
 ## LPCC Parameter Profiles
 
 LPCC tuning profiles are defined in `algo_common.py` under `LPCC_PROFILES`. Each profile is a complete, named parameter set that can be selected via `--profile`:
@@ -111,8 +144,11 @@ examples/PowerTCP/
     results_fairness/           Parsed fairness results (.1-.4)
     results_workload/           Parsed workload results (.fct, .buf)
     mix/                        FCT results and plots
+    sensitivity-analysis/       LPCC param sweeps: run-sensitivity*.sh + plots/ (data/ gitignored)
     powertcp-evaluation-*.cc    C++ simulation source files
 ```
+
+> **Note:** Raw and parsed data (`dump_*/`, `results_*/`, `sensitivity-analysis/**/data/`, `*.out`, `*.log`) are gitignored, so a fresh clone has empty data directories — rerun the commands above to regenerate. Binaries (`build/`) are also gitignored; build first. The `run-sensitivity*.sh` scripts hardcode `NS3=/home/master01/CC_Exp`; edit that path if you clone elsewhere.
 
 ## Legacy Shell Scripts
 
