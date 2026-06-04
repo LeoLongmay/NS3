@@ -9,6 +9,7 @@
 #include "rdma-flow-table.h"
 #include "pint.h"
 #include "ns3/nstime.h"
+#include "ns3/random-variable-stream.h"
 
 namespace ns3 {
 
@@ -111,6 +112,11 @@ private:
 	    uint64_t m_flowTableInactiveThresholdNs{50000}; // default 50us; overridable from config
 	    uint64_t m_flowTableCleanIntervalNs{50000};     // default 50us; overridable from config
 	    bool m_flowTableMaintenance{true};              // false skips Insert*/Clean* for A/B no-op tests
+	    // Per-packet flow-table-op datapath delay model (0/0 => disabled, backward compatible).
+	    uint64_t m_flowTableOpDelayMinNs{0};
+	    uint64_t m_flowTableOpDelayMaxNs{0};
+	    Ptr<UniformRandomVariable> m_flowTableOpDelayRng;
+	    uint64_t m_egressPipeFreeNs[pCnt];              // per-egress-port FIFO clamp for the delay
 		uint64_t m_lastFcnpSentTs[pCnt][qCnt];
 		uint64_t m_lastBiccNsSentTs[pCnt][qCnt];
 		BifrostState m_bifrost[pCnt][qCnt];
@@ -256,6 +262,8 @@ public:
 	void SetFlowTableInactiveThresholdNs(uint64_t ns);
 	void SetFlowTableCleanIntervalNs(uint64_t ns) { m_flowTableCleanIntervalNs = ns; }
 	void SetFlowTableMaintenance(bool on) { m_flowTableMaintenance = on; }
+	void SetFlowTableOpDelayNs(uint64_t minNs, uint64_t maxNs);
+	void DeferredSwitchSend(uint32_t idx, uint32_t qIndex, Ptr<Packet> p, CustomHeader ch);
 	void SetEpsilon(uint32_t epsilon) {m_epsilon = epsilon;}
 	void ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k);
 	void SetBifrostPortEnabled(uint32_t inPort, bool enabled);

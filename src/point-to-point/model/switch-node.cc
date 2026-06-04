@@ -187,6 +187,9 @@ SwitchNode::SwitchNode() {
 	m_node_type = 1;
 	m_mmu = CreateObject<SwitchMmu>();
 	m_mmu->SetSwitchId(m_id);
+	m_flowTableOpDelayRng = CreateObject<UniformRandomVariable>();
+	for (uint32_t i = 0; i < pCnt; i++)
+		m_egressPipeFreeNs[i] = 0;
 	for (uint32_t i = 0; i < pCnt; i++)
 		for (uint32_t j = 0; j < pCnt; j++)
 			for (uint32_t k = 0; k < qCnt; k++)
@@ -238,6 +241,16 @@ void SwitchNode::SetFlowTableInactiveThresholdNs(uint64_t ns) {
     if (m_flowTable) {
         m_flowTable->SetInactiveThreshold(ns);
     }
+}
+
+void SwitchNode::SetFlowTableOpDelayNs(uint64_t minNs, uint64_t maxNs) {
+	m_flowTableOpDelayMinNs = minNs;
+	m_flowTableOpDelayMaxNs = maxNs;
+}
+
+void SwitchNode::DeferredSwitchSend(uint32_t idx, uint32_t qIndex, Ptr<Packet> p, CustomHeader ch) {
+	m_devices[idx]->SwitchSend(qIndex, p, ch);
+	DynamicCast<QbbNetDevice>(m_devices[idx])->totalBytesRcvd += p->GetSize(); // counted at actual (deferred) send
 }
 
 void SwitchNode::ConfigureBifrostPort(uint32_t inPort, uint64_t bdpBytes, uint64_t reservedBytesH, Time slot, uint32_t k) {
@@ -458,13 +471,27 @@ void SwitchNode::SendToDev(Ptr<Packet>p, CustomHeader &ch) {
 		// std::cout << "inDev: " << inDev << " outDev: " << idx << " qIndex: " << qIndex << std::endl;
 		// qIndex %= 8;
 			m_bytes[inDev][idx][qIndex] += p->GetSize();
+			bool ranFtOp = false;
 			if (m_flowTableMaintenance && ch.l3Prot == 0x11 && qIndex != 0) {
 				m_flowTable->InsertOrUpdateFlowOnEgress(Ipv4Address(ch.sip), Ipv4Address(ch.dip),
 				                                        ch.udp.sport, ch.udp.dport, idx, qIndex, ch.udp.pg,
 				                                        p->GetSize());
+				ranFtOp = true;
 			}
-			m_devices[idx]->SwitchSend(qIndex, p, ch);
-		DynamicCast<QbbNetDevice>(m_devices[idx])->totalBytesRcvd += p->GetSize(); // Attention: this is the egress port's total received packets. Not the ingress port.
+			if (ranFtOp && m_flowTableOpDelayMaxNs > 0 && idx < pCnt) {
+				uint64_t now = Simulator::Now().GetNanoSeconds();
+				uint64_t draw = (m_flowTableOpDelayMinNs >= m_flowTableOpDelayMaxNs)
+					? m_flowTableOpDelayMaxNs
+					: m_flowTableOpDelayRng->GetInteger((uint32_t)m_flowTableOpDelayMinNs,
+					                                    (uint32_t)m_flowTableOpDelayMaxNs);
+				uint64_t tSend = std::max(now + draw, m_egressPipeFreeNs[idx]); // per-port FIFO clamp
+				m_egressPipeFreeNs[idx] = tSend;
+				Simulator::Schedule(NanoSeconds(tSend - now),
+				                    &SwitchNode::DeferredSwitchSend, this, idx, qIndex, p, ch);
+			} else {
+				m_devices[idx]->SwitchSend(qIndex, p, ch);
+				DynamicCast<QbbNetDevice>(m_devices[idx])->totalBytesRcvd += p->GetSize(); // egress port's total received bytes, counted at actual send
+			}
 	} else
 		std::cout << "outdev not found! Dropped. This should not happen. Debugging required!" << std::endl;
 	return; // Drop
