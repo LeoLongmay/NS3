@@ -22,3 +22,9 @@ def test_parse_flow_table_real_fixture_has_node_74():
     stats = ao.parse_flow_table(FIX / "real-lpcc-64" / "flow_table.txt")
     assert 74 in stats
     assert stats[74].flow_count > 0
+
+
+def test_parse_fct_returns_fct_ns_column():
+    recs = ao.parse_fct(FIX / "fct_small.txt")
+    assert [r.fct_ns for r in recs] == [5230000, 17890000, 123190000]
+    assert recs[0].size_bytes == 1000000

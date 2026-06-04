@@ -19,6 +19,13 @@ class PeakStats:
     flow_count: int = 0
 
 
+@dataclass
+class FlowRecord:
+    size_bytes: int
+    start_ns: int
+    fct_ns: int
+
+
 def parse_flow_table(path):
     """Stream a flow_table.txt and return {switch_id: PeakStats} (peak over time)."""
     stats = {}
@@ -43,3 +50,21 @@ def parse_flow_table(path):
             s.ft_bytes = max(s.ft_bytes, ft)
             s.flow_count = max(s.flow_count, fc)
     return stats
+
+
+def parse_fct(path):
+    """Stream fct.txt -> list[FlowRecord]. Columns: src dst sport dport size start_ns fct_ns ..."""
+    out = []
+    p = Path(path)
+    if not p.exists():
+        return out
+    with p.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 7:
+                continue
+            try:
+                out.append(FlowRecord(int(parts[4]), int(parts[5]), int(parts[6])))
+            except ValueError:
+                continue
+    return out
