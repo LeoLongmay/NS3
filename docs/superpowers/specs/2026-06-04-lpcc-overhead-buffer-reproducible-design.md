@@ -78,11 +78,13 @@ Non-goals (explicitly out of scope):
 | Switch口径 | Max over all switches (bottleneck), matching `plot-overhead.py`'s `max()`; `--switch-id` to pin one. |
 | Time aggregation | **Peak** over time. |
 | `/4` factor | Report **true byte conversions** (no `/4`); footnote that historical `memory_vs_flows.pdf` applied an undocumented `/4`. |
-| Buffer table output | New file `overhead-buffer.md`. |
+| Buffer table output | **Appended below the existing table inside `overhead.md`** (preserves the original historical data; no separate file). |
 | Binary | optimized (metrics are profile-independent); `BIN` parameterized. |
 | Dump slimming | Set `ENABLE_TRACE 0` in per-run config to avoid multi-GB `mix.tr`. |
 | N list | Default `64,256,1024,4096,16384` (16384 **included**); `--counts` configurable; warn for large N. |
-| Goodput口径 | **Bottleneck-link monitor point** (reuse burst throughput monitor, e.g. `--monitorSwitchId=72`), to match the historical ~100G-ceiling semantics. |
+| Goodput口径 | **Bottleneck-link monitor point at node 74** (the bottleneck switch in this topology; reuse burst throughput monitor `--monitorSwitchId=74`), matching the historical ~100G-ceiling semantics. |
+| Maintenance table output | Reproduced Goodput/P99 table written to a **separate `overhead-maint.md`** so the original `overhead.md` historical numbers are preserved for side-by-side comparison. |
+| RNG seed | **Fixed** (confirmed required): pin `RngSeed`/`RngRun` so buffer-occupancy peaks are reproducible. |
 | Reproducibility caveat | Historical `overhead.md` numbers' exact recipe is unrecoverable; the new tool uses explicit definitions — same magnitude/trend expected, **not bit-identical**. |
 
 ## 4. Architecture
@@ -99,9 +101,12 @@ script-ab-maintenance.sh   (EDIT) parameterize BIN, extend N to 16384,
 `analyze-overhead.py` has two table modes sharing the same parsers:
 
 ```
-analyze-overhead.py --table buffer      --alg lpcc --root dump_burst_overhead    --out overhead-buffer.md
-analyze-overhead.py --table maintenance --root dump_burst_overhead_ab            --out overhead.md
+analyze-overhead.py --table buffer      --alg lpcc --root dump_burst_overhead    --out overhead.md --append
+analyze-overhead.py --table maintenance --root dump_burst_overhead_ab            --out overhead-maint.md
 ```
+
+`--append` (buffer mode) appends the new table below the existing content of
+`overhead.md` instead of overwriting, preserving the original historical table.
 
 ## 5. Phase 1 — `analyze-overhead.py` skeleton
 
@@ -128,8 +133,8 @@ Parser units (single responsibility, unit-testable on tiny fixtures):
    - Streams `fct.txt`; column index 6 is `fct_ns`, column 4 is size, column 5 is
      start. Used by maintenance mode (P99) and as a fallback.
 3. `parse_monitor_throughput(path) -> goodput_gbps`
-   - Reads the burst throughput-monitor output for the monitored switch/port and
-     reduces it to a single goodput number. **Exact field + reduction (steady-state
+   - Reads the burst throughput-monitor output for the monitored switch **node 74**
+     and reduces it to a single goodput number. **Exact field + reduction (steady-state
      mean vs peak) to be pinned during implementation** against the real monitor
      output (`PrintResults` / `MONITOR_TARGET` rows).
 4. `reduce_*` + `render_markdown(rows, counts) -> str`
@@ -164,7 +169,8 @@ Cross-cutting rules:
 
 Intent: rows 1–2 = data-plane buffer pressure; rows 3–4 = control-plane flow-table
 footprint (and how negligible it is vs the 128 MB pool); row 5 = context / alignment
-sanity. Output file: `examples/PowerTCP/overhead-buffer.md`, with a footnote:
+sanity. Output: **appended below the existing table in `examples/PowerTCP/overhead.md`**
+(via `--append`), preserving the original maintenance table. Footnote:
 
 > Historical `memory_vs_flows.pdf` divided memory by an extra, undocumented factor of
 > 4; values here are true byte conversions (≈4× the old plot). This table is canonical.
@@ -187,18 +193,19 @@ for N in $COUNTS:
         ENABLE_TRACE       -> 0
     timeout $T "$BIN" --conf=$run_dir/config.txt --algorithm=9 --windowCheck=0 ... > run.log 2>&1
 python3 analyze-overhead.py --table buffer --alg lpcc --root dump_burst_overhead \
-        --counts $COUNTS --out overhead-buffer.md
+        --counts $COUNTS --out overhead.md --append
 ```
 
 Properties:
 - **Isolation:** all output under `dump_burst_overhead/` and `sweep_flows/`, both
   `.gitignore`d → no repo pollution.
-- **Determinism:** flow files use `seed=42`. **RNG seed verification:** confirm the
-  simulation fixes `RngSeed`/`RngRun`; if not, set it so buffer-occupancy peaks are
-  reproducible (flow-table memory/flow-count peaks are already determined by the
-  deterministic flow file).
-- **Provenance stamp** prepended to `overhead-buffer.md`: git commit, date, `$COUNTS`,
-  `sha256(config-burst.txt)`, seed.
+- **Determinism (required):** flow files use `seed=42`, **and the simulation's
+  `RngSeed`/`RngRun` is pinned** (confirmed required by user) so buffer-occupancy peaks
+  are reproducible (flow-table memory/flow-count peaks are already determined by the
+  deterministic flow file). If the sim does not currently fix the RNG, the driver sets
+  it (via config knob or `--RngRun` CLI).
+- **Provenance stamp** included with the appended table in `overhead.md`: git commit,
+  date, `$COUNTS`, `sha256(config-burst.txt)`, seed/RngRun.
 - **N list:** default `64,256,1024,4096,16384`; `--counts` override. Print a wall-time
   warning for N > 8192 (16384 × 1 MB ≈ 16 GB of traffic under incast contention is a
   heavy run, though `flow_table.txt` itself stays small).
@@ -207,19 +214,21 @@ Properties:
 
 Extend `analyze-overhead.py` with `--table maintenance`: reads
 `dump_burst_overhead_ab/{on,off}/<N>/` and emits the Goodput / P99 table (rows =
-metric × Maint On/Off, columns = N).
+metric × Maint On/Off, columns = N) into a **separate `overhead-maint.md`** — the
+original `overhead.md` historical table is left intact for side-by-side comparison.
 
 | Metric | Source | Definition |
 |--------|--------|-----------|
 | P99 FCT (ms) | `fct.txt` col idx 6 (`fct_ns`) | `percentile(fcts, 99) / 1e6` (matches old `plot-overhead.py`). |
-| Goodput (Gbps) | burst throughput monitor | Bottleneck-link monitored throughput at `--monitorSwitchId` (reduction pinned in impl). |
+| Goodput (Gbps) | burst throughput monitor | Monitored throughput at **node 74** (the bottleneck switch); reduction pinned in impl. |
 
 Driver edits to `script-ab-maintenance.sh`:
 - Parameterize `BIN` (default optimized).
 - Extend N to include 16384.
-- **Enable the throughput monitor** (pass `--monitorSwitchId` / `--monitorThroughputBps`,
-  e.g. node 72 as in `run_burst.py`) so goodput is measured at the bottleneck link.
-- After the runs, call `analyze-overhead.py --table maintenance`.
+- **Enable the throughput monitor at node 74** (pass `--monitorSwitchId=74` /
+  `--monitorThroughputBps`) so goodput is measured at the bottleneck link.
+- Pin the RNG (same as Phase 3) for reproducibility.
+- After the runs, call `analyze-overhead.py --table maintenance --out overhead-maint.md`.
 
 Honesty caveat (also printed in the table footnote): the historical `overhead.md`
 recipe is unrecoverable; regenerated numbers use the explicit definitions above —
@@ -227,9 +236,10 @@ expected same order of magnitude and trend, **not bit-identical**.
 
 ## 9. Implementation-time verifications (must confirm before claiming done)
 
-1. ns-3 RNG seed is fixed (else set it) — for reproducible buffer-occupancy peaks.
+1. ns-3 RNG seed: locate where (if anywhere) `RngSeed`/`RngRun` is set; the driver
+   must pin it (required) — for reproducible buffer-occupancy peaks.
 2. Exact burst-monitor output field + the goodput reduction (steady-state mean vs
-   peak) against real `PrintResults`/`MONITOR_TARGET` output.
+   peak) for **node 74**, against real `PrintResults`/`MONITOR_TARGET` output.
 3. Confirm the `/4` in `plot-overhead.py:154-155` is indeed unjustified before
    footnoting (optionally fix the plot later — not bound to this design).
 
@@ -243,9 +253,12 @@ expected same order of magnitude and trend, **not bit-identical**.
 
 ## 11. Deliverables
 
-1. `examples/PowerTCP/analyze-overhead.py` (two table modes, stdlib-only).
-2. `examples/PowerTCP/run-overhead-buffer.sh` (LPCC buffer driver → `overhead-buffer.md`).
+1. `examples/PowerTCP/analyze-overhead.py` (two table modes, `--append`, stdlib-only).
+2. `examples/PowerTCP/run-overhead-buffer.sh` (LPCC buffer driver → appends table to
+   `overhead.md`).
 3. Edited `examples/PowerTCP/script-ab-maintenance.sh` (parameterized, N→16384,
-   monitor enabled, calls analyzer → regenerates `overhead.md`).
-4. `examples/PowerTCP/overhead-buffer.md` (the new buffer table).
+   monitor at node 74, RNG pinned, calls analyzer → writes `overhead-maint.md`).
+4. Updated `examples/PowerTCP/overhead.md` (original table preserved + new LPCC buffer
+   table appended below) and new `examples/PowerTCP/overhead-maint.md` (reproduced
+   Goodput/P99 for comparison).
 5. Unit-test fixtures + a short README note on how to reproduce both tables.
