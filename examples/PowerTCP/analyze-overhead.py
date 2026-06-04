@@ -157,3 +157,24 @@ def render_buffer_md(cols, rows_by_n, buffer_mb):
             "_Note: historical `memory_vs_flows.pdf` applied an undocumented /4 to memory; "
             "values here are true byte conversions (≈4× the old plot) and are canonical._")
     return "\n".join(lines) + "\n" + note
+
+
+def _mcell(d, key, fmt="{:.2f}"):
+    if d is None or d.get(key) is None:
+        return "—"
+    return fmt.format(d[key])
+
+
+def render_maintenance_md(cols, data):
+    header = "| Metric | Maint. | " + " | ".join(str(c) for c in cols) + " |"
+    sep = "| " + " | ".join(["---", "---"] + ["---:"] * len(cols)) + " |"
+    lines = [header, sep]
+    spec = [("Goodput (Gbps)", "goodput"), ("P99 FCT (ms)", "p99")]
+    for label, key in spec:
+        for arm, arm_label in (("on", "On"), ("off", "Off")):
+            cells = [_mcell(data.get(arm, {}).get(c), key) for c in cols]
+            lines.append(f"| {label} | {arm_label} | " + " | ".join(cells) + " |")
+    note = ("\n_DCQCN control (maintenance machinery on vs off); goodput = mean bottleneck-link "
+            "throughput at node 74. Historical recipe unrecoverable — magnitudes/trends match, "
+            "not bit-identical._")
+    return "\n".join(lines) + "\n" + note

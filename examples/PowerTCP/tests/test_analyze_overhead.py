@@ -64,3 +64,15 @@ def test_render_markdown_buffer_table():
     assert "| Peak switch buffer (MB)" in md
     assert "—" in md           # missing cell
     assert "| 64 | 256 |" in md.replace("  ", " ") or "64" in md
+
+def test_render_maintenance_md():
+    cols = [64, 256]
+    # data[arm][n] = {"goodput": Gbps, "p99": ms}
+    data = {
+        "on":  {64: {"goodput": 3.64, "p99": 5.23}, 256: {"goodput": 15.29, "p99": 17.89}},
+        "off": {64: {"goodput": 3.64, "p99": 5.12}, 256: {"goodput": 15.78, "p99": 15.63}},
+    }
+    md = ao.render_maintenance_md(cols, data)
+    assert "| Goodput (Gbps) | On" in md
+    assert "| P99 FCT (ms)   | Off".replace("   ", " ") in md.replace("   ", " ")
+    assert "3.64" in md and "17.89" in md
