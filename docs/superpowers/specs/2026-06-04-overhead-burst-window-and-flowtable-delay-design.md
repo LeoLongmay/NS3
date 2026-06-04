@@ -33,6 +33,7 @@ Two follow-up changes to the existing overhead study:
 | Reproducibility | `UniformRandomVariable` seeded by the global RNG; runs pin `--RngRun=1`. |
 | Maintenance rerun | `script-ab-maintenance.sh` with the new workload, `COUNTS=64,256,1024,4096`; `on` arm sets maintenance=1 + delay 20/50, `off` arm sets maintenance=0. |
 | 4096 caveat | 4 GB over the 100 G/~10 ms-RTT DCI link can't drain in 0.35 s; 4096 may still time out → mark unreliable if so. |
+| Log slimming (Design D) | `run.log` (stdout) is the multi-GB culprit (95 `std::cout` sites + a per-`delay` per-port throughput monitor under heavy congestion); the data files (`flow_table.txt` etc.) are ~1 MB. Buffer sweep discards stdout; maintenance sweep filters stdout to only the lines the analyzer needs. |
 
 ## 3. Design A — buffer-table workload change (driver only, no C++)
 
@@ -51,6 +52,9 @@ Edit `examples/PowerTCP/run-overhead-buffer.sh`:
    the buffer table reads **peak-over-time** from `flow_table.txt`; peak concurrency/buffer
    is reached shortly after the 0.12–0.13 s burst, long before sim end, so a late timeout on
    a huge N still yields valid peaks. (`flow_table.txt` is written every 100 µs throughout.)
+5. **Discard stdout** (Design D) — redirect the binary's stdout to `/dev/null` (keep a small
+   stderr log); the buffer table reads only `flow_table.txt`, so the multi-GB `run.log` is
+   unnecessary. Essential for N=16384.
 
 No analyzer change: it already renders whatever `--counts` it is given, max-over-switches,
 peak-over-time, missing→`—`.
@@ -128,12 +132,44 @@ Edit `examples/PowerTCP/script-ab-maintenance.sh`:
   - `on` arm: `FLOW_TABLE_MAINTENANCE 1`, `FLOW_TABLE_OP_DELAY_MIN_NS 20`, `FLOW_TABLE_OP_DELAY_MAX_NS 50`.
   - `off` arm: `FLOW_TABLE_MAINTENANCE 0` (delay keys 0/0 or absent — no ops, no delay).
 - Keep `--RngRun=1`, monitor node 74, `ENABLE_TRACE 0`, provenance stamp.
+- **Filter stdout** to keep `run.log` small (Design D): pipe the binary's output through
+  `grep` so only the analyzer-relevant lines survive.
 - After the runs, regenerate `overhead-maint.md` (provenance comment + analyzer `--append`).
 
 Expected outcome: `on` now carries an extra 20–50 ns per-packet pipeline delay that `off`
 does not, so Goodput/P99 should differ (no longer bit-identical). At low N the difference
 is tiny; it should grow with load. If 4096 times out (4 GB can't drain the DCI link in
 0.35 s), annotate that column as unreliable and/or exclude it (as before).
+
+## 5.5. Design D — log slimming (disk)
+
+`run.log` (the binary's stdout/stderr) is what ballooned the dump dirs to ~16 GB: 95
+`std::cout` sites plus a per-`delay` (`delay = 1.5·minRtt`) per-port throughput monitor,
+amplified under heavy 4096-incast congestion → multi-GB per run. The actual data files
+(`flow_table.txt` ≈ 1 MB, `fct.txt`/`pfc.txt`/`qlen.txt` small) are tiny. With N=16384 and
+SIM 0.35 s, an unfiltered `run.log` could reach 10–30 GB/run (>100 GB across the sweep). No
+`.cc` change — fix entirely in the drivers:
+
+**Buffer sweep (`run-overhead-buffer.sh`):** the buffer table reads only `flow_table.txt`, so
+`run.log` is unused. Discard stdout, keep a tiny stderr log for diagnosis:
+```bash
+timeout "$PER_RUN_TIMEOUT" "$BIN" --conf=... --algorithm=9 ... --RngRun=1 \
+    > /dev/null 2> "$run_dir/run.err" || echo "    (run timed out or failed)"
+```
+
+**Maintenance sweep (`script-ab-maintenance.sh`):** goodput parsing needs only the
+`MONITOR_TARGET` and `ToR … PortAgg -1 throughput …` lines. Filter stdout so `run.log` keeps
+just those (GBs → a few MB). Use a filter that never fails the pipe and preserves the
+binary's exit status:
+```bash
+set -o pipefail   # near the top of the script
+timeout "$PER_RUN_TIMEOUT" "$BIN" --conf=... ... --RngRun=1 2>&1 \
+    | grep -E --line-buffered 'MONITOR_TARGET|PortAgg -1 throughput' > "$run_dir/run.log" \
+    || echo "    (run timed out or failed)"
+```
+Note: `grep` exits 1 when it matches nothing, which with `pipefail` would look like failure;
+that is acceptable here (the `|| echo` branch just prints a note and the loop continues). The
+analyzer already tolerates a `run.log` with no matches (goodput → `None` → `—`).
 
 ## 6. Implementation-time verifications
 
@@ -164,12 +200,16 @@ is tiny; it should grow with load. If 4096 times out (4 GB can't drain the DCI l
   produces a buffer table; flow start times in the generated flow file span [0.12, 0.13].
 - **No-reorder check:** on the delay-on smoke, confirm no intra-port reordering was introduced
   (the FIFO clamp holds) — spot-check via run completing without RoCE order errors.
+- **Log-slimming check (Design D):** after a buffer smoke run, confirm no `run.log` is written
+  (stdout went to `/dev/null`) and the run dir is ~MB (just `flow_table.txt` etc.); after a
+  maintenance smoke run, confirm `run.log` is a few MB and contains only `MONITOR_TARGET` /
+  `PortAgg -1 throughput` lines, and that goodput still parses.
 
 ## 9. Deliverables
 
 1. Edited `src/point-to-point/model/switch-node.{h,cc}` (delay knobs + injection + helper).
 2. Edited `examples/PowerTCP/powertcp-evaluation-burst.cc` (parse + apply new config keys).
-3. Edited `examples/PowerTCP/run-overhead-buffer.sh` (burst window, 0.35 s, N→16384, timeout).
-4. Edited `examples/PowerTCP/script-ab-maintenance.sh` (new workload + per-arm delay keys).
+3. Edited `examples/PowerTCP/run-overhead-buffer.sh` (burst window, 0.35 s, N→16384, timeout, stdout→/dev/null per Design D).
+4. Edited `examples/PowerTCP/script-ab-maintenance.sh` (new workload + per-arm delay keys + stdout grep-filter per Design D).
 5. Regenerated `overhead.md` (buffer table, 5 columns) and `overhead-maint.md` (On/Off now
    differing). 4096/16384 annotated if timeout-truncated.
