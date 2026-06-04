@@ -13,18 +13,19 @@ OUT_ROOT="$NS3/examples/PowerTCP/dump_burst_overhead"
 FLOW_DIR="$NS3/examples/PowerTCP/sweep_flows"
 BIN="${BIN:-$NS3/build/examples/PowerTCP/ns3.39-powertcp-evaluation-burst-optimized}"
 OUT_MD="$NS3/examples/PowerTCP/overhead.md"
+PER_RUN_TIMEOUT="${PER_RUN_TIMEOUT:-10800}"
 
 [ -x "$BIN" ] || { echo "[*] building binary"; (cd "$NS3" && CXXFLAGS=-w ./ns3 build examples/PowerTCP/powertcp-evaluation-burst); }
 
 mkdir -p "$OUT_ROOT" "$FLOW_DIR"
-python3 "$SCRIPT_DIR/gen-sweep-flows.py" --out_dir "$FLOW_DIR" --sizes "$COUNTS" --bytes 1000000
+python3 "$SCRIPT_DIR/gen-sweep-flows.py" --out_dir "$FLOW_DIR" --sizes "$COUNTS" --bytes 1000000 \
+    --start_time 0.12 --rand_start_window 0.01
 
 cd "$NS3"
 IFS=',' read -ra NLIST <<< "$COUNTS"
 for N in "${NLIST[@]}"; do
-    if   (( N <= 1024 )); then SIM_STOP=0.20
-    elif (( N <= 4096 )); then SIM_STOP=0.25
-    else                       SIM_STOP=0.50; echo "[warn] N=$N is heavy (large dump / long wall-clock)"; fi
+    SIM_STOP=0.35
+    (( N > 4096 )) && echo "[warn] N=$N is heavy (long wall-clock; peaks still captured early)"
     run_dir="$OUT_ROOT/lpcc/$N"; mkdir -p "$run_dir"; run_conf="$run_dir/config.txt"
     awk -v flow="$FLOW_DIR/flow-burstExp-$N.txt" -v fct="$run_dir/fct.txt" \
         -v pfc="$run_dir/pfc.txt" -v ftmon="$run_dir/flow_table.txt" \
@@ -40,10 +41,10 @@ for N in "${NLIST[@]}"; do
     grep -q "^FLOW_TABLE_MON_FILE " "$run_conf" || { echo "FLOW_TABLE_MON_FILE $run_dir/flow_table.txt" >> "$run_conf"; echo "FLOW_TABLE_MON_INTERVAL_NS 100000" >> "$run_conf"; }
 
     echo "[*] LPCC N=$N SIM_STOP=$SIM_STOP -> $run_dir"
-    timeout 7200 "$BIN" --conf="$run_conf" --algorithm=9 --transportMode=0 \
+    timeout "$PER_RUN_TIMEOUT" "$BIN" --conf="$run_conf" --algorithm=9 --transportMode=0 \
         --flowControlMode=0 --wien=false --delayWien=false --windowCheck=0 \
         --monitorSwitchId=74 --monitorThroughputBps=100000000000 --RngRun=1 \
-        > "$run_dir/run.log" 2>&1 || echo "    (run timed out or failed)"
+        > /dev/null 2> "$run_dir/run.err" || echo "    (run timed out or failed)"
     echo "    ft lines=$(wc -l < "$run_dir/flow_table.txt" 2>/dev/null || echo 0)"
 done
 
