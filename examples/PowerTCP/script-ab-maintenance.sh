@@ -5,6 +5,7 @@
 #   off: FLOW_TABLE_MAINTENANCE 0  -> Insert/Clean compiled out at runtime
 # Same workload, same CC, same SIM_STOP. Diff = forwarding cost of maintenance.
 set -e
+set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/config.sh"
 
@@ -15,20 +16,18 @@ BIN="${BIN:-$NS3/build/examples/PowerTCP/ns3.39-powertcp-evaluation-burst-optimi
 [ -x "$BIN" ] || (cd "$NS3" && CXXFLAGS=-w ./ns3 build examples/PowerTCP/powertcp-evaluation-burst)
 PER_RUN_TIMEOUT=3600
 
-COUNTS="${COUNTS:-64,256,1024,4096,16384}"
+COUNTS="${COUNTS:-64,256,1024,4096}"
 IFS=',' read -ra NLIST <<< "$COUNTS"
 
 cd "$NS3"
 
-python3 "$SCRIPT_DIR/gen-sweep-flows.py" --out_dir "$FLOW_DIR" --sizes "$COUNTS" --bytes 1000000
+python3 "$SCRIPT_DIR/gen-sweep-flows.py" --out_dir "$FLOW_DIR" --sizes "$COUNTS" --bytes 1000000 \
+    --start_time 0.12 --rand_start_window 0.01
 
 alg=dcqcn; cc=1; fc=0; tp=0; window=0; wien=false; delay=false
 
 for N in "${NLIST[@]}"; do
-    if   (( N <= 1024 )); then SIM_STOP=0.20
-    elif (( N <= 4096 )); then SIM_STOP=0.25
-    else                       SIM_STOP=0.50
-    fi
+    SIM_STOP=0.35
     for maint in on off; do
         run_dir="$OUT_ROOT/${maint}/$N"
         mkdir -p "$run_dir"
@@ -53,6 +52,9 @@ for N in "${NLIST[@]}"; do
         ' "$CONFIG_TEMPLATE" > "$run_conf"
         # Append maintenance flag if missing in template.
         grep -q "^FLOW_TABLE_MAINTENANCE " "$run_conf" || echo "FLOW_TABLE_MAINTENANCE $maint_val" >> "$run_conf"
+        if [[ "$maint" == "on" ]]; then dmin=20; dmax=50; else dmin=0; dmax=0; fi
+        echo "FLOW_TABLE_OP_DELAY_MIN_NS $dmin" >> "$run_conf"
+        echo "FLOW_TABLE_OP_DELAY_MAX_NS $dmax" >> "$run_conf"
 
         echo "[*] alg=$alg N=$N maint=$maint SIM_STOP=$SIM_STOP -> $run_dir"
         START=$(date +%s)
@@ -60,8 +62,9 @@ for N in "${NLIST[@]}"; do
             --conf="$run_conf" --algorithm="$cc" --transportMode="$tp" \
             --flowControlMode="$fc" --wien="$wien" --delayWien="$delay" \
             --windowCheck="$window" \
-            --monitorSwitchId=74 --monitorThroughputBps=100000000000 --RngRun=1 \
-            > "$run_dir/run.log" 2>&1 || echo "    (run failed/timeout)"
+            --monitorSwitchId=74 --monitorThroughputBps=100000000000 --RngRun=1 2>&1 \
+            | grep -E --line-buffered 'MONITOR_TARGET|PortAgg -1 throughput' > "$run_dir/run.log" \
+            || echo "    (run failed/timeout or no monitor lines)"
         END=$(date +%s)
         echo "    elapsed=$((END - START))s, fct=$(wc -l < "$run_dir/fct.txt" 2>/dev/null), ft=$(wc -l < "$run_dir/flow_table.txt" 2>/dev/null)"
     done
