@@ -105,6 +105,8 @@ uint64_t flow_table_mon_interval_ns = 100000;
 uint64_t flow_table_inactive_threshold_ns = 50000; // per-switch flow-table inactivity threshold
 uint64_t flow_table_clean_interval_ns = 50000;     // per-switch flow-table eviction sweep period
 int flow_table_maintenance = 1;                    // 0 disables Insert*/Clean* (A/B no-op test)
+uint64_t flow_table_op_delay_min_ns = 0; // per-packet flow-table-op datapath delay (0/0 = disabled)
+uint64_t flow_table_op_delay_max_ns = 0;
 FILE* g_flow_table_output = nullptr;
 
 unordered_map<uint64_t, uint32_t> rate2kmax, rate2kmin;
@@ -949,6 +951,12 @@ int main(int argc, char *argv[])
 		} else if (key.compare("FLOW_TABLE_MAINTENANCE") == 0) {
 			conf >> flow_table_maintenance;
 			std::cout << "FLOW_TABLE_MAINTENANCE\t\t\t\t" << flow_table_maintenance << '\n';
+		} else if (key.compare("FLOW_TABLE_OP_DELAY_MIN_NS") == 0) {
+			conf >> flow_table_op_delay_min_ns;
+			std::cout << "FLOW_TABLE_OP_DELAY_MIN_NS\t\t\t\t" << flow_table_op_delay_min_ns << '\n';
+		} else if (key.compare("FLOW_TABLE_OP_DELAY_MAX_NS") == 0) {
+			conf >> flow_table_op_delay_max_ns;
+			std::cout << "FLOW_TABLE_OP_DELAY_MAX_NS\t\t\t\t" << flow_table_op_delay_max_ns << '\n';
 		} else if (key.compare("MULTI_RATE") == 0) {
 			int v;
 			conf >> v;
@@ -1265,6 +1273,7 @@ int main(int argc, char *argv[])
 			sw->SetFlowTableInactiveThresholdNs(flow_table_inactive_threshold_ns);
 			sw->SetFlowTableCleanIntervalNs(flow_table_clean_interval_ns);
 			sw->SetFlowTableMaintenance(flow_table_maintenance != 0);
+			sw->SetFlowTableOpDelayNs(flow_table_op_delay_min_ns, flow_table_op_delay_max_ns);
 			// uint32_t shift = 3; // by default 1/8
 			double alpha = 1.0 / 8;
 				sw->m_mmu->SetAlphaIngress(alpha);
