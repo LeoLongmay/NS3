@@ -178,3 +178,70 @@ def render_maintenance_md(cols, data):
             "throughput at node 74. Historical recipe unrecoverable — magnitudes/trends match, "
             "not bit-identical._")
     return "\n".join(lines) + "\n" + note
+
+
+def _run_dir(root, alg, n, arm=None):
+    base = Path(root)
+    return (base / arm / str(n)) if arm else (base / alg / str(n))
+
+
+def build_buffer_table(root, alg, counts, buffer_mb, switch_id):
+    rows, missing = {}, []
+    for n in counts:
+        stats = parse_flow_table(_run_dir(root, alg, n) / "flow_table.txt")
+        row = buffer_metrics(stats, buffer_mb, switch_id)
+        rows[n] = row
+        if row is None:
+            missing.append(n)
+    return render_buffer_md(counts, rows, buffer_mb), missing
+
+
+def build_maintenance_table(root, counts):
+    data = {"on": {}, "off": {}}
+    missing = []
+    for arm in ("on", "off"):
+        for n in counts:
+            rd = _run_dir(root, None, n, arm=arm)
+            fcts = [r.fct_ns for r in parse_fct(rd / "fct.txt")]
+            good = parse_monitor_goodput(rd / "run.log")
+            p99 = p99_ms(fcts)
+            if not fcts and good is None:
+                missing.append((arm, n)); data[arm][n] = None
+            else:
+                data[arm][n] = {"goodput": good, "p99": p99}
+    return render_maintenance_md(counts, data), missing
+
+
+def main():
+    ap = argparse.ArgumentParser(description="LPCC overhead / buffer analysis")
+    ap.add_argument("--table", choices=["buffer", "maintenance"], required=True)
+    ap.add_argument("--root", required=True)
+    ap.add_argument("--alg", default="lpcc")
+    ap.add_argument("--counts", default="64,256,1024,4096,16384")
+    ap.add_argument("--buffer-mb", type=int, default=128)
+    ap.add_argument("--switch-id", type=int, default=None)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--append", action="store_true")
+    args = ap.parse_args()
+    counts = [int(x) for x in args.counts.split(",") if x.strip()]
+
+    if args.table == "buffer":
+        md, missing = build_buffer_table(args.root, args.alg, counts, args.buffer_mb, args.switch_id)
+        title = "\n\n## LPCC switch-buffer & flow-table memory vs concurrent flows\n\n"
+    else:
+        md, missing = build_maintenance_table(args.root, counts)
+        title = "## Flow-table maintenance overhead (DCQCN control)\n\n"
+
+    block = title + md + "\n"
+    out = Path(args.out)
+    if args.append and out.exists():
+        out.write_text(out.read_text().rstrip() + "\n" + block)
+    else:
+        out.write_text(block)
+    print(block)
+    if missing:
+        print(f"[warn] missing/empty runs (rendered as —): {missing}")
+
+
+if __name__ == "__main__":
+    main()

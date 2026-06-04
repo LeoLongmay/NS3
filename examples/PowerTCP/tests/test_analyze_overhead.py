@@ -76,3 +76,24 @@ def test_render_maintenance_md():
     assert "| Goodput (Gbps) | On" in md
     assert "| P99 FCT (ms)   | Off".replace("   ", " ") in md.replace("   ", " ")
     assert "3.64" in md and "17.89" in md
+
+
+import subprocess, sys, os
+
+def test_cli_buffer_mode_append(tmp_path):
+    # Build a fake root: <root>/lpcc/64/flow_table.txt
+    root = tmp_path / "root"
+    d = root / "lpcc" / "64"; d.mkdir(parents=True)
+    (d / "flow_table.txt").write_text(
+        "rdma: 1000 74 1048576 8192 64 64\nrdma: 2000 74 2097152 16384 64 64\n")
+    out = tmp_path / "overhead.md"
+    out.write_text("# existing\n\n| old | table |\n")
+    script = Path(__file__).resolve().parents[1] / "analyze-overhead.py"
+    r = subprocess.run([sys.executable, str(script), "--table", "buffer", "--alg", "lpcc",
+                        "--root", str(root), "--counts", "64", "--buffer-mb", "128",
+                        "--out", str(out), "--append"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    text = out.read_text()
+    assert "old | table" in text          # original preserved
+    assert "Peak switch buffer (MB)" in text
+    assert "2.00" in text                  # 2 MiB peak buffer
