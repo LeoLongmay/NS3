@@ -95,3 +95,65 @@ def parse_monitor_goodput(path):
     if not samples:
         return None
     return sum(samples) / len(samples) / 1e9
+
+
+def p99_ms(fct_ns_values):
+    if not fct_ns_values:
+        return None
+    xs = sorted(fct_ns_values)
+    # nearest-rank-ish linear interpolation, matching numpy.percentile default
+    k = 0.99 * (len(xs) - 1)
+    lo = int(k); hi = min(lo + 1, len(xs) - 1)
+    frac = k - lo
+    return (xs[lo] + (xs[hi] - xs[lo]) * frac) / 1e6
+
+
+def buffer_metrics(stats, buffer_mb, switch_id=None):
+    if not stats:
+        return None
+    if switch_id is not None:
+        chosen = {switch_id: stats[switch_id]} if switch_id in stats else {}
+        if not chosen:
+            return None
+    else:
+        chosen = stats
+    peak_buf = max(s.buf_bytes for s in chosen.values())
+    peak_ft = max(s.ft_bytes for s in chosen.values())
+    peak_flows = max(s.flow_count for s in chosen.values())
+    cap_bytes = buffer_mb * 1024 * 1024
+    return {
+        "peak_buf_mb": peak_buf / 1024 / 1024,
+        "buf_util_pct": peak_buf / cap_bytes * 100,
+        "peak_ft_kb": peak_ft / 1024,
+        "ft_cap_pct": peak_ft / cap_bytes * 100,
+        "peak_flows": peak_flows,
+    }
+
+
+_BUF_ROWS = [
+    ("Peak switch buffer (MB)", "peak_buf_mb", "{:.2f}"),
+    ("Buffer utilization (%)", "buf_util_pct", "{:.2f}"),
+    ("Peak flow-table mem (KB)", "peak_ft_kb", "{:.2f}"),
+    ("FT mem / buffer cap (%)", "ft_cap_pct", "{:.4f}"),
+    ("Peak concurrent flows", "peak_flows", "{:d}"),
+]
+
+
+def _cell(row, key, fmt):
+    if row is None or row.get(key) is None:
+        return "—"
+    val = row[key]
+    return fmt.format(int(val)) if fmt.endswith("d}") else fmt.format(val)
+
+
+def render_buffer_md(cols, rows_by_n, buffer_mb):
+    header = "| Metric | " + " | ".join(str(c) for c in cols) + " |"
+    sep = "| " + " | ".join(["---"] + ["---:"] * len(cols)) + " |"
+    lines = [header, sep]
+    for label, key, fmt in _BUF_ROWS:
+        cells = [_cell(rows_by_n.get(c), key, fmt) for c in cols]
+        lines.append("| " + label + " | " + " | ".join(cells) + " |")
+    note = (f"\n_LPCC only; peak over time, max over switches; buffer cap = {buffer_mb} MB._\n"
+            "_Note: historical `memory_vs_flows.pdf` applied an undocumented /4 to memory; "
+            "values here are true byte conversions (≈4× the old plot) and are canonical._")
+    return "\n".join(lines) + "\n" + note

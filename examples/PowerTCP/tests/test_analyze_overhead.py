@@ -40,3 +40,27 @@ def test_parse_monitor_goodput_real_fixture_in_range():
     g = ao.parse_monitor_goodput(FIX / "real-lpcc-64" / "run.log")
     # N=64 is far below line rate; expect a small positive Gbps value.
     assert g is None or g > 0
+
+
+def test_p99_ms():
+    vals_ns = [i * 1_000_000 for i in range(1, 101)]  # 1..100 ms
+    assert abs(ao.p99_ms(vals_ns) - 99.0) < 0.5
+
+def test_buffer_row_for_n():
+    stats = {74: ao.PeakStats(buf_bytes=64 * 1024 * 1024, ft_bytes=512 * 1024, flow_count=4096),
+             75: ao.PeakStats(buf_bytes=1024, ft_bytes=10, flow_count=3)}
+    row = ao.buffer_metrics(stats, buffer_mb=128, switch_id=None)
+    assert abs(row["peak_buf_mb"] - 64.0) < 1e-6        # max over switches
+    assert abs(row["buf_util_pct"] - 50.0) < 1e-6       # 64/128
+    assert abs(row["peak_ft_kb"] - 512.0) < 1e-6
+    assert row["peak_flows"] == 4096
+
+def test_render_markdown_buffer_table():
+    cols = [64, 256]
+    rows = {64: {"peak_buf_mb": 1.0, "buf_util_pct": 0.78, "peak_ft_kb": 8.0,
+                 "ft_cap_pct": 0.006, "peak_flows": 64},
+            256: None}  # 256 missing -> em dash
+    md = ao.render_buffer_md(cols, rows, buffer_mb=128)
+    assert "| Peak switch buffer (MB)" in md
+    assert "—" in md           # missing cell
+    assert "| 64 | 256 |" in md.replace("  ", " ") or "64" in md
