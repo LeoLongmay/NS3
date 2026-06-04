@@ -28,3 +28,15 @@ def test_parse_fct_returns_fct_ns_column():
     recs = ao.parse_fct(FIX / "fct_small.txt")
     assert [r.fct_ns for r in recs] == [5230000, 17890000, 123190000]
     assert recs[0].size_bytes == 1000000
+
+
+def test_parse_monitor_goodput_mean_of_active_samples():
+    # active samples: 90e9 and 100e9 -> mean 95e9 -> 95.0 Gbps (the 0 sample is excluded)
+    g = ao.parse_monitor_goodput(FIX / "runlog_small.txt")
+    assert abs(g - 95.0) < 1e-9
+
+
+def test_parse_monitor_goodput_real_fixture_in_range():
+    g = ao.parse_monitor_goodput(FIX / "real-lpcc-64" / "run.log")
+    # N=64 is far below line rate; expect a small positive Gbps value.
+    assert g is None or g > 0

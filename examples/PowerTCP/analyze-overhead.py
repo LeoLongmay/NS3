@@ -8,6 +8,7 @@ Two table modes:
 Standard library only; never slurps large dumps (streams line by line).
 """
 import argparse
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -68,3 +69,29 @@ def parse_fct(path):
             except ValueError:
                 continue
     return out
+
+
+_AGG_RE = re.compile(r"^ToR\s+\d+\s+PortAgg\s+-1\s+throughput\s+([0-9.eE+]+)\b")
+
+
+def parse_monitor_goodput(path):
+    """Mean of the monitored bottleneck-link throughput (bps) over active samples,
+    returned in Gbps. 'Active' = throughput > 0 (excludes pre-traffic warmup)."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    samples = []
+    with p.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            m = _AGG_RE.match(line)
+            if not m:
+                continue
+            try:
+                v = float(m.group(1))
+            except ValueError:
+                continue
+            if v > 0:
+                samples.append(v)
+    if not samples:
+        return None
+    return sum(samples) / len(samples) / 1e9

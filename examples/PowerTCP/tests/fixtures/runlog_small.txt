@@ -1,0 +1,3 @@
+ToR 10 PortAgg -1 throughput 0 txBytes 0 qlen 0 time 0.10 normpower 0
+ToR 10 PortAgg -1 throughput 90000000000 txBytes 0 qlen 100 time 0.15 normpower 1
+ToR 10 PortAgg -1 throughput 100000000000 txBytes 0 qlen 200 time 0.16 normpower 1
