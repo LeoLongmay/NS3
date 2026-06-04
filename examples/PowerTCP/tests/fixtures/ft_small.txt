@@ -1,0 +1,5 @@
+rdma: 1000 74 500 100 5 5
+rdma: 1000 75 200 40 2 2
+rdma: 2000 74 1500 300 12 12
+rdma: 2000 75 800 90 7 7
+rdma_counter: 74 insert=12 insert_egress=12 clean=3 topk=4
