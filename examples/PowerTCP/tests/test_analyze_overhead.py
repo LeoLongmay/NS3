@@ -38,8 +38,8 @@ def test_parse_monitor_goodput_mean_of_active_samples():
 
 def test_parse_monitor_goodput_real_fixture_in_range():
     g = ao.parse_monitor_goodput(FIX / "real-lpcc-64" / "run.log")
-    # N=64 is far below line rate; expect a small positive Gbps value.
-    assert g is None or g > 0
+    # N=64 is far below line rate; expect a positive sub-line-rate Gbps value.
+    assert g is not None and 0 < g < 100
 
 
 def test_p99_ms():

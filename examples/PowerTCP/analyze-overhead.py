@@ -22,6 +22,8 @@ class PeakStats:
 
 @dataclass
 class FlowRecord:
+    # size_bytes/start_ns retained for future per-flow latency slicing;
+    # current analysis paths only consume fct_ns.
     size_bytes: int
     start_ns: int
     fct_ns: int
@@ -227,7 +229,7 @@ def main():
 
     if args.table == "buffer":
         md, missing = build_buffer_table(args.root, args.alg, counts, args.buffer_mb, args.switch_id)
-        title = "\n\n## LPCC switch-buffer & flow-table memory vs concurrent flows\n\n"
+        title = "## LPCC switch-buffer & flow-table memory vs concurrent flows\n\n"
     else:
         md, missing = build_maintenance_table(args.root, counts)
         title = "## Flow-table maintenance overhead (DCQCN control)\n\n"
@@ -235,7 +237,7 @@ def main():
     block = title + md + "\n"
     out = Path(args.out)
     if args.append and out.exists():
-        out.write_text(out.read_text().rstrip() + "\n" + block)
+        out.write_text(out.read_text().rstrip() + "\n\n" + block)
     else:
         out.write_text(block)
     print(block)
