@@ -11,16 +11,23 @@ source "$SCRIPT_DIR/config.sh"
 CONFIG_TEMPLATE="$NS3/examples/PowerTCP/config-burst.txt"
 OUT_ROOT="$NS3/examples/PowerTCP/dump_burst_overhead_ab"
 FLOW_DIR="$NS3/examples/PowerTCP/sweep_flows_ab"
-BIN="$NS3/build/examples/PowerTCP/ns3.39-powertcp-evaluation-burst-debug"
+BIN="${BIN:-$NS3/build/examples/PowerTCP/ns3.39-powertcp-evaluation-burst-optimized}"
+[ -x "$BIN" ] || (cd "$NS3" && CXXFLAGS=-w ./ns3 build examples/PowerTCP/powertcp-evaluation-burst)
 PER_RUN_TIMEOUT=3600
+
+COUNTS="${COUNTS:-64,256,1024,4096,16384}"
+IFS=',' read -ra NLIST <<< "$COUNTS"
 
 cd "$NS3"
 
+python3 "$SCRIPT_DIR/gen-sweep-flows.py" --out_dir "$FLOW_DIR" --sizes "$COUNTS" --bytes 1000000
+
 alg=dcqcn; cc=1; fc=0; tp=0; window=0; wien=false; delay=false
 
-for N in 64 256 1024 4096; do
+for N in "${NLIST[@]}"; do
     if   (( N <= 1024 )); then SIM_STOP=0.20
-    else                       SIM_STOP=0.25
+    elif (( N <= 4096 )); then SIM_STOP=0.25
+    else                       SIM_STOP=0.50
     fi
     for maint in on off; do
         run_dir="$OUT_ROOT/${maint}/$N"
@@ -41,6 +48,7 @@ for N in 64 256 1024 4096; do
             $1 == "QLEN_MON_FILE"       { print "QLEN_MON_FILE " qlen; next }
             $1 == "SIMULATOR_STOP_TIME" { print "SIMULATOR_STOP_TIME " stop; next }
             $1 == "FLOW_TABLE_MAINTENANCE" { print "FLOW_TABLE_MAINTENANCE " maint_val; next }
+            $1 == "ENABLE_TRACE"        { print "ENABLE_TRACE 0"; next }
             { print }
         ' "$CONFIG_TEMPLATE" > "$run_conf"
         # Append maintenance flag if missing in template.
@@ -51,9 +59,15 @@ for N in 64 256 1024 4096; do
         timeout "$PER_RUN_TIMEOUT" "$BIN" \
             --conf="$run_conf" --algorithm="$cc" --transportMode="$tp" \
             --flowControlMode="$fc" --wien="$wien" --delayWien="$delay" \
-            --windowCheck="$window" > "$run_dir/run.log" 2>&1 || echo "    (run failed/timeout)"
+            --windowCheck="$window" \
+            --monitorSwitchId=74 --monitorThroughputBps=100000000000 --RngRun=1 \
+            > "$run_dir/run.log" 2>&1 || echo "    (run failed/timeout)"
         END=$(date +%s)
         echo "    elapsed=$((END - START))s, fct=$(wc -l < $run_dir/fct.txt 2>/dev/null), ft=$(wc -l < $run_dir/flow_table.txt 2>/dev/null)"
     done
 done
+python3 "$SCRIPT_DIR/analyze-overhead.py" --table maintenance \
+    --root "$OUT_ROOT" --counts "$COUNTS" \
+    --out "$NS3/examples/PowerTCP/overhead-maint.md"
+echo "## wrote $NS3/examples/PowerTCP/overhead-maint.md ##"
 echo "## A/B MAINTENANCE TEST FINISHED ##"
