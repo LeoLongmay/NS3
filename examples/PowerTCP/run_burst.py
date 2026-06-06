@@ -59,22 +59,25 @@ def parse_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 def parse_burst_results(dump_file: Path, output_file: Path) -> None:
-    """Extract monitored ToR/Port lines from a raw burst dump file."""
-    text = dump_file.read_text(encoding="utf-8", errors="replace")
-    lines = text.splitlines()
+    """Extract monitored ToR/Port lines from a raw burst dump file.
 
-    # Find MONITOR_TARGET line to determine ToR index and port.
+    Streams the dump line-by-line; burst dumps can be multiple GB, so the file
+    must never be slurped into memory all at once.
+    """
+    # Pass 1: find the MONITOR_TARGET line (printed near the top) to determine
+    # the ToR index and port. Stop as soon as it is found.
     monitor_tor = None
     monitor_port = None
-    for line in lines:
-        if line.startswith("MONITOR_TARGET"):
-            parts = line.split()
-            for i, tok in enumerate(parts):
-                if tok == "ToRIdx" and i + 1 < len(parts):
-                    monitor_tor = parts[i + 1]
-                elif tok == "MonitorPort" and i + 1 < len(parts):
-                    monitor_port = parts[i + 1]
-            break
+    with dump_file.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if line.startswith("MONITOR_TARGET"):
+                parts = line.split()
+                for i, tok in enumerate(parts):
+                    if tok == "ToRIdx" and i + 1 < len(parts):
+                        monitor_tor = parts[i + 1]
+                    elif tok == "MonitorPort" and i + 1 < len(parts):
+                        monitor_port = parts[i + 1]
+                break
 
     # Build grep pattern.
     if monitor_tor and monitor_tor != "-1" and (not monitor_port or monitor_port == "-1"):
@@ -85,10 +88,16 @@ def parse_burst_results(dump_file: Path, output_file: Path) -> None:
         print(f"  [warn] MONITOR_TARGET not found in {dump_file.name}, fallback ToR 0 Port 0")
         prefix = "ToR 0 Port 0 "
 
-    matched = [l for l in lines if l.startswith(prefix)]
+    # Pass 2: stream matches straight to the output file.
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text("\n".join(matched) + ("\n" if matched else ""), encoding="utf-8")
-    print(f"  [parse] {len(matched)} lines → {output_file}")
+    count = 0
+    with dump_file.open("r", encoding="utf-8", errors="replace") as fin, \
+            output_file.open("w", encoding="utf-8") as fout:
+        for line in fin:
+            if line.startswith(prefix):
+                fout.write(line if line.endswith("\n") else line + "\n")
+                count += 1
+    print(f"  [parse] {count} lines → {output_file}")
 
 
 # ---------------------------------------------------------------------------

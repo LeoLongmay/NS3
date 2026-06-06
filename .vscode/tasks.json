@@ -5,9 +5,9 @@
       "label": "NS3: build",
       "type": "shell",
       "command": "bash",
-      "args": ["-c", "cd /home/master01/CC_Exp && ./ns3 build"],
+      "args": ["-c", "cd /home/leo/CC_Exp && ./ns3 build"],
       "options": {
-        "cwd": "/home/master01/CC_Exp"
+        "cwd": "/home/leo/CC_Exp"
       },
       "problemMatcher": [
         "$gcc"

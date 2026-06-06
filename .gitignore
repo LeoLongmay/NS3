@@ -41,8 +41,22 @@ examples/PowerTCP/results_*/
 examples/PowerTCP/sweep_*/
 *.log
 
+# overhead 结果表 (实测/预估混合, 不纳入版本追踪)
+examples/PowerTCP/overhead.md
+examples/PowerTCP/overhead-maint.md
+
 # LPCC sensitivity-analysis 中间数据 (保留 run-sensitivity*.sh 脚本与 plots/, 只挡 .burst 数据与临时绘图 CWD)
 examples/PowerTCP/sensitivity-analysis/data/
 examples/PowerTCP/sensitivity-analysis/*/data/
 examples/PowerTCP/sensitivity-analysis/.plotwork/
 examples/PowerTCP/sensitivity-analysis/*/.plotwork/
+examples/PowerTCP/flowtable-mem-vs-flows.pdf
+examples/PowerTCP/flowtable-mem-vs-flows.png
+examples/PowerTCP/ATC_2026.pdf
+examples/PowerTCP/ATC_2026.pdf:Zone.Identifier
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/c_cpp_properties.json
+.vscode/launch.json
